@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "Chabaqa",
+    "slug": "mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/brandmark_chabaqa.png",
+    "scheme": "chabaqa",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/brandmark_chabaqa.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.mariembenali.chabaqa",
+      "allowBackup": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+       [
+    "expo-splash-screen",
+    {
+      "image": "./assets/images/brandmark_chabaqa.png",
+      "imageWidth": 200,
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    }
+  ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "4f1e72f1-1ef0-4a42-9dfc-027e057539e3"
+      }
+    }
+    
+  }
+}

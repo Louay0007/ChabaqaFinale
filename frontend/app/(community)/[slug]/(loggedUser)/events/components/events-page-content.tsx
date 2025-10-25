@@ -1,0 +1,32 @@
+"use client";
+
+import { useState } from "react";
+import { Event } from "@/lib/models";
+import EventsHeader from "@/app/(community)/[slug]/(loggedUser)/events/components/events-header";
+import EventsTabs from "@/app/(community)/[slug]/(loggedUser)/events/components/events-tabs";
+
+interface EventsPageContentProps {
+  availableEvents: Event[];
+  myTickets: any[];
+}
+
+export default function EventsPageContent({ 
+  availableEvents, 
+  myTickets 
+}: EventsPageContentProps) {
+  const [activeTab, setActiveTab] = useState("available");
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        <EventsHeader availableEvents={availableEvents} myTickets={myTickets} />
+        <EventsTabs
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          availableEvents={availableEvents}
+          myTickets={myTickets}
+        />
+      </div>
+    </div>
+  );
+}

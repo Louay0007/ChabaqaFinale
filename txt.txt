@@ -1,0 +1,2 @@
+  "email": "jane.creator@example.com",
+  "password": "SecurePassword123!",
