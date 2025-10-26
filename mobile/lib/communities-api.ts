@@ -172,10 +172,17 @@ export const getCommunities = async (
     const queryString = params.toString();
     console.log('📡 [COMMUNITIES-API] Query string:', queryString);
 
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
     const resp = await tryEndpoints<CommunitiesResponse>(
       `/api/community-aff-crea-join/all-communities${queryString ? `?${queryString}` : ''}`,
       {
         method: 'GET',
+        headers,
         timeout: 30000,
       }
     );

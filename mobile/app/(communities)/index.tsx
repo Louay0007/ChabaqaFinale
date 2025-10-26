@@ -85,9 +85,9 @@ export default function CommunitiesScreen() {
 
       const result = await getCommunities(filters);
 
-      // Backend returns data as Community[] directly
-      const communitiesData = result.data;
-      
+      // Backend returns {success, message, data}
+      const communitiesData = result.data || [];
+
       console.log('✅ [COMMUNITIES] Loaded successfully:', {
         count: communitiesData.length,
         total: result.pagination?.total || communitiesData.length,

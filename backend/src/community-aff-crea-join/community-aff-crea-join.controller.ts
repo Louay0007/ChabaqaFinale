@@ -1,29 +1,29 @@
-import { 
-  Controller, 
-  Post, 
-  Get, 
-  Body, 
-  UseGuards, 
-  Request, 
-  Param, 
-  HttpCode, 
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
+  Request,
+  Param,
+  HttpCode,
   HttpStatus,
   ValidationPipe,
-  UsePipes, 
+  UsePipes,
   UseInterceptors,
   UploadedFile
 } from '@nestjs/common';
-import { 
-  ApiTags, 
-  ApiOperation, 
-  ApiResponse, 
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
   ApiBearerAuth,
   ApiBody,
-  ApiParam, 
+  ApiParam,
   ApiConsumes,
   ApiQuery
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CommunityAffCreaJoinService } from './community-aff-crea-join.service';
 import { CreateCommunityDto } from '../dto-community/create-community.dto';
 import { JoinCommunityDto, JoinByInviteDto, GenerateInviteDto } from '../dto-community/join-community.dto';
@@ -33,8 +33,6 @@ import { FileType, UploadService } from 'src/upload/upload.service';
 
 @ApiTags('Community Management')
 @Controller('community-aff-crea-join')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
 export class CommunityAffCreaJoinController {
   constructor(
     private readonly communityService: CommunityAffCreaJoinService,
@@ -47,6 +45,7 @@ export class CommunityAffCreaJoinController {
  * Authentification: JWT obligatoire
  */
 @Post('create')
+@UseGuards(JwtAuthGuard)
 @HttpCode(HttpStatus.CREATED)
 @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
 @UseInterceptors(FileInterceptor('logo'))
@@ -301,71 +300,67 @@ async createCommunity(
   }
 
   /**
-   * Obtenir toutes les communautés
-   * Route: GET /community-aff-crea-join/all-communities
-   * Authentification: JWT obligatoire
-   */
-  @Get('all-communities')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Obtenir toutes les communautés',
-    description: 'Récupère toutes les communautés actives avec leurs informations complètes'
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Liste des communautés récupérée avec succès',
-    schema: {
-      example: {
-        success: true,
-        message: 'Communautés récupérées avec succès',
-        data: [
-          {
-            _id: '507f1f77bcf86cd799439011',
-            name: 'Développeurs JavaScript',
-            logo: 'https://example.com/logo.png',
-            photo_de_couverture: 'https://example.com/cover.jpg',
-            short_description: 'Une communauté pour partager des connaissances sur JavaScript',
-            createur: {
-              _id: '507f1f77bcf86cd799439012',
-              name: 'John Doe',
-              email: 'john@example.com'
-            },
-            members: [
-              {
-                _id: '507f1f77bcf86cd799439012',
-                name: 'John Doe',
-                email: 'john@example.com'
-              }
-            ],
-            admins: [
-              {
-                _id: '507f1f77bcf86cd799439012',
-                name: 'John Doe',
-                email: 'john@example.com'
-              }
-            ],
-            rank: 1,
-            fees_of_join: 0,
-            isPrivate: false,
-            isActive: true,
-            isVerified: false,
-            membersCount: 1,
-            createdAt: '2023-12-01T00:00:00.000Z',
-            updatedAt: '2023-12-01T00:00:00.000Z'
-          }
-        ]
-      }
-    }
-  })
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Token JWT manquant ou invalide'
-  })
-  @ApiResponse({
-    status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Erreur interne du serveur'
-  })
-  async getAllCommunities(@Request() req?: any) {
+    * Obtenir toutes les communautés
+    * Route: GET /community-aff-crea-join/all-communities
+    * Authentification: Optionnelle (public)
+    */
+   @Get('all-communities')
+   @HttpCode(HttpStatus.OK)
+   @ApiOperation({
+     summary: 'Obtenir toutes les communautés',
+     description: 'Récupère toutes les communautés actives avec leurs informations complètes'
+   })
+   @ApiResponse({
+     status: HttpStatus.OK,
+     description: 'Liste des communautés récupérée avec succès',
+     schema: {
+       example: {
+         success: true,
+         message: 'Communautés récupérées avec succès',
+         data: [
+           {
+             _id: '507f1f77bcf86cd799439011',
+             name: 'Développeurs JavaScript',
+             logo: 'https://example.com/logo.png',
+             photo_de_couverture: 'https://example.com/cover.jpg',
+             short_description: 'Une communauté pour partager des connaissances sur JavaScript',
+             createur: {
+               _id: '507f1f77bcf86cd799439012',
+               name: 'John Doe',
+               email: 'john@example.com'
+             },
+             members: [
+               {
+                 _id: '507f1f77bcf86cd799439012',
+                 name: 'John Doe',
+                 email: 'john@example.com'
+               }
+             ],
+             admins: [
+               {
+                 _id: '507f1f77bcf86cd799439012',
+                 name: 'John Doe',
+                 email: 'john@example.com'
+               }
+             ],
+             rank: 1,
+             fees_of_join: 0,
+             isPrivate: false,
+             isActive: true,
+             isVerified: false,
+             membersCount: 1,
+             createdAt: '2023-12-01T00:00:00.000Z',
+             updatedAt: '2023-12-01T00:00:00.000Z'
+           }
+         ]
+       }
+     }
+   })
+   @ApiResponse({
+     status: HttpStatus.INTERNAL_SERVER_ERROR,
+     description: 'Erreur interne du serveur'
+   })
+   async getAllCommunities(@Request() req?: any) {
     try {
       const communities = await this.communityService.getAllCommunities();
       
