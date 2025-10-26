@@ -33,6 +33,7 @@ import { InstructorCard } from './_components/InstructorCard';
 import { NotesTab } from './_components/NotesTab';
 import { ProgressCard } from './_components/ProgressCard';
 import { ResourcesTab } from './_components/ResourcesTab';
+import { ReviewsTab } from './_components/ReviewsTab';
 import { TabsNavigation, TabType } from './_components/TabsNavigation';
 import { VideoPlayer } from './_components/VideoPlayer';
 
@@ -250,6 +251,8 @@ export default function CourseDetailsScreen() {
           {activeTab === 'resources' && <ResourcesTab />}
 
           {activeTab === 'discussion' && <DiscussionTab />}
+
+          {activeTab === 'reviews' && <ReviewsTab course={course} />}
 
           {/* Sidebar Cards */}
           <View style={styles.sidebarCards}>

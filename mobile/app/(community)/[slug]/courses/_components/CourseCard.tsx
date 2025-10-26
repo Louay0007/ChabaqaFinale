@@ -1,6 +1,7 @@
 import { BookOpen, CheckCircle, Clock, Star, Users } from 'lucide-react-native';
 import React from 'react';
 import { Image, Text, TouchableOpacity, View } from 'react-native';
+import RatingSummary from '../../../../_components/RatingSummary';
 import { styles } from '../styles';
 
 interface CourseCardProps {
@@ -56,10 +57,12 @@ export const CourseCard: React.FC<CourseCardProps> = ({
           <Text style={styles.courseTitle} numberOfLines={1}>
             {course.title}
           </Text>
-          <View style={styles.ratingContainer}>
-            <Star size={14} color="#f59e0b" />
-            <Text style={styles.ratingText}>4.8</Text>
-          </View>
+          <RatingSummary
+            relatedModel="Cours"
+            relatedTo={course._id}
+            size="small"
+            showReviewCount={false}
+          />
         </View>
 
         <Text style={styles.courseDescription} numberOfLines={2}>

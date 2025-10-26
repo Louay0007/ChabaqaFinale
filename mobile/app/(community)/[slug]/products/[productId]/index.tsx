@@ -16,6 +16,7 @@ import { LicenseTab } from './_components/LicenseTab';
 import { OverviewTab } from './_components/OverviewTab';
 import { ProductHeader } from './_components/ProductHeader';
 import { ProductTabs } from './_components/ProductTabs';
+import { ReviewsTab } from './_components/ReviewsTab';
 
 export default function ProductDetailScreen() {
   const { slug, productId } = useLocalSearchParams<{ slug: string; productId: string }>();
@@ -95,7 +96,8 @@ export default function ProductDetailScreen() {
     { key: 'overview', title: 'Overview' },
     { key: 'files', title: 'Files' },
     { key: 'license', title: 'License' },
-    { key: 'community', title: 'Community' }
+    { key: 'community', title: 'Community' },
+    { key: 'reviews', title: 'Reviews' }
   ];
 
   const handleDownload = (fileId: string) => {
@@ -148,6 +150,8 @@ export default function ProductDetailScreen() {
             onReplyToComment={handleReplyToComment}
           />
         );
+      case 'reviews':
+        return <ReviewsTab product={transformedProduct} />;
       default:
         return <OverviewTab product={transformedProduct} />;
     }

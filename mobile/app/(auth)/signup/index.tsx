@@ -1,6 +1,7 @@
 import AdaptiveBackground from '@/_components/AdaptiveBackground';
 import AdaptiveStatusBar from '@/_components/AdaptiveStatusBar';
 import { signupAction } from '@/lib/auth-api';
+import { authenticateWithGoogle } from '@/lib/google-auth';
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -80,8 +81,32 @@ export default function SignUpScreen() {
     }
   };
 
-  const handleGoogleSignup = () => {
-    Alert.alert('Google Signup', 'Fonctionnalité Google Signup à implémenter');
+  const handleGoogleSignup = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      
+      console.log('🔐 [SIGNUP] Starting Google Sign-Up');
+      
+      const result = await authenticateWithGoogle();
+      
+      if (result.success && result.user) {
+        console.log('✅ [SIGNUP] Google Sign-Up successful');
+        
+        // Navigate to communities (main app)
+        router.replace('/(communities)');
+        
+      } else {
+        console.log('❌ [SIGNUP] Google Sign-Up failed:', result.error);
+        setError(result.error || 'Google Sign-Up failed');
+      }
+      
+    } catch (error: any) {
+      console.error('💥 [SIGNUP] Google Sign-Up error:', error);
+      setError('An error occurred during Google Sign-Up');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

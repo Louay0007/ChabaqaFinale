@@ -16,6 +16,9 @@ export async function forgotPasswordAction(data: { email: string }): Promise<For
         method: 'POST',
         data: { email: data.email },
         timeout: 30000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
       }
     );
 
@@ -27,20 +30,33 @@ export async function forgotPasswordAction(data: { email: string }): Promise<For
       console.log('✅ Demande de reset envoyée avec succès');
       return { 
         success: true, 
-        message: result.message 
+        message: result.message || 'Code de vérification envoyé par email'
+      };
+    } else if (resp.status >= 500) {
+      // Server error - likely email configuration issue
+      console.log('🚨 Erreur serveur (email):', result.error);
+      return { 
+        success: false, 
+        error: 'Service email temporairement indisponible. Contactez le support si le problème persiste.'
       };
     } else {
       console.log('❌ Erreur dans la réponse:', result.error);
       return { 
         success: false, 
-        error: result.error || "Une erreur s'est produite" 
+        error: result.error || result.message || "Une erreur s'est produite" 
       };
     }
   } catch (error: any) {
     console.error('💥 Erreur de connexion:', error);
+    const isNetworkError = error?.message?.includes('Network') || 
+                           error?.message?.includes('timeout') || 
+                           error?.message?.includes('ECONNREFUSED');
+    
     return { 
       success: false, 
-      error: "Erreur de connexion. Veuillez réessayer." 
+      error: isNetworkError 
+        ? "Impossible de joindre le serveur. Vérifiez votre connexion." 
+        : "Erreur de connexion. Veuillez réessayer."
     };
   }
 }

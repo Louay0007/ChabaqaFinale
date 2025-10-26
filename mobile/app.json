@@ -28,15 +28,16 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-       [
-    "expo-splash-screen",
-    {
-      "image": "./assets/images/brandmark_chabaqa.png",
-      "imageWidth": 200,
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
-    }
-  ]
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/brandmark_chabaqa.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
@@ -49,6 +50,5 @@
         "projectId": "4f1e72f1-1ef0-4a42-9dfc-027e057539e3"
       }
     }
-    
   }
 }

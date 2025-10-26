@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { styles } from '../../styles';
 
-export type TabType = 'content' | 'notes' | 'resources' | 'discussion';
+export type TabType = 'content' | 'notes' | 'resources' | 'discussion' | 'reviews';
 
 interface TabsNavigationProps {
   activeTab: TabType;
@@ -66,6 +66,19 @@ export const TabsNavigation: React.FC<TabsNavigationProps> = ({
             ]}
           >
             Discussion
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'reviews' && styles.activeTab]}
+          onPress={() => onTabChange('reviews')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'reviews' && styles.activeTabText,
+            ]}
+          >
+            Reviews
           </Text>
         </TouchableOpacity>
       </ScrollView>

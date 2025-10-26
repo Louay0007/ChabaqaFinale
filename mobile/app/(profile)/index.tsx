@@ -14,6 +14,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedText } from '@/_components/ThemedText';
+import { ThemedView } from '@/_components/ThemedView';
+import GlobalBottomNavigation from '../_components/GlobalBottomNavigation';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuth } from '@/hooks/use-auth';
@@ -506,6 +509,9 @@ export default function ProfileScreen() {
         isVisible={sidebarVisible}
         onClose={() => setSidebarVisible(false)}
       />
+
+      {/* Global Bottom Navigation */}
+      <GlobalBottomNavigation />
     </SafeAreaView>
   );
 }

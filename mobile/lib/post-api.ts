@@ -18,71 +18,67 @@ import { getAccessToken } from './auth';
  * Post author information
  */
 export interface PostAuthor {
-  _id: string;
+  id: string;
   name: string;
   email: string;
-  avatar?: string;
-  role?: string;
+  profile_picture?: string;
 }
 
 /**
  * Post comment
  */
 export interface PostComment {
-  _id: string;
+  id: string;
   content: string;
-  author: PostAuthor;
-  created_at: string;
-  updated_at: string;
-  likes_count?: number;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
- * Post attachment
+ * Community reference
  */
-export interface PostAttachment {
-  type: 'image' | 'video' | 'document' | 'link';
-  url: string;
-  thumbnail?: string;
-  name?: string;
-  size?: number;
+export interface PostCommunity {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 /**
- * Main post interface
+ * Main post interface (aligned with backend DTOs)
  */
 export interface Post {
-  _id: string;
+  id: string;
+  title: string;
   content: string;
+  excerpt?: string;
+  thumbnail?: string;
+  communityId: string;
+  community: PostCommunity;
+  authorId: string;
   author: PostAuthor;
-  community_id?: {
-    _id: string;
-    name: string;
-    slug: string;
-  };
-  attachments?: PostAttachment[];
-  tags?: string[];
-  likes_count: number;
-  comments_count: number;
-  bookmarks_count?: number;
-  is_pinned?: boolean;
-  is_edited?: boolean;
-  created_at: string;
-  updated_at: string;
-  // User interaction flags
-  is_liked?: boolean;
-  is_bookmarked?: boolean;
+  isPublished: boolean;
+  likes: number;
+  isLikedByUser: boolean;
+  comments: PostComment[];
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
- * API response for post list
+ * API response for post list (aligned with backend)
  */
 export interface PostListResponse {
   posts: Post[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 /**
@@ -98,33 +94,36 @@ export interface PostFilters {
 }
 
 /**
- * Create post data
+ * Create post data (aligned with backend DTO)
  */
 export interface CreatePostData {
+  title: string;
   content: string;
-  community_id: string;
-  attachments?: PostAttachment[];
+  excerpt?: string;
+  thumbnail?: string;
+  communityId: string;
   tags?: string[];
 }
 
 /**
- * Update post data
+ * Update post data (aligned with backend DTO)
  */
 export interface UpdatePostData {
+  title?: string;
   content?: string;
-  attachments?: PostAttachment[];
+  excerpt?: string;
+  thumbnail?: string;
   tags?: string[];
 }
 
 /**
- * Post statistics
+ * Post statistics (aligned with backend DTO)
  */
 export interface PostStats {
-  likes_count: number;
-  comments_count: number;
-  bookmarks_count: number;
-  is_liked: boolean;
-  is_bookmarked: boolean;
+  postId: string;
+  totalLikes: number;
+  totalComments: number;
+  isLikedByUser: boolean;
 }
 
 // ============================================================================
@@ -161,10 +160,12 @@ export async function getPosts(filters: PostFilters = {}): Promise<PostListRespo
       console.log('✅ [POST-API] Posts fetched successfully:', resp.data.data?.posts?.length || 0);
       return {
         posts: resp.data.data?.posts || [],
-        total: resp.data.data?.total || 0,
-        page: resp.data.data?.page || 1,
-        limit: resp.data.data?.limit || 10,
-        totalPages: resp.data.data?.totalPages || 1,
+        pagination: {
+          page: resp.data.data?.pagination?.page || 1,
+          limit: resp.data.data?.pagination?.limit || 10,
+          total: resp.data.data?.pagination?.total || 0,
+          totalPages: resp.data.data?.pagination?.totalPages || 1,
+        }
       };
     }
 
@@ -235,10 +236,12 @@ export async function getPostsByCommunity(
       console.log('✅ [POST-API] Community posts fetched:', resp.data.data?.posts?.length || 0);
       return {
         posts: resp.data.data?.posts || [],
-        total: resp.data.data?.total || 0,
-        page: resp.data.data?.page || 1,
-        limit: resp.data.data?.limit || 10,
-        totalPages: resp.data.data?.totalPages || 1,
+        pagination: {
+          page: resp.data.data?.pagination?.page || 1,
+          limit: resp.data.data?.pagination?.limit || 10,
+          total: resp.data.data?.pagination?.total || 0,
+          totalPages: resp.data.data?.pagination?.totalPages || 1,
+        }
       };
     }
 
@@ -277,10 +280,12 @@ export async function getPostsByUser(
       console.log('✅ [POST-API] User posts fetched:', resp.data.data?.posts?.length || 0);
       return {
         posts: resp.data.data?.posts || [],
-        total: resp.data.data?.total || 0,
-        page: resp.data.data?.page || 1,
-        limit: resp.data.data?.limit || 10,
-        totalPages: resp.data.data?.totalPages || 1,
+        pagination: {
+          page: resp.data.data?.pagination?.page || 1,
+          limit: resp.data.data?.pagination?.limit || 10,
+          total: resp.data.data?.pagination?.total || 0,
+          totalPages: resp.data.data?.pagination?.totalPages || 1,
+        }
       };
     }
 
@@ -572,6 +577,52 @@ export async function deleteComment(
 }
 
 /**
+ * Update a comment
+ * 
+ * @param postId - Post ID
+ * @param commentId - Comment ID
+ * @param content - Updated comment content
+ * @returns Promise with updated comment
+ */
+export async function updateComment(
+  postId: string,
+  commentId: string,
+  content: string
+): Promise<PostComment> {
+  try {
+    const token = await getAccessToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    console.log('✏️ [POST-API] Updating comment:', commentId);
+
+    const resp = await tryEndpoints<any>(
+      `/api/posts/${postId}/comments/${commentId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        data: { content },
+        timeout: 30000,
+      }
+    );
+
+    if (resp.status >= 200 && resp.status < 300) {
+      console.log('✅ [POST-API] Comment updated');
+      return resp.data.data;
+    }
+
+    throw new Error(resp.data.message || 'Failed to update comment');
+  } catch (error: any) {
+    console.error('💥 [POST-API] Error updating comment:', error);
+    throw new Error(error.message || 'Failed to update comment');
+  }
+}
+
+/**
  * Bookmark a post
  * 
  * @param postId - Post ID
@@ -662,7 +713,10 @@ export async function getBookmarkedPosts(
   try {
     const token = await getAccessToken();
     if (!token) {
-      return { posts: [], total: 0, page: 1, limit: 10, totalPages: 0 };
+      return { 
+        posts: [], 
+        pagination: { page: 1, limit: 10, total: 0, totalPages: 0 }
+      };
     }
 
     console.log('🔖 [POST-API] Fetching bookmarked posts');
@@ -682,18 +736,96 @@ export async function getBookmarkedPosts(
       console.log('✅ [POST-API] Bookmarked posts fetched:', resp.data.data?.posts?.length || 0);
       return {
         posts: resp.data.data?.posts || [],
-        total: resp.data.data?.total || 0,
-        page: resp.data.data?.page || 1,
-        limit: resp.data.data?.limit || 10,
-        totalPages: resp.data.data?.totalPages || 1,
+        pagination: {
+          page: resp.data.data?.pagination?.page || 1,
+          limit: resp.data.data?.pagination?.limit || 10,
+          total: resp.data.data?.pagination?.total || 0,
+          totalPages: resp.data.data?.pagination?.totalPages || 1,
+        }
       };
     }
 
-    return { posts: [], total: 0, page: 1, limit: 10, totalPages: 0 };
+    return { 
+      posts: [], 
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 0 }
+    };
   } catch (error: any) {
     console.error('💥 [POST-API] Error fetching bookmarked posts:', error);
-    return { posts: [], total: 0, page: 1, limit: 10, totalPages: 0 };
+    return { 
+      posts: [], 
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 0 }
+    };
   }
+}
+
+/**
+ * Get post statistics
+ * 
+ * @param postId - Post ID
+ * @param userId - Optional user ID to check interactions
+ * @returns Promise with post statistics
+ */
+export async function getPostStats(postId: string, userId?: string): Promise<PostStats> {
+  try {
+    console.log('📊 [POST-API] Fetching post stats:', postId);
+
+    const params = new URLSearchParams();
+    if (userId) params.append('userId', userId);
+
+    const resp = await tryEndpoints<any>(
+      `/api/posts/${postId}/stats?${params.toString()}`,
+      {
+        method: 'GET',
+        timeout: 30000,
+      }
+    );
+
+    if (resp.status >= 200 && resp.status < 300) {
+      console.log('✅ [POST-API] Post stats fetched');
+      return resp.data.data;
+    }
+
+    throw new Error(resp.data.message || 'Failed to fetch post stats');
+  } catch (error: any) {
+    console.error('💥 [POST-API] Error fetching post stats:', error);
+    throw new Error(error.message || 'Failed to fetch post stats');
+  }
+}
+
+/**
+ * Convert API post to UI-compatible format
+ * 
+ * @param apiPost - Post from API
+ * @returns Converted post for UI components
+ */
+export function convertPostForUI(apiPost: any): Post {
+  return {
+    id: apiPost.id,
+    title: apiPost.title,
+    content: apiPost.content,
+    excerpt: apiPost.excerpt,
+    thumbnail: apiPost.thumbnail,
+    communityId: apiPost.communityId,
+    community: {
+      id: apiPost.community?.id || apiPost.communityId,
+      name: apiPost.community?.name || 'Unknown Community',
+      slug: apiPost.community?.slug || 'unknown',
+    },
+    authorId: apiPost.authorId,
+    author: {
+      id: apiPost.author?.id || apiPost.authorId,
+      name: apiPost.author?.name || 'Unknown Author',
+      email: apiPost.author?.email || '',
+      profile_picture: apiPost.author?.profile_picture,
+    },
+    isPublished: apiPost.isPublished ?? true,
+    likes: apiPost.likes || 0,
+    isLikedByUser: apiPost.isLikedByUser || false,
+    comments: apiPost.comments || [],
+    tags: apiPost.tags || [],
+    createdAt: apiPost.createdAt,
+    updatedAt: apiPost.updatedAt,
+  };
 }
 
 /**

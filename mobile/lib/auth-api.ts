@@ -21,6 +21,12 @@ export interface SignupResult {
   user?: User;
 }
 
+export interface GoogleSignInResult {
+  success: boolean;
+  error?: string;
+  user?: User;
+}
+
 // Note: signupAction now uses the robust API client with automatic fallback
 
 /**
@@ -171,6 +177,59 @@ export const signupAction = async (data: {
       ? "Impossible de joindre le serveur"
       : 'Erreur de connexion';
     console.error('💥 [AUTH-API] Exception lors de l\'inscription:', error);
+    return { success: false, error: msg };
+  }
+};
+
+/**
+ * Action de connexion avec Google
+ * 
+ * @param idToken - Google ID token obtenu depuis Expo Google Auth
+ * @returns GoogleSignInResult avec success, user ou error
+ */
+export const googleSignInAction = async (idToken: string): Promise<GoogleSignInResult> => {
+  try {
+    console.log('🔐 [AUTH-API] Tentative de connexion Google');
+    
+    const resp = await tryEndpoints<any>(
+      '/api/auth/google/mobile',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        data: { idToken },
+        timeout: 30000,
+      }
+    );
+
+    if (resp.status >= 200 && resp.status < 300) {
+      const { access_token, refresh_token, user } = resp.data;
+      
+      console.log('✅ [AUTH-API] Connexion Google réussie:', user.email);
+      
+      // Stocker les tokens et les informations utilisateur
+      await storeTokens(access_token, refresh_token);
+      await storeUser(user);
+      
+      return {
+        success: true,
+        user: user
+      };
+    }
+
+    const payload = resp.data;
+    const backendMessage = payload?.message || 'Échec de l\'authentification Google';
+    console.log('❌ [AUTH-API] Échec de connexion Google:', backendMessage);
+    return { success: false, error: backendMessage };
+    
+  } catch (error: any) {
+    const msg = error?.message?.includes('timeout')
+      ? "Le serveur ne répond pas (délai dépassé)"
+      : error?.message?.includes('Network')
+      ? "Impossible de joindre le serveur"
+      : 'Erreur de connexion Google';
+    console.error('💥 [AUTH-API] Exception lors de la connexion Google:', error);
     return { success: false, error: msg };
   }
 };

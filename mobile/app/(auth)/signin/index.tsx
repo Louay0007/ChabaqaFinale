@@ -3,6 +3,7 @@ import AdaptiveStatusBar from '@/_components/AdaptiveStatusBar';
 import { useAuth } from '@/hooks/use-auth';
 import { useAdaptiveColors } from '@/hooks/useAdaptiveColors';
 import { loginAction, verifyTwoFactorAction } from '@/lib/auth-api';
+import { authenticateWithGoogle } from '@/lib/google-auth';
 import { BlurView } from 'expo-blur';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -183,8 +184,39 @@ export default function SignInScreen() {
     setPassword('');
   };
 
-  const handleGoogleLogin = () => {
-    Alert.alert('Google Login', 'Fonctionnalité Google Login à implémenter');
+  const handleGoogleLogin = async () => {
+    try {
+      setIsSubmitting(true);
+      setError('');
+      
+      console.log('🔐 [SIGNIN] Starting Google Sign-In');
+      
+      const result = await authenticateWithGoogle();
+      
+      if (result.success && result.user) {
+        console.log('✅ [SIGNIN] Google Sign-In successful');
+        
+        // Refetch user data to update auth state
+        await refetch();
+        
+        // Navigate based on redirect parameter or default to communities
+        if (redirectTo) {
+          router.replace(redirectTo as any);
+        } else {
+          router.replace('/(communities)');
+        }
+        
+      } else {
+        console.log('❌ [SIGNIN] Google Sign-In failed:', result.error);
+        setError(result.error || 'Google Sign-In failed');
+      }
+      
+    } catch (error: any) {
+      console.error('💥 [SIGNIN] Google Sign-In error:', error);
+      setError('An error occurred during Google Sign-In');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // ===== MODE TEST STATIQUE =====

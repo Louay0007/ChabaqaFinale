@@ -7,6 +7,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Platform,
   RefreshControl,
   Text,
   TouchableOpacity,
@@ -21,6 +22,7 @@ import { communityStyles } from './_styles';
 import CommunityCard from './_components/_ComponentCard';
 import SearchBar from './_components/SearchBar';
 import Sidebar from './_components/Sidebar';
+import GlobalBottomNavigation from '../_components/GlobalBottomNavigation';
 
 export default function CommunitiesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -189,14 +191,19 @@ export default function CommunitiesScreen() {
   };
 
   const renderTopBar = () => (
-    <View style={[communityStyles.topNavBar, { backgroundColor: adaptiveColors.cardBackground, borderBottomColor: adaptiveColors.cardBorder }]}>
+    <View style={[
+      communityStyles.topNavBar, 
+      { 
+        backgroundColor: adaptiveColors.cardBackground, 
+        borderBottomColor: adaptiveColors.cardBorder,
+        paddingTop: Platform.OS === 'ios' ? 44 : 0, // iPhone safe area
+      }
+    ]}>
       {/* Left section - Menu + Logo */}
       <View style={communityStyles.navLeft}>
         <TouchableOpacity 
           style={communityStyles.menuButton}
-          onPress={() => {
-            setSidebarVisible(true);
-          }}
+          onPress={() => setSidebarVisible(true)}
         >
           <Ionicons name="menu" size={24} color={adaptiveColors.primaryText} />
         </TouchableOpacity>
@@ -287,6 +294,9 @@ export default function CommunitiesScreen() {
         isVisible={sidebarVisible}
         onClose={() => setSidebarVisible(false)}
       />
+
+      {/* Global Bottom Navigation */}
+      <GlobalBottomNavigation />
     </SafeAreaView>
   );
 }

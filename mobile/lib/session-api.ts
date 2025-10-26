@@ -23,6 +23,10 @@ export interface SessionCreator {
   email: string;
   avatar?: string;
   title?: string;
+  role?: string;
+  rating?: number;
+  reviews?: number;
+  bio?: string;
 }
 
 /**
@@ -30,16 +34,18 @@ export interface SessionCreator {
  */
 export interface SessionBooking {
   _id: string;
+  id: string;
   user_id: string;
   user_name: string;
   user_email?: string;
   user_avatar?: string;
   booked_at: string;
-  start_time: string;
-  end_time: string;
+  scheduled_at: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
-  meeting_link?: string;
+  meeting_url?: string;
   notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
@@ -47,6 +53,7 @@ export interface SessionBooking {
  */
 export interface Session {
   _id: string;
+  id: string;
   title: string;
   description: string;
   creator: SessionCreator;
@@ -61,9 +68,27 @@ export interface Session {
   currency: string;
   is_active: boolean;
   bookings?: SessionBooking[];
-  available_slots?: string[];
+  bookings_count?: number;
+  bookings_this_week?: number;
+  can_book_more?: boolean;
+  max_bookings_per_week?: number;
+  average_rating?: number;
+  rating_count?: number;
+  resources?: SessionResource[];
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Session resource interface
+ */
+export interface SessionResource {
+  id: string;
+  title: string;
+  type: 'video' | 'article' | 'code' | 'tool' | 'pdf' | 'link';
+  url: string;
+  description: string;
+  order: number;
 }
 
 /**
@@ -102,8 +127,27 @@ export interface SessionFilters {
  * Book session data
  */
 export interface BookSessionData {
+  scheduled_at: string;
+  notes?: string;
+}
+
+/**
+ * Available slot interface
+ */
+export interface AvailableSlot {
+  id: string;
   start_time: string;
   end_time: string;
+  is_available: boolean;
+  booked_by?: string;
+  booked_at?: string;
+}
+
+/**
+ * Book slot data
+ */
+export interface BookSlotData {
+  slot_id: string;
   notes?: string;
 }
 
@@ -563,7 +607,7 @@ export function canCancelBooking(booking: SessionBooking): boolean {
   }
   
   // Can cancel if it's in the future
-  const startTime = new Date(booking.start_time);
+  const startTime = new Date(booking.scheduled_at);
   const now = new Date();
   
   return startTime > now;
@@ -594,4 +638,185 @@ export function formatSessionDateTime(dateString: string): string {
   const formattedTime = date.toLocaleTimeString('en-US', timeOptions);
   
   return `${formattedDate} at ${formattedTime}`;
+}
+
+/**
+ * Get available slots for a session
+ * 
+ * @param sessionId - Session ID
+ * @param startDate - Optional start date filter
+ * @param endDate - Optional end date filter
+ * @returns Promise with available slots
+ */
+export async function getAvailableSlots(
+  sessionId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<AvailableSlot[]> {
+  try {
+    console.log('🕐 [SESSION-API] Fetching available slots for session:', sessionId);
+
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    const resp = await tryEndpoints<any>(
+      `/api/sessions/${sessionId}/available-slots?${params.toString()}`,
+      {
+        method: 'GET',
+        timeout: 30000,
+      }
+    );
+
+    if (resp.status >= 200 && resp.status < 300) {
+      console.log('✅ [SESSION-API] Available slots fetched:', resp.data.slots?.length || 0);
+      return resp.data.slots || [];
+    }
+
+    return [];
+  } catch (error: any) {
+    console.error('💥 [SESSION-API] Error fetching available slots:', error);
+    return [];
+  }
+}
+
+/**
+ * Book a specific time slot
+ * 
+ * @param sessionId - Session ID
+ * @param bookSlotData - Slot booking data
+ * @returns Promise with booked session
+ */
+export async function bookSlot(
+  sessionId: string,
+  bookSlotData: BookSlotData
+): Promise<Session> {
+  try {
+    const token = await getAccessToken();
+    if (!token) {
+      throw new Error('Authentication required. Please login to book slots.');
+    }
+
+    console.log('📝 [SESSION-API] Booking slot for session:', sessionId);
+
+    const resp = await tryEndpoints<any>(
+      `/api/sessions/${sessionId}/book-slot`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        data: bookSlotData,
+        timeout: 30000,
+      }
+    );
+
+    if (resp.status >= 200 && resp.status < 300) {
+      console.log('✅ [SESSION-API] Slot booked successfully');
+      return resp.data;
+    }
+
+    throw new Error(resp.data.message || 'Failed to book slot');
+  } catch (error: any) {
+    console.error('💥 [SESSION-API] Error booking slot:', error);
+    throw new Error(error.message || 'Failed to book slot');
+  }
+}
+
+/**
+ * Cancel a booked slot
+ * 
+ * @param sessionId - Session ID
+ * @param slotId - Slot ID
+ * @returns Promise with updated session
+ */
+export async function cancelSlot(
+  sessionId: string,
+  slotId: string
+): Promise<Session> {
+  try {
+    const token = await getAccessToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    console.log('❌ [SESSION-API] Cancelling slot:', slotId);
+
+    const resp = await tryEndpoints<any>(
+      `/api/sessions/${sessionId}/cancel-slot/${slotId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        timeout: 30000,
+      }
+    );
+
+    if (resp.status >= 200 && resp.status < 300) {
+      console.log('✅ [SESSION-API] Slot cancelled successfully');
+      return resp.data;
+    }
+
+    throw new Error(resp.data.message || 'Failed to cancel slot');
+  } catch (error: any) {
+    console.error('💥 [SESSION-API] Error cancelling slot:', error);
+    throw new Error(error.message || 'Failed to cancel slot');
+  }
+}
+
+/**
+ * Convert API session to component-compatible format
+ * 
+ * @param apiSession - Session from API
+ * @returns Converted session for UI components
+ */
+export function convertSessionForUI(apiSession: Session): any {
+  return {
+    id: apiSession.id || apiSession._id,
+    title: apiSession.title,
+    description: apiSession.description,
+    duration: apiSession.duration,
+    price: apiSession.price,
+    currency: apiSession.currency,
+    category: apiSession.category || 'General',
+    tags: [], // Add tags if available in backend
+    mentor: {
+      id: apiSession.creator._id,
+      name: apiSession.creator.name,
+      avatar: apiSession.creator.avatar,
+      title: apiSession.creator.title || 'Mentor',
+      role: apiSession.creator.role || 'Mentor',
+      rating: apiSession.creator.rating || apiSession.average_rating || 0,
+      reviews: apiSession.creator.reviews || apiSession.rating_count || 0,
+      bio: apiSession.creator.bio || apiSession.description,
+    },
+    isActive: apiSession.is_active,
+    bookingsCount: apiSession.bookings_count || apiSession.bookings?.length || 0,
+    canBookMore: apiSession.can_book_more !== false,
+    resources: apiSession.resources || [],
+    createdAt: apiSession.created_at,
+    updatedAt: apiSession.updated_at,
+  };
+}
+
+/**
+ * Convert API booking to component-compatible format
+ * 
+ * @param apiBooking - Booking from API
+ * @param sessionType - Associated session type
+ * @returns Converted booking for UI components
+ */
+export function convertBookingForUI(apiBooking: SessionBooking, sessionType?: Session): any {
+  return {
+    id: apiBooking.id || apiBooking._id,
+    sessionTypeId: sessionType?.id || sessionType?._id,
+    userId: apiBooking.user_id,
+    scheduledAt: apiBooking.scheduled_at,
+    status: apiBooking.status,
+    meetingUrl: apiBooking.meeting_url,
+    notes: apiBooking.notes,
+    sessionType: sessionType ? convertSessionForUI(sessionType) : undefined,
+  };
 }

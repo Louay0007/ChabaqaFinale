@@ -1,0 +1,26 @@
+import { Stack } from 'expo-router';
+import { useColorScheme } from '@/hooks/useColorScheme';
+
+export default function MessagesLayout() {
+  const colorScheme = useColorScheme();
+
+  return (
+    <Stack>
+      <Stack.Screen 
+        name="index" 
+        options={{ 
+          headerShown: false,
+          title: 'Messages'
+        }} 
+      />
+      <Stack.Screen 
+        name="[conversationId]/index" 
+        options={{ 
+          headerShown: false,
+          title: 'Conversation',
+          presentation: 'card'
+        }} 
+      />
+    </Stack>
+  );
+}

@@ -9,12 +9,72 @@ export const communityStyles = StyleSheet.create({
   
   // Header styles
   header: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
   },
-  
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 16,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionButton: {
+    marginLeft: 12,
+    padding: 8,
+    borderRadius: 8,
+  },
+  titleContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  screenTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  screenSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  quickStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(142, 120, 251, 0.05)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#8e78fb',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    marginHorizontal: 16,
+  },
   headerTitle: {
     fontSize: fontSize.xxl + 4, // 28px
     fontWeight: fontWeight.bold,
@@ -200,7 +260,7 @@ export const communityStyles = StyleSheet.create({
     gap: spacing.lg,
   },
   
-  statItem: {
+  communityStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
@@ -756,7 +816,7 @@ export const communityStyles = StyleSheet.create({
     gap: spacing.sm - 2, // 6px
   },
 
-  actionButton: {
+  communityActionButton: {
     backgroundColor: 'rgba(255,255,255,0.95)',
     padding: spacing.sm - 2, // 6px
     borderRadius: borderRadius.md,

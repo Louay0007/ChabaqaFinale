@@ -12,22 +12,23 @@ export default function Index() {
 
   // 📝 NORMAL MODE: Uncomment this section for production behavior
   /*
-  // Afficher un loader pendant la vérification de l'authentification
+  // Show loader during authentication verification
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
-        <Text style={{ marginTop: 10 }}>🔍 Vérification de l'authentification...</Text>
+        <Text style={{ marginTop: 10 }}>🔍 Checking authentication...</Text>
       </View>
     );
   }
 
-  // Rediriger vers la page appropriée en fonction de l'état d'authentification
+  // Redirect to appropriate page based on authentication state
+  // COMMUNITIES ARE NOW THE BASE OF EVERYTHING
   if (isAuthenticated) {
-    console.log('✅ [INDEX] Utilisateur authentifié, redirection vers communities');
+    console.log('✅ [INDEX] User authenticated, redirecting to communities hub');
     return <Redirect href="/(communities)" />;
   } else {
-    console.log('🔐 [INDEX] Utilisateur non authentifié, redirection vers signin');
+    console.log('🔐 [INDEX] User not authenticated, redirecting to signin');
     return <Redirect href="/(auth)/signin" />;
   }
   */
