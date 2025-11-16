@@ -35,29 +35,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/a
 
 class ApiClient {
   private baseURL: string;
-  private refreshPromise: Promise<string | null> | null = null;
+  private refreshPromise: Promise<Response | null> | null = null;
+  private isRefreshing: boolean = false;
 
   constructor() {
     this.baseURL = API_BASE_URL;
-  }
-
-  private getAccessToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('accessToken');
-    }
-    return null;
-  }
-
-  private setAccessToken(token: string): void {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('accessToken', token);
-    }
-  }
-
-  private removeAccessToken(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-    }
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -85,12 +67,9 @@ class ApiClient {
 
   private getHeaders(isFormData: boolean = false): HeadersInit {
     const headers: HeadersInit = {};
-    
     if (!isFormData) {
       headers['Content-Type'] = 'application/json';
     }
-    // IMPORTANT: Do not include Authorization header. Rely on httpOnly cookies (credentials: 'include').
-    // This prevents stale localStorage tokens from overriding the real session and showing the wrong user.
     return headers;
   }
 
@@ -98,13 +77,10 @@ class ApiClient {
   async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
     const url = this.buildUrl(endpoint, params);
     const doRequest = async () => fetch(url, { method: 'GET', headers: this.getHeaders(), credentials: 'include' });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
-      const refreshed = await this.tryRefreshToken();
-      if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
-      }
+      await this.tryRefreshToken();
+      response = await doRequest();
     }
     return this.handleResponse<T>(response);
   }
@@ -113,13 +89,10 @@ class ApiClient {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
       method: 'POST', headers: this.getHeaders(), credentials: 'include', body: data ? JSON.stringify(data) : undefined,
     });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
-      const refreshed = await this.tryRefreshToken();
-      if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
-      }
+      await this.tryRefreshToken();
+      response = await doRequest();
     }
     return this.handleResponse<T>(response);
   }
@@ -128,13 +101,10 @@ class ApiClient {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
       method: 'PATCH', headers: this.getHeaders(), credentials: 'include', body: data ? JSON.stringify(data) : undefined,
     });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
-      const refreshed = await this.tryRefreshToken();
-      if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
-      }
+      await this.tryRefreshToken();
+      response = await doRequest();
     }
     return this.handleResponse<T>(response);
   }
@@ -143,13 +113,10 @@ class ApiClient {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
       method: 'PUT', headers: this.getHeaders(), credentials: 'include', body: data ? JSON.stringify(data) : undefined,
     });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
-      const refreshed = await this.tryRefreshToken();
-      if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
-      }
+      await this.tryRefreshToken();
+      response = await doRequest();
     }
     return this.handleResponse<T>(response);
   }
@@ -158,13 +125,10 @@ class ApiClient {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
       method: 'DELETE', headers: this.getHeaders(), credentials: 'include',
     });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
-      const refreshed = await this.tryRefreshToken();
-      if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
-      }
+      await this.tryRefreshToken();
+      response = await doRequest();
     }
     return this.handleResponse<T>(response);
   }
@@ -177,13 +141,10 @@ class ApiClient {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
       method: 'POST', headers: this.getHeaders(true), credentials: 'include', body: formData,
     });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
-      const refreshed = await this.tryRefreshToken();
-      if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
-      }
+      await this.tryRefreshToken();
+      response = await doRequest();
     }
     return this.handleResponse<T>(response);
   }
@@ -204,49 +165,49 @@ class ApiClient {
     return this.handleResponse<T>(response);
   }
 
-  // Auth methods
-  setToken(token: string): void {
-    this.setAccessToken(token);
-  }
+  // Token refresh logic (single-flight with better error handling)
+  private async tryRefreshToken(): Promise<Response | null> {
+    if (this.isRefreshing) {
+      // Wait for ongoing refresh to complete
+      while (this.isRefreshing) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      return null; // Return null to retry the original request
+    }
 
-  clearToken(): void {
-    this.removeAccessToken();
-  }
-
-  // Token refresh logic (single-flight)
-  private async tryRefreshToken(): Promise<string | null> {
     if (this.refreshPromise) return this.refreshPromise;
+    
+    this.isRefreshing = true;
     this.refreshPromise = (async () => {
       try {
         const res = await fetch(`${this.baseURL}/auth/refresh`, {
           method: 'POST',
-          // Do NOT include Authorization header when refreshing
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
         });
+        
         if (!res.ok) {
-          this.clearToken();
+          // If refresh fails, redirect to login
+          if (typeof window !== 'undefined') {
+            window.location.href = '/signin';
+          }
           return null;
         }
-        const json = await res.json().catch(() => null);
-        const token = (json?.data?.accessToken)
-          || (json?.data?.access_token)
-          || json?.accessToken
-          || json?.access_token
-          || null;
-        if (token) {
-          this.setToken(token);
-        } else {
-          this.clearToken();
+        
+        return res;
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+        // Redirect to login on network error
+        if (typeof window !== 'undefined') {
+          window.location.href = '/signin';
         }
-        return token;
-      } catch {
-        this.clearToken();
         return null;
       } finally {
+        this.isRefreshing = false;
         this.refreshPromise = null;
       }
     })();
+    
     return this.refreshPromise;
   }
 }

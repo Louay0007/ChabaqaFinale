@@ -1,13 +1,12 @@
 import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { OAuth2Client } from 'google-auth-library';
 import { User, UserDocument } from '../schema/user.schema';
 import { LoginDto } from '../dto-user/login.dto';
 import { LoginResponseDto } from '../dto-user/login-response.dto';
-import { Verify2FADto } from '../dto-user/verify-2fa.dto';
 import { EmailService } from '../common/services/email.service';
 import { VerificationCodeSchema } from '../schema/verification-code.schema';
 import { TokenBlacklistService } from '../common/services/token-blacklist.service';
@@ -26,9 +25,6 @@ export class AuthService {
     private userLoginActivityService: UserLoginActivityService,
   ) {}
 
-  /**
-   * Login/Signup via Google OAuth profile
-   */
   async loginWithGoogle(oauthUser: {
     provider: 'google';
     providerId: string;
@@ -40,445 +36,195 @@ export class AuthService {
       throw new BadRequestException('Adresse e-mail Google introuvable');
     }
 
-    // Lookup existing user by email
     let user = await this.userModel.findOne({ email: oauthUser.email.toLowerCase() });
 
-    // Auto-provision user if not exists (handle potential unique name constraint)
     if (!user) {
       const baseName = oauthUser.name || 'Google User';
       const passwordHash = await this.hashPassword(`google:${oauthUser.providerId}:${Date.now()}`);
       let attempt = 0;
-      while (true) {
-        const candidateName = attempt === 0 ? baseName : `${baseName} ${attempt}`;
-        try {
-          user = await this.userModel.create({
-            name: candidateName,
-            email: oauthUser.email.toLowerCase(),
-            role: 'user',
-            password: passwordHash,
-          });
-          break;
-        } catch (err: any) {
-          // If duplicate key on name, try again with a suffixed name; otherwise rethrow
-          if (err?.code === 11000 && err?.keyPattern && err.keyPattern.name) {
-            attempt++;
-            if (attempt > 10) {
-              throw new BadRequestException('Impossible de créer le compte Google (conflit de nom).');
-            }
-            continue;
-          }
-          throw err;
-        }
+      let candidateName = baseName;
+      while (await this.userModel.findOne({ name: candidateName })) {
+        attempt++;
+        candidateName = `${baseName} ${attempt}`;
       }
+      user = await this.userModel.create({
+        name: candidateName,
+        email: oauthUser.email.toLowerCase(),
+        role: 'user',
+        password: passwordHash,
+      });
     }
 
-    // Issue tokens (2FA bypass for social login)
     const { accessToken, refreshToken } = this.generateTokens(user, true);
 
-    // Track user login for all communities they're member of
-    try {
-      await this.userLoginActivityService.trackUserLoginForAllCommunities(user._id.toString());
-    } catch (error) {
-      // Log error but don't fail the login
-      console.error('Error tracking Google login activity:', error);
-    }
+    await this.userLoginActivityService.trackUserLoginForAllCommunities(user._id.toString());
 
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
-      user: {
-        _id: user._id.toString(),
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        createdAt: user.createdAt,
-      },
+      user: this.toUserDto(user),
       rememberMe: true,
       message: 'Connexion réussie avec Google',
     };
   }
 
-  /**
-   * Mobile Google Sign-In with ID token verification
-   */
   async loginWithGoogleMobile(idToken: string): Promise<LoginResponseDto> {
-    try {
-      // Initialize Google OAuth2Client
-      const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-      
-      // Verify the ID token
-      const ticket = await client.verifyIdToken({
-        idToken: idToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
-      
-      const payload = ticket.getPayload();
-      if (!payload) {
-        throw new UnauthorizedException('Invalid Google ID token');
-      }
-
-      // Extract user information from the verified token
-      const googleUser = {
-        provider: 'google' as const,
-        providerId: payload.sub,
-        email: payload.email,
-        name: payload.name,
-        photo: payload.picture,
-      };
-
-      // Use the existing loginWithGoogle method
-      return await this.loginWithGoogle(googleUser);
-      
-    } catch (error) {
-      console.error('Google mobile authentication error:', error);
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-      throw new UnauthorizedException('Failed to authenticate with Google');
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    const ticket = await client.verifyIdToken({
+      idToken: idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload) {
+      throw new UnauthorizedException('Invalid Google ID token');
     }
+    const googleUser = {
+      provider: 'google' as const,
+      providerId: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      photo: payload.picture,
+    };
+    return this.loginWithGoogle(googleUser);
   }
 
-  /**
-   * Valide les credentials de l'utilisateur
-   */
   async validateUser(email: string, password: string): Promise<UserDocument> {
     const user = await this.userModel.findOne({ email }).select('+password');
-    
     if (!user) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
-
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
-
     return user;
   }
 
-  /**
-   * Génère les tokens JWT
-   */
   private generateTokens(user: UserDocument, rememberMe: boolean = false) {
-    const currentTime = Date.now();
-    const accessTokenId = `${user._id}-access-${currentTime}`;
-    const refreshTokenId = `${user._id}-refresh-${currentTime}`;
+    const accessTokenPayload = { sub: user._id, email: user.email, role: user.role, jti: new Types.ObjectId().toHexString() };
+    const refreshTokenPayload = { sub: user._id, jti: new Types.ObjectId().toHexString() };
 
-    const basePayload = {
-      sub: user._id,
-      email: user.email,
-      role: user.role,
-    };
-
-    // Durées différentes selon "Remember Me"
-    const accessTokenDuration = rememberMe ? '4h' : '2h'; // Plus long si "Remember Me"
-    const refreshTokenDuration = rememberMe ? '90d' : '30d'; // 3 mois si "Remember Me"
-
-    const accessToken = this.jwtService.sign(
-      {
-        ...basePayload,
-        jti: accessTokenId, // JWT ID unique
-      },
-      {
-        expiresIn: accessTokenDuration,
-        secret: process.env.JWT_SECRET || 'your-secret-key',
-      }
-    );
-
-    const refreshToken = this.jwtService.sign(
-      {
-        ...basePayload,
-        jti: refreshTokenId, // JWT ID unique
-      },
-      {
-        expiresIn: refreshTokenDuration,
-        secret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
-      }
-    );
+    const accessToken = this.jwtService.sign(accessTokenPayload, {
+      expiresIn: rememberMe ? '4h' : '2h',
+      secret: process.env.JWT_SECRET || 'your-secret-key',
+    });
+    const refreshToken = this.jwtService.sign(refreshTokenPayload, {
+      expiresIn: rememberMe ? '90d' : '30d',
+      secret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
+    });
 
     return { accessToken, refreshToken, rememberMe };
   }
 
-  /**
-   * Connexion avec envoi automatique du code 2FA
-   */
   async login(loginDto: LoginDto): Promise<LoginResponseDto> {
     const user = await this.validateUser(loginDto.email, loginDto.password);
-    
-    // Générer et envoyer automatiquement le code 2FA
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Sauvegarder le code dans la base de données (avec expiration)
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-    
-    // Utiliser le modèle VerificationCode
-    const verificationCodeModel = this.userModel.db.model('VerificationCode', VerificationCodeSchema);
-    
-    // Supprimer les anciens codes pour cet utilisateur
-    await verificationCodeModel.deleteMany({ userId: user._id, type: '2fa' });
-    
-    // Sauvegarder le nouveau code avec l'information "Remember Me"
-    await verificationCodeModel.create({
-      userId: user._id,
-      code: verificationCode,
-      type: '2fa',
-      expiresAt,
-      // Stocker temporairement l'option "Remember Me" dans le code
-      rememberMe: loginDto.remember_me || false,
-    });
-
-    // Envoyer le code par email
-    await this.emailService.send2FACode(user.email, verificationCode, user.name);
-
-    return {
-      access_token: "",
-      refresh_token: "",
-      requires2FA: true,
-      message: 'Code de vérification envoyé par email. Utilisez /auth/verify-2fa pour compléter la connexion.',
-    };
-  }
-
-  /**
-   * Vérification du code 2FA et génération des tokens
-   */
-  async verify2FA(verify2FADto: Verify2FADto): Promise<LoginResponseDto> {
-    const { email, verificationCode } = verify2FADto;
-
-    // Vérifier si l'utilisateur existe
-    const user = await this.userModel.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      throw new BadRequestException('Email invalide');
-    }
-
-    // Vérifier le code 2FA
-    const verificationCodeModel = this.userModel.db.model('VerificationCode', VerificationCodeSchema);
-    
-    const verificationRecord = await verificationCodeModel.findOne({
-      userId: user._id,
-      code: verificationCode,
-      type: '2fa',
-      expiresAt: { $gt: new Date() },
-    });
-
-    if (!verificationRecord) {
-      throw new BadRequestException('Code de vérification invalide ou expiré');
-    }
-
-    // Récupérer l'option "Remember Me" du code de vérification
-    const rememberMe = verificationRecord.rememberMe || false;
-
-    // Supprimer le code utilisé
-    await verificationCodeModel.deleteOne({ _id: verificationRecord._id });
-
-    // Générer les tokens avec la durée appropriée selon "Remember Me"
-    const { accessToken, refreshToken } = this.generateTokens(user, rememberMe);
-
-    // Track user login for all communities they're member of
-    try {
-      await this.userLoginActivityService.trackUserLoginForAllCommunities(user._id.toString());
-    } catch (error) {
-      // Log error but don't fail the login
-      console.error('Error tracking login activity:', error);
-    }
-
+    const { accessToken, refreshToken } = this.generateTokens(user, loginDto.remember_me || false);
+    await this.userLoginActivityService.trackUserLoginForAllCommunities(user._id.toString());
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
-      user: {
-        _id: user._id.toString(),
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        createdAt: user.createdAt,
-      },
-      rememberMe: rememberMe,
-      message: rememberMe 
-        ? 'Connexion réussie avec authentification à deux facteurs (session prolongée)'
-        : 'Connexion réussie avec authentification à deux facteurs',
+      user: this.toUserDto(user),
+      rememberMe: loginDto.remember_me || false,
+      message: 'Connexion réussie',
     };
   }
 
-  /**
-   * Rafraîchit le token d'accès
-   */
   async refreshToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
     try {
       const payload = this.jwtService.verify(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
       });
-
-      // Vérifier si le token est dans la blacklist
-      const tokenId = payload.jti || `${payload.sub}-${payload.iat}`;
-      const isRevoked = await this.tokenBlacklistService.isTokenRevoked(tokenId);
       
+      // Check if refresh token is revoked
+      const isRevoked = await this.tokenBlacklistService.isTokenRevoked(payload.jti, payload.sub);
       if (isRevoked) {
         throw new UnauthorizedException('Token de rafraîchissement révoqué');
       }
-
+      
       const user = await this.userModel.findById(payload.sub);
       if (!user) {
         throw new UnauthorizedException('Utilisateur non trouvé');
       }
-
-      const currentTime = Date.now();
-      const newAccessTokenId = `${user._id}-access-${currentTime}`;
-
-      const newPayload = {
-        sub: user._id,
-        email: user.email,
-        role: user.role,
-        jti: newAccessTokenId, // Nouvel ID unique pour le token d'accès
+      
+      // Generate new access token with proper JTI
+      const newAccessTokenPayload = { 
+        sub: user._id, 
+        email: user.email, 
+        role: user.role, 
+        jti: new Types.ObjectId().toHexString() 
       };
-
-      const accessToken = this.jwtService.sign(newPayload, {
+      
+      const newAccessToken = this.jwtService.sign(newAccessTokenPayload, {
         expiresIn: '2h',
         secret: process.env.JWT_SECRET || 'your-secret-key',
       });
-
+      
       return {
-        access_token: accessToken,
+        access_token: newAccessToken,
         expires_in: 2 * 60 * 60,
       };
     } catch (error) {
-      throw new UnauthorizedException('Token de rafraîchissement invalide');
+      if (error.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Token de rafraîchissement expiré');
+      } else if (error.name === 'JsonWebTokenError') {
+        throw new UnauthorizedException('Token de rafraîchissement invalide');
+      }
+      throw error;
     }
   }
 
-  /**
-   * Get user by ID with all profile fields
-   */
   async getUserById(userId: string): Promise<UserDocument | null> {
-    try {
-      const user = await this.userModel.findById(userId).select('-password').exec();
-      return user;
-    } catch (error) {
-      console.error('Error fetching user by ID:', error);
-      return null;
-    }
+    return this.userModel.findById(userId).select('-password').exec();
   }
   
-  /**
-   * Decodes a JWT token without verifying its signature or expiration
-   * Used for debugging and token inspection only - not for authentication
-   */
-  decodeToken(token: string): any {
-    try {
-      // This only decodes the token without verifying signature or expiration
-      return this.jwtService.decode(token);
-    } catch (error) {
-      console.error(`Failed to decode token: ${error.message}`);
-      return null;
+  async logout(accessToken?: string, refreshToken?: string): Promise<void> {
+    if (accessToken) {
+      const accessPayload = this.jwtService.decode(accessToken) as any;
+      if(accessPayload && accessPayload.sub) {
+        await this.tokenBlacklistService.revokeToken(new Types.ObjectId(accessPayload.sub), accessPayload.jti, 'access', new Date(accessPayload.exp * 1000));
+      }
+    }
+    if (refreshToken) {
+      const refreshPayload = this.jwtService.decode(refreshToken) as any;
+      if(refreshPayload && refreshPayload.sub) {
+        await this.tokenBlacklistService.revokeToken(new Types.ObjectId(refreshPayload.sub), refreshPayload.jti, 'refresh', new Date(refreshPayload.exp * 1000));
+      }
     }
   }
 
-  /**
-   * Déconnexion avec révocation des tokens
-   */
-  async logout(accessToken?: string, refreshToken?: string): Promise<{ message: string; revokedTokens: number }> {
-    let revokedCount = 0;
-
-    try {
-      // Révoquer l'access token s'il est fourni
-      if (accessToken) {
-        const accessPayload = this.jwtService.verify(accessToken, {
-          secret: process.env.JWT_SECRET || 'your-secret-key',
-        });
-        
-        await this.tokenBlacklistService.revokeTokenFromJWT(
-          accessPayload.sub,
-          accessPayload,
-          'access'
-        );
-        revokedCount++;
-      }
-
-      // Révoquer le refresh token s'il est fourni
-      if (refreshToken) {
-        const refreshPayload = this.jwtService.verify(refreshToken, {
-          secret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
-        });
-        
-        await this.tokenBlacklistService.revokeTokenFromJWT(
-          refreshPayload.sub,
-          refreshPayload,
-          'refresh'
-        );
-        revokedCount++;
-      }
-
-      return {
-        message: `Déconnexion réussie. ${revokedCount} token(s) révoqué(s).`,
-        revokedTokens: revokedCount,
-      };
-    } catch (error) {
-      // Même si la révocation échoue, on considère la déconnexion comme réussie
-      return {
-        message: 'Déconnexion réussie (tokens expirés ou invalides).',
-        revokedTokens: revokedCount,
-      };
-    }
+  async revokeAllTokens(userId: string): Promise<void> {
+    await this.tokenBlacklistService.revokeAllUserTokens(new Types.ObjectId(userId));
   }
 
-  /**
-   * Révoquer tous les tokens d'un utilisateur
-   */
-  async revokeAllTokens(userId: string): Promise<{ message: string }> {
-    await this.tokenBlacklistService.revokeAllUserTokens(userId as any);
-    
-    return {
-      message: 'Tous les tokens de l\'utilisateur ont été révoqués.',
-    };
-  }
-
-  /**
-   * Hash un mot de passe
-   */
   async hashPassword(password: string): Promise<string> {
     const saltRounds = 12;
     return bcrypt.hash(password, saltRounds);
   }
 
-  /**
-   * Forgot password: send reset code to email
-   */
   async forgotPassword(email: string): Promise<{ success: boolean; message?: string; error?: string }> {
     const user = await this.userModel.findOne({ email: email.toLowerCase() });
     if (!user) {
       return { success: false, error: "Aucun utilisateur trouvé avec cet email." };
     }
-
-    // Generate reset code
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); 
     const verificationCodeModel = this.userModel.db.model('VerificationCode', VerificationCodeSchema);
-
-    // Remove old reset codes
     await verificationCodeModel.deleteMany({ userId: user._id, type: 'password_reset' });
-
-    // Save new reset code
     await verificationCodeModel.create({
       userId: user._id,
       code: resetCode,
       type: 'password_reset',
       expiresAt,
     });
-
-    // Send code by email
     await this.emailService.send2FACode(user.email, resetCode, user.name);
-
     return { success: true, message: "Code de réinitialisation envoyé par email." };
   }
 
-  /**
-   * Reset password using code
-   */
   async resetPassword(email: string, code: string, newPassword: string): Promise<{ success: boolean; message?: string; error?: string }> {
     const user = await this.userModel.findOne({ email: email.toLowerCase() });
     if (!user) {
       return { success: false, error: "Aucun utilisateur trouvé avec cet email." };
     }
-
     const verificationCodeModel = this.userModel.db.model('VerificationCode', VerificationCodeSchema);
     const verificationRecord = await verificationCodeModel.findOne({
       userId: user._id,
@@ -486,104 +232,69 @@ export class AuthService {
       type: 'password_reset',
       expiresAt: { $gt: new Date() },
     });
-
     if (!verificationRecord) {
       return { success: false, error: "Code de réinitialisation invalide ou expiré." };
     }
-
-    // Update password
     user.password = await this.hashPassword(newPassword);
-    
-    // Ensure role is lowercase (fix for old data with uppercase roles)
     if (user.role) {
       user.role = user.role.toLowerCase() as any;
     }
-    
     await user.save();
-
-    // Remove used code
     await verificationCodeModel.deleteOne({ _id: verificationRecord._id });
-
     return { success: true, message: "Mot de passe réinitialisé avec succès." };
   }
 
-  /**
-   * Register a new user
-   */
   async register(registerDto: RegisterDto): Promise<{ success: boolean; message: string; user?: any; error?: string }> {
     const { name, email, password, numtel, date_naissance } = registerDto;
-
-    // Check if user already exists
     const existingUser = await this.userModel.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       throw new BadRequestException('Un utilisateur avec cet email existe déjà.');
     }
-
-    // Hash password
     const hashedPassword = await this.hashPassword(password);
-
-    try {
-      const newUser = await this.userModel.create({
-        name,
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        numtel,
-        date_naissance,
-        role: 'user', // Default role
-      });
-
-      // Omit password from the returned user object
-      const userObject: any = newUser.toObject();
-      delete userObject.password;
-
-      return {
-        success: true,
-        message: 'Utilisateur créé avec succès.',
-        user: userObject,
-      };
-    } catch (error) {
-      // Handle potential database errors (e.g., unique index conflicts)
-      throw new BadRequestException('Impossible de créer l\'utilisateur.');
-    }
+    const newUser = await this.userModel.create({
+      name,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      numtel,
+      date_naissance,
+      role: 'user',
+    });
+    return {
+      success: true,
+      message: 'Utilisateur créé avec succès.',
+      user: this.toUserDto(newUser),
+    };
   }
 
-  /**
-   * Register a new creator user
-   */
   async registerCreator(registerDto: RegisterDto): Promise<{ success: boolean; message: string; user?: any; error?: string }> {
     const { name, email, password, numtel, date_naissance } = registerDto;
-
-    // Check if user already exists
     const existingUser = await this.userModel.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       throw new BadRequestException('Un utilisateur avec cet email existe déjà.');
     }
-
-    // Hash password
     const hashedPassword = await this.hashPassword(password);
+    const newUser = await this.userModel.create({
+      name,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      numtel,
+      date_naissance,
+      role: 'creator',
+    });
+    return {
+      success: true,
+      message: 'Créateur créé avec succès.',
+      user: this.toUserDto(newUser),
+    };
+  }
 
-    try {
-      const newUser = await this.userModel.create({
-        name,
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        numtel,
-        date_naissance,
-        role: 'creator', // Creator role
-      });
-
-      // Omit password from the returned user object
-      const userObject: any = newUser.toObject();
-      delete userObject.password;
-
-      return {
-        success: true,
-        message: 'Créateur créé avec succès.',
-        user: userObject,
-      };
-    } catch (error) {
-      // Handle potential database errors (e.g., unique index conflicts)
-      throw new BadRequestException('Impossible de créer le créateur.');
-    }
+  private toUserDto(user: UserDocument) {
+    return {
+      _id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+    };
   }
 }

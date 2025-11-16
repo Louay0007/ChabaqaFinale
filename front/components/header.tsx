@@ -8,7 +8,7 @@ import { siteData } from "@/lib/data"
 import { useRouter } from "next/navigation"
 import { logoutAction } from "@/app/(auth)/signin/actions"
 import Image from "next/image"
-import { useAuth } from "@/lib/auth"
+import { useAuth } from "@/hooks/use-auth"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)

@@ -24,8 +24,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: any) {
     // ÉTAPE 1: Vérifier si le token est révoqué (blacklist)
     const tokenId = payload.jti || `${payload.sub}-${payload.iat}`;
-    const isRevoked = await this.tokenBlacklistService.isTokenRevoked(tokenId);
-    
+    const isRevoked = await this.tokenBlacklistService.isTokenRevoked(tokenId, payload.sub);
+
     if (isRevoked) {
       throw new UnauthorizedException('Token révoqué - veuillez vous reconnecter');
     }
