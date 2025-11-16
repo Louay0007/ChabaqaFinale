@@ -1,23 +1,11 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
-import { FlatList, ActivityIndicator, Text, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList } from 'react-native';
 import { ThemedView } from '../../../../_components/ThemedView';
-import { 
-  Session,
-  SessionBooking,
-  getSessionsByCommunity,
-  getUserBookings,
-  bookSession,
-  cancelBooking,
-  convertSessionForUI,
-  convertBookingForUI,
-  formatSessionDateTime,
-  formatSessionPrice,
-  getBookingStatusColor,
-  getBookingStatusLabel,
-  canCancelBooking
-} from '../../../../lib/session-api';
-import { useAuth } from '../../../../hooks/use-auth';
+import { ThemedText } from '../../../../_components/ThemedText';
+import { getAvailableMentors, getAvailableSessionTypes, getBookedSessionsByUser, Mentor } from '../../../../lib/session-utils';
+import { getSessionsByCommunity, getUserBookings, convertSessionForUI, convertBookingForUI } from '../../../../lib/session-api';
+import { getCommunityBySlug } from '../../../../lib/communities-api';
 import BottomNavigation from '../../_components/BottomNavigation';
 import { BookedSessionCard } from './_components/BookedSessionCard';
 import { BookingModal } from './_components/BookingModal';
@@ -30,82 +18,102 @@ import { styles } from './styles';
 
 export default function SessionsScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const router = useRouter();
-  const { isAuthenticated, user } = useAuth();
-  
-  // State management
   const [activeTab, setActiveTab] = useState<string>('available');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(new Date(2025, 8, 3)); // September 2025
   const [showBookingModal, setShowBookingModal] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionType | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [sessionNotes, setSessionNotes] = useState<string>('');
   
-  // API data state
-  const [availableSessions, setAvailableSessions] = useState<Session[]>([]);
-  const [userBookings, setUserBookings] = useState<SessionBooking[]>([]);
+  // Real data state
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-  const [booking, setBooking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [community, setCommunity] = useState<any>(null);
+  const [sessionTypes, setSessionTypes] = useState<any[]>([]);
+  const [bookedSessions, setBookedSessions] = useState<any[]>([]);
+  const [mentors, setMentors] = useState<any[]>([]);
   
-  // Load sessions data
-  const loadSessions = useCallback(async (isRefresh = false) => {
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchSessionsData();
+  }, [slug]);
+  
+  const fetchSessionsData = async () => {
     try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+      setLoading(true);
+      setError(null);
+      console.log('📚 Fetching sessions for community:', slug);
+
+      // Fetch community data first
+      const communityResponse = await getCommunityBySlug(slug || '');
+      if (!communityResponse.success || !communityResponse.data) {
+        throw new Error('Community not found');
       }
-      setError('');
-
-      console.log('📅 [SESSIONS] Loading sessions for community:', slug);
-
-      // Fetch available sessions for this community
-      const sessions = await getSessionsByCommunity(slug as string);
-      setAvailableSessions(sessions);
-
-      // Fetch user bookings if authenticated
-      if (isAuthenticated) {
-        const bookings = await getUserBookings();
-        setUserBookings(bookings);
-        console.log('✅ [SESSIONS] User bookings loaded:', bookings.length);
+      
+      const communityData = {
+        id: communityResponse.data._id || communityResponse.data.id,
+        name: communityResponse.data.name,
+        slug: communityResponse.data.slug,
+      };
+      setCommunity(communityData);
+      
+      // Fetch sessions for this community
+      const communitySlug = slug as string;
+      const sessionsResponse = await getSessionsByCommunity(communitySlug);
+      
+      // Transform backend sessions to match frontend interface
+      const transformedSessions = sessionsResponse.map((session: any) => convertSessionForUI(session));
+      setSessionTypes(transformedSessions);
+      
+      // Extract unique mentors from sessions
+      const uniqueMentors = transformedSessions.reduce((acc: any[], session: any) => {
+        const existingMentor = acc.find(m => m.id === session.mentor.id);
+        if (!existingMentor) {
+          acc.push(session.mentor);
+        }
+        return acc;
+      }, []);
+      setMentors(uniqueMentors);
+      
+      // Fetch user's booked sessions
+      try {
+        const userBookingsResponse = await getUserBookings();
+        const transformedBookings = userBookingsResponse.map((booking: any) => {
+          const relatedSession = transformedSessions.find(s => s.id === booking.sessionTypeId);
+          return convertBookingForUI(booking, relatedSession);
+        });
+        setBookedSessions(transformedBookings);
+      } catch (bookingError) {
+        console.warn('⚠️ Could not fetch user bookings:', bookingError);
+        setBookedSessions([]);
       }
-
-      console.log('✅ [SESSIONS] Sessions loaded successfully:', sessions.length);
+      
+      console.log('✅ Sessions loaded:', transformedSessions.length);
     } catch (err: any) {
-      console.error('💥 [SESSIONS] Error loading sessions:', err);
+      console.error('❌ Error fetching sessions:', err);
       setError(err.message || 'Failed to load sessions');
+      
+      // Fallback to mock data
+      console.log('⚠️ Falling back to mock data');
+      const mockSessionTypes = getAvailableSessionTypes();
+      const mockMentors = getAvailableMentors();
+      const mockBookedSessions = getBookedSessionsByUser("2");
+      
+      setSessionTypes(mockSessionTypes);
+      setMentors(mockMentors);
+      setBookedSessions(mockBookedSessions);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }, [slug, isAuthenticated]);
-
-  // Load on mount
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
-
-  // Handle refresh
-  const handleRefresh = () => {
-    loadSessions(true);
   };
   
-  // Convert sessions for UI compatibility
-  const convertedSessions = availableSessions.map(convertSessionForUI);
-  const convertedBookings = userBookings.map(booking => {
-    const session = availableSessions.find(s => s.bookings?.some(b => b.id === booking.id));
-    return convertBookingForUI(booking, session);
-  });
+  const totalSessionsBooked = bookedSessions.length;
+  const totalAvailableTypes = sessionTypes.length;
+  const avgRating = mentors.length > 0 ? mentors.reduce((sum, mentor) => sum + mentor.rating, 0) / mentors.length : 0;
   
-  const totalSessionsBooked = userBookings.length;
-  const totalAvailableTypes = availableSessions.length;
-  const avgRating = availableSessions.reduce((sum, session) => sum + (session.average_rating || 0), 0) / (availableSessions.length || 1);
-  
-  const filteredSessions = convertedSessions.filter(session => 
+  const filteredSessions = sessionTypes.filter(session => 
     session.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     session.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
     session.mentor.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -113,29 +121,14 @@ export default function SessionsScreen() {
 
   const tabs: TabItem[] = [
     { key: 'available', title: 'Available' },
-    { key: 'mysessions', title: `My Sessions (${userBookings.length})` },
+    { key: 'mysessions', title: `My Sessions (${bookedSessions.length})` },
     { key: 'calendar', title: 'Calendar' }
   ];
 
-  const openBookingModal = (session: any) => {
-    if (!isAuthenticated) {
-      Alert.alert(
-        'Login Required',
-        'Please login to book sessions',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Login', 
-            onPress: () => router.push('/(auth)/signin')
-          }
-        ]
-      );
-      return;
-    }
-    
+  const openBookingModal = (session: SessionType) => {
     setSelectedSession(session);
     setShowBookingModal(true);
-    setSelectedDate(new Date());
+    setSelectedDate(new Date(2025, 8, 3));
     setSelectedTime('09:00');
     setSessionNotes('');
   };
@@ -149,46 +142,14 @@ export default function SessionsScreen() {
     setSessionNotes('');
   };
 
-  const handleBookingConfirm = async () => {
-    if (!selectedSession || !selectedDate || !selectedTime) {
-      Alert.alert('Error', 'Please select a date and time for your session');
-      return;
-    }
-
-    try {
-      setBooking(true);
-      
-      // Create scheduled datetime
-      const [hours, minutes] = selectedTime.split(':').map(Number);
-      const scheduledAt = new Date(selectedDate);
-      scheduledAt.setHours(hours, minutes, 0, 0);
-      
-      console.log('📝 [SESSIONS] Booking session:', selectedSession.id);
-      
-      await bookSession(selectedSession.id, {
-        scheduled_at: scheduledAt.toISOString(),
-        notes: sessionNotes
-      });
-      
-      Alert.alert(
-        'Success!',
-        'Your session has been booked successfully',
-        [{ text: 'OK', onPress: () => {
-          closeBookingModal();
-          loadSessions(true); // Refresh data
-        }}]
-      );
-      
-      console.log('✅ [SESSIONS] Session booked successfully');
-    } catch (err: any) {
-      console.error('💥 [SESSIONS] Booking error:', err);
-      Alert.alert(
-        'Booking Failed',
-        err.message || 'Failed to book session. Please try again.'
-      );
-    } finally {
-      setBooking(false);
-    }
+  const handleBookingConfirm = () => {
+    console.log('Booking confirmed:', {
+      session: selectedSession,
+      date: selectedDate,
+      time: selectedTime,
+      notes: sessionNotes
+    });
+    closeBookingModal();
   };
 
   const previousMonth = () => {
@@ -199,58 +160,50 @@ export default function SessionsScreen() {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
-  const renderAvailableSession = ({ item }: { item: any }) => {
+  const renderAvailableSession = ({ item }: { item: SessionType }) => {
+    const mentor = mentors.find((m: Mentor) => m.id === item.mentor.id);
     return (
       <SessionCard
         session={item}
-        mentor={item.mentor}
+        mentor={mentor}
         onBookPress={openBookingModal}
       />
     );
   };
 
   const renderBookedSession = ({ item }: { item: any }) => {
-    if (!item.sessionType) return null;
+    const sessionType = sessionTypes.find(s => s.id === item.sessionTypeId);
+    const mentor = sessionType ? mentors.find(m => m.id === sessionType.mentor.id) : null;
+    
+    if (!sessionType || !mentor) return null;
     
     return (
       <BookedSessionCard
         session={item}
-        sessionType={item.sessionType}
-        mentor={item.sessionType.mentor}
+        sessionType={sessionType}
+        mentor={mentor}
       />
     );
   };
-  
-  // Loading state
-  if (loading && !refreshing) {
+
+  if (loading) {
     return (
       <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#8e78fb" />
-        <Text style={{ marginTop: 16, color: '#666', fontSize: 16 }}>Loading sessions...</Text>
+        <ThemedText style={{ marginTop: 16, opacity: 0.7 }}>Loading sessions...</ThemedText>
       </ThemedView>
     );
   }
 
-  // Error state
-  if (error && !refreshing) {
+  if (error) {
     return (
-      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-        <Text style={{ fontSize: 48, marginBottom: 16 }}>⚠️</Text>
-        <Text style={{ fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 8 }}>Oops!</Text>
-        <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 }}>
+      <ThemedView style={styles.container}>
+        <ThemedText style={{ color: '#ef4444', textAlign: 'center', margin: 20 }}>
           {error}
-        </Text>
-        <TouchableOpacity
-          onPress={() => loadSessions()}
-          style={{
-            backgroundColor: '#8e78fb',
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Try Again</Text>
-        </TouchableOpacity>
+        </ThemedText>
+        <ThemedText style={{ textAlign: 'center', opacity: 0.7 }}>
+          Community: {slug}
+        </ThemedText>
       </ThemedView>
     );
   }
@@ -272,7 +225,7 @@ export default function SessionsScreen() {
         tabs={tabs}
         activeTab={activeTab}
         onTabPress={setActiveTab}
-        bookedSessionsCount={userBookings.length}
+        bookedSessionsCount={bookedSessions.length}
         availableSessionsCount={filteredSessions.length}
       />
       
@@ -283,41 +236,25 @@ export default function SessionsScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.sessionsList}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor="#8e78fb"
-              colors={['#8e78fb']}
-            />
-          }
         />
       )}
       
       {activeTab === 'mysessions' && (
         <FlatList
-          data={convertedBookings}
+          data={bookedSessions}
           renderItem={renderBookedSession}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.sessionsList}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor="#8e78fb"
-              colors={['#8e78fb']}
-            />
-          }
         />
       )}
       
       {activeTab === 'calendar' && (
         <CalendarView
           currentDate={currentDate}
-          bookedSessions={convertedBookings}
-          sessionTypes={convertedSessions}
-          mentors={convertedSessions.map(s => s.mentor)}
+          bookedSessions={bookedSessions}
+          sessionTypes={sessionTypes}
+          mentors={mentors}
           onPreviousMonth={previousMonth}
           onNextMonth={nextMonth}
         />
@@ -330,7 +267,6 @@ export default function SessionsScreen() {
         selectedDate={selectedDate}
         selectedTime={selectedTime}
         sessionNotes={sessionNotes}
-        booking={booking}
         onClose={closeBookingModal}
         onConfirm={handleBookingConfirm}
         onDateSelect={setSelectedDate}

@@ -5,6 +5,7 @@ import { Conversation, ConversationDocument } from '../schema/conversation.schem
 import { Message, MessageDocument } from '../schema/message.schema';
 import { Community, CommunityDocument } from '../schema/community.schema';
 import { User } from '../schema/user.schema';
+import { Admin, AdminDocument } from '../schema/admin.schema';
 import { PolicyService } from '../common/services/policy.service';
 import { DmGateway } from './dm.gateway';
 import { NotificationService } from '../notification/notification.service';
@@ -16,6 +17,7 @@ export class DmService {
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
     @InjectModel(Community.name) private communityModel: Model<CommunityDocument>,
     @InjectModel('User') private userModel: Model<User>,
+    @InjectModel(Admin.name) private adminModel: Model<AdminDocument>,
 
     private readonly policyService: PolicyService,
     private readonly dmGateway: DmGateway,
@@ -55,16 +57,31 @@ export class DmService {
       type: 'HELP_DM',
       participantA: new Types.ObjectId(userId),
       isOpen: true,
-    });
-    if (existing) return existing;
+    }).populate('participantB', 'name email photo_profil poste departement');
+    
+    if (existing) {
+      // Auto-assign admin if not already assigned and send welcome message
+      if (!existing.participantB) {
+        await this.autoAssignAdminToHelp(existing._id.toString());
+        const updatedConv = await this.conversationModel.findById(existing._id).populate('participantB', 'name email photo_profil poste departement');
+        return updatedConv || existing;
+      }
+      return existing;
+    }
 
-    return this.conversationModel.create({
+    const conv = await this.conversationModel.create({
       type: 'HELP_DM',
       participantA: new Types.ObjectId(userId),
       isOpen: true,
       unreadCountA: 0,
       unreadCountB: 0,
     });
+
+    // Auto-assign admin and send welcome message
+    await this.autoAssignAdminToHelp(conv._id.toString());
+    
+    const finalConv = await this.conversationModel.findById(conv._id).populate('participantB', 'name email photo_profil poste departement');
+    return finalConv || conv;
   }
 
   async listUnassignedHelpThreads() {
@@ -82,31 +99,82 @@ export class DmService {
     const [items, total] = await Promise.all([
       this.conversationModel
         .find(filter)
+        .populate('participantA', 'name email profile_picture')
+        .populate('participantB', 'name email photo_profil poste departement')
+        .populate('communityId', 'name slug logo')
         .sort({ lastMessageAt: -1 })
         .skip(skip)
         .limit(limit),
       this.conversationModel.countDocuments(filter),
     ]);
-    return { items, page, total };
+    const totalPages = Math.ceil(total / limit);
+    return { 
+      conversations: items, 
+      page, 
+      total, 
+      totalPages,
+      hasMore: page < totalPages,
+      limit 
+    };
   }
 
-  async listMessages(conversationId: string, userId: string, page = 1, limit = 30) {
-    const conv = await this.conversationModel.findById(conversationId);
+  async listMessages(conversationId: string, userId: string, page = 1, limit = 30, options?: { isAdmin?: boolean }) {
+    const conv = await this.conversationModel.findById(conversationId)
+      .populate('participantA', 'name email profile_picture')
+      .populate('participantB', 'name email photo_profil poste departement');
+    
     if (!conv) throw new NotFoundException('Conversation introuvable');
-    const uid = new Types.ObjectId(userId);
-    if (!uid.equals(conv.participantA) && (!conv.participantB || !uid.equals(conv.participantB))) {
-      throw new ForbiddenException();
+    
+    // Convert userId to ObjectId for comparison
+    let uid: Types.ObjectId;
+    try {
+      uid = new Types.ObjectId(userId);
+    } catch (error) {
+      console.error('❌ [DM] Invalid userId format:', userId);
+      throw new ForbiddenException('Invalid user ID format');
+    }
+    
+    // Check permissions: user must be participant or admin viewing help conversation
+    const isParticipantA = uid.equals(conv.participantA);
+    const isParticipantB = conv.participantB && uid.equals(conv.participantB);
+    const isParticipant = isParticipantA || isParticipantB;
+    const isAdminViewingHelp = options?.isAdmin && conv.type === 'HELP_DM';
+    
+    // Debug logging
+    if (!isParticipant && !isAdminViewingHelp) {
+      console.log('🚫 [DM] Access denied:', {
+        userId: userId,
+        conversationId: conversationId,
+        conversationType: conv.type,
+        participantA: conv.participantA?.toString(),
+        participantB: conv.participantB?.toString(),
+        isParticipantA,
+        isParticipantB,
+        isAdmin: options?.isAdmin,
+      });
+      throw new ForbiddenException('You do not have access to this conversation');
     }
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
       this.messageModel
         .find({ conversationId: conv._id })
+        .populate('senderId', 'name email profile_picture photo_profil poste departement role')
+        .populate('recipientId', 'name email profile_picture photo_profil poste departement role')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
       this.messageModel.countDocuments({ conversationId: conv._id }),
     ]);
-    return { items: items.reverse(), page, total };
+    const totalPages = Math.ceil(total / limit);
+    return { 
+      messages: items.reverse(),
+      conversation: conv,
+      page, 
+      total, 
+      totalPages,
+      hasMore: page < totalPages,
+      limit 
+    };
   }
 
   async sendMessage(
@@ -161,13 +229,26 @@ export class DmService {
       this.dmGateway.emitNewMessage(conv._id.toString(), recipientId.toString(), msg);
 
       // Send notification
-      const sender = await this.userModel.findById(senderId);
+      let sender: any = null;
+      let senderName = 'Unknown User';
+      
+      // Check if sender is admin or regular user
+      if (options?.isAdmin) {
+        const adminSender = await this.adminModel.findById(senderId);
+        sender = adminSender;
+        senderName = adminSender?.name || 'Support Agent';
+      } else {
+        const userSender = await this.userModel.findById(senderId);
+        sender = userSender;
+        senderName = userSender?.name || 'User';
+      }
+      
       if (sender) {
         this.notificationService.createNotification({
           recipient: recipientId.toString(),
           sender: senderId,
           type: 'new_dm_message',
-          title: `New message from ${sender.name}`,
+          title: `New message from ${senderName}`,
           body: msg.text || 'You received a new attachment.',
           data: { conversationId: conv._id.toString() },
         });
@@ -198,13 +279,77 @@ export class DmService {
   }
 
   async assignHelpThread(conversationId: string, adminId: string) {
-    const conv = await this.conversationModel.findById(conversationId);
+    const conv = await this.conversationModel.findById(conversationId)
+      .populate('participantA', 'name email profile_picture');
     if (!conv) throw new NotFoundException('Conversation introuvable');
     if (conv.type !== 'HELP_DM') throw new BadRequestException('Non applicable');
     if (conv.participantB) return conv; // already assigned
+    
+    const admin = await this.adminModel.findById(adminId);
+    if (!admin) throw new NotFoundException('Admin introuvable');
+    
     conv.participantB = new Types.ObjectId(adminId);
     await conv.save();
-    return conv;
+    
+    // Send welcome message from admin
+    await this.sendWelcomeMessage(conversationId, adminId, admin.name);
+    
+    return await this.conversationModel.findById(conversationId)
+      .populate('participantA', 'name email profile_picture')
+      .populate('participantB', 'name email photo_profil poste departement');
+  }
+
+  /**
+   * Auto-assign available admin to help conversation
+   */
+  private async autoAssignAdminToHelp(conversationId: string) {
+    // Find an available admin (simple round-robin or least busy)
+    const availableAdmin = await this.adminModel.findOne({ role: 'admin' }).sort({ createdAt: 1 });
+    
+    if (availableAdmin) {
+      await this.assignHelpThread(conversationId, availableAdmin._id.toString());
+    }
+  }
+
+  /**
+   * Send welcome message from assigned admin
+   */
+  private async sendWelcomeMessage(conversationId: string, adminId: string, adminName: string) {
+    const conv = await this.conversationModel.findById(conversationId);
+    if (!conv) return;
+
+    const welcomeText = `Hello! I'm ${adminName}, your support agent. How can I help you today? 😊`;
+    
+    const msg = await this.messageModel.create({
+      conversationId: conv._id,
+      senderId: new Types.ObjectId(adminId),
+      recipientId: conv.participantA,
+      text: welcomeText,
+      attachments: [],
+    });
+
+    // Update conversation
+    conv.lastMessageText = welcomeText;
+    conv.lastMessageAt = new Date();
+    conv.unreadCountA = (conv.unreadCountA || 0) + 1;
+    await conv.save();
+
+    // Emit realtime event
+    this.dmGateway.emitNewMessage(conv._id.toString(), conv.participantA.toString(), msg);
+  }
+
+  /**
+   * Get admin info for help conversations
+   */
+  async getHelpConversationAdmin(conversationId: string) {
+    const conv = await this.conversationModel.findById(conversationId)
+      .populate('participantB', 'name email photo_profil poste departement');
+    
+    if (conv?.type === 'HELP_DM' && conv.participantB) {
+      return conv.participantB;
+    }
+    
+    return null;
   }
 }
 

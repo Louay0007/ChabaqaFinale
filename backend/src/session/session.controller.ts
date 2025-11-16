@@ -12,7 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { SessionService } from './session.service';
 import { CreateSessionDto } from '../dto-session/create-session.dto';
 import { UpdateSessionDto } from '../dto-session/update-session.dto';
@@ -194,6 +194,69 @@ export class SessionController {
   @ApiResponse({ status: 200, description: 'Réservations du créateur récupérées avec succès', type: CreatorBookingsResponseDto })
   async getCreatorBookings(@Request() req: any): Promise<CreatorBookingsResponseDto> {
     return this.sessionService.getCreatorBookings(req.user.userId);
+  }
+
+  // Get sessions for a specific user (for profile viewing)
+  @Get('by-user/:userId')
+  @ApiOperation({ 
+    summary: 'Get sessions for a specific user',
+    description: 'Retrieve sessions associated with a user (booked + created)'
+  })
+  @ApiParam({ name: 'userId', description: 'User ID', type: 'string' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiQuery({ name: 'type', required: false, enum: ['booked', 'created', 'all'], description: 'Session type filter' })
+  @ApiQuery({ name: 'timeFilter', required: false, enum: ['upcoming', 'past', 'all'], description: 'Time filter' })
+  @ApiResponse({
+    status: 200,
+    description: 'User sessions retrieved successfully',
+    content: {
+      'application/json': {
+        example: {
+          success: true,
+          message: 'User sessions retrieved successfully',
+          data: {
+            sessions: [
+              {
+                id: '1',
+                title: 'Design Systems Workshop',
+                description: 'Learn to build scalable design systems',
+                thumbnail: 'https://example.com/thumb.jpg',
+                startTime: '2024-01-20T14:00:00Z',
+                duration: 60,
+                status: 'upcoming',
+                type: 'booked',
+                creator: {
+                  name: 'Jane Doe',
+                  avatar: 'https://example.com/avatar.jpg'
+                }
+              }
+            ],
+            pagination: {
+              page: 1,
+              limit: 10,
+              total: 5,
+              totalPages: 1
+            }
+          }
+        }
+      }
+    }
+  })
+  async getSessionsByUser(
+    @Param('userId') userId: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+    @Query('type') type: 'booked' | 'created' | 'all' = 'all',
+    @Query('timeFilter') timeFilter: 'upcoming' | 'past' | 'all' = 'all'
+  ) {
+    return await this.sessionService.getSessionsByUser(
+      userId, 
+      Number(page) || 1, 
+      Number(limit) || 10,
+      type,
+      timeFilter
+    );
   }
 
   // ============ GESTION DES HEURES DE DISPONIBILITÉ ============

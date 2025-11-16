@@ -10,24 +10,18 @@ interface CommunityCardProps {
     id: string;
     slug: string;
     name: string;
-    creator: string | { id: string; name: string; avatar: string };
+    creator: string;
     creatorAvatar?: string;
-    description?: string;
-    shortDescription?: string;
+    description: string;
     category: string;
-    members?: number;
-    membersCount?: number;
-    rating?: number;
-    averageRating?: number;
+    members: number;
+    rating: number;
     price: number;
     priceType: string;
-    image?: number; // Local images (mock data)
-    logo?: string; // Remote images (API data)
-    coverImage?: string;
+    image: number; // Images locales uniquement
     tags: string[];
     featured: boolean;
-    verified?: boolean;
-    isVerified?: boolean;
+    verified: boolean;
     type?: "community" | "course" | "challenge" | "product" | "oneToOne";
   };
   viewMode?: 'list' | 'grid';
@@ -36,56 +30,6 @@ interface CommunityCardProps {
 export default function CommunityCard({ community, viewMode = 'list' }: CommunityCardProps) {
   const handlePress = () => {
     router.push(`/(communities)/${community.slug}`);
-  };
-
-  // Helper to get creator name (handles both string and object)
-  const getCreatorName = () => {
-    if (typeof community.creator === 'string') {
-      return community.creator;
-    }
-    return community.creator?.name || 'Unknown';
-  };
-
-  // Helper to get creator avatar (handles both structures)
-  const getCreatorAvatar = () => {
-    if (typeof community.creator === 'object' && community.creator.avatar) {
-      return community.creator.avatar;
-    }
-    return community.creatorAvatar;
-  };
-
-  // Helper to get member count (handles both field names)
-  const getMemberCount = () => {
-    return community.membersCount ?? community.members ?? 0;
-  };
-
-  // Helper to get rating (handles both field names)
-  const getRating = () => {
-    return community.averageRating ?? community.rating ?? 0;
-  };
-
-  // Helper to get description (handles both field names)
-  const getDescription = () => {
-    return community.shortDescription || community.description || '';
-  };
-
-  // Helper to check verified status (handles both field names)
-  const isVerified = () => {
-    return community.isVerified ?? community.verified ?? false;
-  };
-
-  // Helper to get image source (handles both local images and URLs)
-  const getImageSource = () => {
-    // If image exists (local image from mock data), use it
-    if (community.image) {
-      return community.image;
-    }
-    // Otherwise, use coverImage or logo URL from API
-    const imageUrl = community.coverImage || community.logo;
-    // Use remote placeholder if no image available
-    return imageUrl 
-      ? { uri: imageUrl } 
-      : { uri: 'https://via.placeholder.com/400x200/8e78fb/ffffff?text=Community' };
   };
 
   const formatMembers = (count: number) => {
@@ -166,7 +110,7 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
             {/* Image Section */}
             <View style={communityStyles.listImageContainer}>
               <Image 
-                source={getImageSource()} 
+                source={community.image} 
                 style={communityStyles.listImage}
                 resizeMode="cover"
                 onError={(error) => {
@@ -210,17 +154,17 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
                 {/* Creator */}
                 <View style={communityStyles.creatorRow}>
                   <Image
-                    source={{ uri: getCreatorAvatar() }}
+                    source={{ uri: community.creatorAvatar }}
                     style={communityStyles.communityCardCreatorAvatar}
                   />
                   <Text style={communityStyles.creatorText}>
-                    by <Text style={communityStyles.communityCardCreatorName}>{getCreatorName()}</Text>
+                    by <Text style={communityStyles.communityCardCreatorName}>{community.creator}</Text>
                   </Text>
                 </View>
 
                 {/* Description */}
                 <Text style={communityStyles.listDescription} numberOfLines={2}>
-                  {getDescription()}
+                  {community.description}
                 </Text>
 
                 {/* Tags */}
@@ -239,11 +183,11 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
                 <View style={communityStyles.communityCardStatsContainer}>
                   <View style={communityStyles.communityCardStatItem}>
                     <Ionicons name="people" size={12} color="#8e78fb" />
-                    <Text style={communityStyles.communityCardStatText}>{formatMembers(getMemberCount())}</Text>
+                    <Text style={communityStyles.communityCardStatText}>{formatMembers(community.members)}</Text>
                   </View>
                   <View style={communityStyles.communityCardStatItem}>
                     <Ionicons name="star" size={12} color="#f59e0b" />
-                    <Text style={communityStyles.communityCardStatText}>{getRating().toFixed(1)}</Text>
+                    <Text style={communityStyles.communityCardStatText}>{community.rating}</Text>
                   </View>
                   <View style={[
                     communityStyles.typeBadge, 
@@ -284,7 +228,7 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
         {/* Image Section */}
         <View style={communityStyles.gridImageContainer}>
           <Image 
-            source={getImageSource()} 
+            source={community.image} 
             style={communityStyles.communityCardGridImage}
             resizeMode="cover"
             onError={(error) => {
@@ -317,11 +261,11 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
           {/* Creator */}
           <View style={communityStyles.gridCreatorRow}>
             <Image
-              source={{ uri: getCreatorAvatar() }}
+              source={{ uri: community.creatorAvatar }}
               style={communityStyles.gridCreatorAvatar}
             />
             <Text style={communityStyles.gridCreatorText}>
-              by <Text style={communityStyles.communityCardCreatorName}>{getCreatorName()}</Text>
+              by <Text style={communityStyles.communityCardCreatorName}>{community.creator}</Text>
             </Text>
           </View>
 
@@ -329,11 +273,11 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
           <View style={communityStyles.gridStatsContainer}>
             <View style={communityStyles.communityCardStatItem}>
               <Ionicons name="people" size={12} color="#8e78fb" />
-              <Text style={communityStyles.communityCardStatText}>{formatMembers(getMemberCount())}</Text>
+              <Text style={communityStyles.communityCardStatText}>{formatMembers(community.members)}</Text>
             </View>
             <View style={communityStyles.communityCardStatItem}>
               <Ionicons name="star" size={12} color="#f59e0b" />
-              <Text style={communityStyles.communityCardStatText}>{getRating().toFixed(1)}</Text>
+              <Text style={communityStyles.communityCardStatText}>{community.rating}</Text>
             </View>
             <View style={[
               communityStyles.typeBadge, 

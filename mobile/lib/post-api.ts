@@ -219,20 +219,41 @@ export async function getPostsByCommunity(
 ): Promise<PostListResponse> {
   try {
     console.log('📝 [POST-API] Fetching posts for community:', communityId);
+    console.log('🔗 [POST-API] Request filters:', filters);
 
     const params = new URLSearchParams();
     if (filters.page) params.append('page', filters.page.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
 
+    const url = `/api/posts/community/${communityId}?${params.toString()}`;
+    console.log('🔗 [POST-API] Request URL:', url);
+
     const resp = await tryEndpoints<any>(
-      `/api/posts/community/${communityId}?${params.toString()}`,
+      url,
       {
         method: 'GET',
         timeout: 30000,
       }
     );
 
+    console.log('🔍 [POST-API] Response status:', resp.status);
+    console.log('📄 [POST-API] Response data:', resp.data);
+
     if (resp.status >= 200 && resp.status < 300) {
+      // Check if the backend returned success: false
+      if (resp.data.success === false) {
+        console.log('⚠️ [POST-API] Backend returned success: false, using empty data');
+        return {
+          posts: [],
+          pagination: {
+            page: filters.page || 1,
+            limit: filters.limit || 10,
+            total: 0,
+            totalPages: 0,
+          }
+        };
+      }
+
       console.log('✅ [POST-API] Community posts fetched:', resp.data.data?.posts?.length || 0);
       return {
         posts: resp.data.data?.posts || [],
@@ -245,7 +266,7 @@ export async function getPostsByCommunity(
       };
     }
 
-    throw new Error(resp.data.message || 'Failed to fetch community posts');
+    throw new Error(resp.data.message || `HTTP ${resp.status}: Failed to fetch community posts`);
   } catch (error: any) {
     console.error('💥 [POST-API] Error fetching community posts:', error);
     throw new Error(error.message || 'Failed to fetch community posts');

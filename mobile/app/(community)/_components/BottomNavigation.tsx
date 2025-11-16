@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BookOpen, Calendar, Home, Package, Sparkles, Zap } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { communityStyles, sectionColors } from './community-styles';
 
 interface BottomNavigationProps {
@@ -14,6 +15,7 @@ export default function BottomNavigation({ slug, currentTab = 'home' }: BottomNa
   const router = useRouter();
   const params = useLocalSearchParams<{ slug: string }>();
   const communitySlug = slug || params.slug;
+  const insets = useSafeAreaInsets();
   
   const handleHome = () => {
     router.replace(`/(community)/${communitySlug}/(loggedUser)/home`);
@@ -42,7 +44,7 @@ export default function BottomNavigation({ slug, currentTab = 'home' }: BottomNa
   const isActive = (tab: string) => currentTab === tab;
 
   return (
-    <View style={communityStyles.bottomBarContainer}>
+    <View style={[communityStyles.bottomBarContainer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       <View style={communityStyles.bottomBar}>
         {/* Home */}
         <TouchableOpacity

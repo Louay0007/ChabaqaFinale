@@ -308,6 +308,63 @@ export class ChallengeController {
     );
   }
 
+  // Get challenges for a specific user (for profile viewing)
+  @Get('by-user/:userId')
+  @ApiOperation({ 
+    summary: 'Get challenges for a specific user',
+    description: 'Retrieve challenges associated with a user (participated + created)'
+  })
+  @ApiParam({ name: 'userId', description: 'User ID', type: 'string' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiQuery({ name: 'type', required: false, enum: ['participated', 'created', 'all'], description: 'Challenge type filter' })
+  @ApiResponse({
+    status: 200,
+    description: 'User challenges retrieved successfully',
+    content: {
+      'application/json': {
+        example: {
+          success: true,
+          message: 'User challenges retrieved successfully',
+          data: {
+            challenges: [
+              {
+                id: '1',
+                title: 'JS Masters',
+                description: 'Master JavaScript fundamentals',
+                thumbnail: 'https://example.com/thumb.jpg',
+                progress: 75,
+                status: 'active',
+                type: 'participated',
+                category: 'Programming',
+                difficulty: 'Intermediate'
+              }
+            ],
+            pagination: {
+              page: 1,
+              limit: 10,
+              total: 5,
+              totalPages: 1
+            }
+          }
+        }
+      }
+    }
+  })
+  async getChallengesByUser(
+    @Param('userId') userId: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+    @Query('type') type: 'participated' | 'created' | 'all' = 'all'
+  ) {
+    return await this.challengeService.getChallengesByUser(
+      userId, 
+      Number(page) || 1, 
+      Number(limit) || 10,
+      type
+    );
+  }
+
   @Get('premium')
   @ApiOperation({ summary: 'Récupérer les défis premium' })
   @ApiResponse({ status: 200, description: 'Liste des défis premium récupérée avec succès', type: ChallengeListResponseDto })

@@ -153,6 +153,10 @@ async createCommunity(
   @Request() req: any
 ) {
   try {
+    console.log('🔍 [CREATE COMMUNITY] Request received')
+    console.log('🔍 [CREATE COMMUNITY] DTO:', JSON.stringify(createCommunityDto, null, 2))
+    console.log('🔍 [CREATE COMMUNITY] User:', req.user?._id)
+    
     const userId = req.user._id;
     const uploadedFiles: { logo?: string } = {};
 
@@ -189,18 +193,22 @@ async createCommunity(
       data: community
     };
   } catch (error) {
-    console.error('❌ Erreur dans createCommunity:', error);
+    console.error('❌ [CREATE COMMUNITY] Error:', error);
+    console.error('❌ [CREATE COMMUNITY] Error message:', error.message);
+    console.error('❌ [CREATE COMMUNITY] Error stack:', error.stack);
     throw error;
   }
 }
 
 
   /**
-   * Obtenir toutes les communautés créées par l'utilisateur connecté
+   * Obtenir toutes les communautés créées par l'utilisateur
    * Route: GET /community-aff-crea-join/my-created
    * Authentification: JWT obligatoire
    */
   @Get('my-created')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Obtenir mes communautés créées',
@@ -227,7 +235,12 @@ async createCommunity(
   })
   async getMyCreatedCommunities(@Request() req: any) {
     try {
-      const userId = req.user._id;
+      const userId = req.user._id || req.user.userId;
+      if (!userId) {
+        throw new Error('User ID not found in request');
+      }
+      
+      console.log('🔍 Getting created communities for user:', userId);
       const communities = await this.communityService.getUserCreatedCommunities(userId);
       
       return {
@@ -236,6 +249,7 @@ async createCommunity(
         data: communities
       };
     } catch (error) {
+      console.error('❌ Error in getMyCreatedCommunities:', error);
       throw error;
     }
   }
@@ -246,6 +260,8 @@ async createCommunity(
    * Authentification: JWT obligatoire
    */
   @Get('my-joined')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Obtenir mes communautés rejointes',
@@ -472,6 +488,8 @@ async createCommunity(
    * Authentification: JWT obligatoire
    */
   @Post('join')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   @ApiOperation({ 
@@ -760,9 +778,9 @@ async createCommunity(
   }
 
   /**
-   * Obtenir une communauté par son ID
+   * Obtenir une communauté par son ID ou slug
    * Route: GET /community-aff-crea-join/:id
-   * Authentification: JWT obligatoire
+   * Authentification: Optionnelle (public)
    * 
    * IMPORTANT: Cette route doit être placée EN DERNIER car elle utilise un paramètre dynamique (:id)
    * qui pourrait capturer d'autres routes spécifiques si elle était placée avant.
@@ -770,13 +788,22 @@ async createCommunity(
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
-    summary: 'Obtenir une communauté par ID',
-    description: 'Récupère les détails d\'une communauté spécifique'
+    summary: 'Obtenir une communauté par ID ou slug',
+    description: 'Récupère les détails d\'une communauté spécifique via son ID MongoDB ou son slug'
   })
   @ApiParam({ 
     name: 'id', 
-    description: 'ID de la communauté',
-    example: '507f1f77bcf86cd799439011'
+    description: 'ID MongoDB ou slug de la communauté',
+    examples: {
+      id: {
+        value: '507f1f77bcf86cd799439011',
+        description: 'MongoDB ObjectId'
+      },
+      slug: {
+        value: 'javascript-developers-tunisia',
+        description: 'Community slug'
+      }
+    }
   })
   @ApiResponse({ 
     status: HttpStatus.OK, 

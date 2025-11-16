@@ -43,6 +43,7 @@ export class CommunitiesController {
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 12)' })
   @ApiQuery({ name: 'featured', required: false, type: Boolean, description: 'Show only featured communities' })
+  @ApiQuery({ name: 'creatorId', required: false, type: String, description: 'Filter by creator ID' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Communities retrieved successfully',
@@ -96,7 +97,8 @@ export class CommunitiesController {
     @Query('sortBy') sortBy?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-    @Query('featured') featured?: boolean
+    @Query('featured') featured?: boolean,
+    @Query('creatorId') creatorId?: string
   ) {
     const filters = {
       search,
@@ -107,12 +109,17 @@ export class CommunitiesController {
       sortBy,
       page: page || 1,
       limit: limit || 12,
-      featured
+      featured,
+      creatorId
     };
 
     const result = await this.communitiesService.getCommunities(filters);
     
-    return result;
+    return {
+      success: true,
+      message: 'Communities retrieved successfully',
+      data: result
+    };
   }
 
   /**
@@ -361,5 +368,70 @@ export class CommunitiesController {
     const suggestions = await this.communitiesService.getSearchSuggestions(query, limit || 5);
     
     return suggestions;
+  }
+
+  // Get communities for a specific user (for profile viewing)
+  @Get('by-user/:userId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Get communities for a specific user',
+    description: 'Retrieve communities associated with a user (joined + created)'
+  })
+  @ApiParam({ name: 'userId', description: 'User ID', type: 'string' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiQuery({ name: 'type', required: false, enum: ['joined', 'created', 'all'], description: 'Community type filter' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User communities retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'User communities retrieved successfully',
+        data: {
+          communities: [
+            {
+              id: '1',
+              slug: 'web-dev-community',
+              name: 'Web Development Hub',
+              logo: 'https://example.com/logo.png',
+              coverImage: 'https://example.com/cover.jpg',
+              shortDescription: 'Learn web development',
+              membersCount: 1250,
+              role: 'member',
+              type: 'joined',
+              joinedAt: '2024-01-15T10:30:00Z'
+            }
+          ],
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 5,
+            totalPages: 1
+          }
+        }
+      }
+    }
+  })
+  async getCommunitiesByUser(
+    @Param('userId') userId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('type') type?: 'joined' | 'created' | 'all'
+  ) {
+    const result = await this.communitiesService.getCommunitiesByUser(
+      userId,
+      {
+        page: page || 1,
+        limit: limit || 10,
+        type: type || 'all'
+      }
+    );
+    
+    return {
+      success: true,
+      message: 'User communities retrieved successfully',
+      data: result
+    };
   }
 }

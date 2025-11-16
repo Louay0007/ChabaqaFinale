@@ -51,6 +51,13 @@ export class PostController {
     @Body() createPostDto: CreatePostDto,
     @Request() req,
   ): Promise<{ success: boolean; data: PostResponseDto }> {
+    console.log('📝 [POST-CONTROLLER] Create post request received:', {
+      body: createPostDto,
+      userId: req.user?.userId,
+      userSub: req.user?.sub,
+      user: req.user
+    });
+    
     const post = await this.postService.create(createPostDto, req.user.userId);
     return { success: true, data: post };
   }
@@ -152,14 +159,50 @@ export class PostController {
   async findByCommunity(
     @Param('communityId') communityId: string,
     @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('limit') limit?: number
   ): Promise<{ success: boolean; data: PostListResponseDto }> {
-    const posts = await this.postService.findByCommunity(
+    console.log('📝 [POST-CONTROLLER] Find posts by community request:', {
       communityId,
-      page || 1,
-      limit || 10,
-    );
-    return { success: true, data: posts };
+      page: page || 1,
+      limit: limit || 10
+    });
+    
+    try {
+      // Validate input parameters
+      if (!communityId || communityId.trim() === '') {
+        throw new Error('Community ID is required');
+      }
+
+      const posts = await this.postService.findByCommunity(
+        communityId.trim(),
+        page || 1,
+        limit || 10,
+      );
+      console.log('✅ [POST-CONTROLLER] Successfully found posts:', posts.posts.length);
+      return { success: true, data: posts };
+    } catch (error: any) {
+      console.error('❌ [POST-CONTROLLER] Error in findByCommunity:', {
+        error: error.message,
+        stack: error.stack,
+        communityId,
+        page,
+        limit
+      });
+      
+      // Return a graceful error response instead of throwing
+      return {
+        success: false,
+        data: {
+          posts: [],
+          pagination: {
+            page: page || 1,
+            limit: limit || 10,
+            total: 0,
+            totalPages: 0,
+          },
+        },
+      };
+    }
   }
 
   @Get(':id')
@@ -385,6 +428,207 @@ export class PostController {
   ): Promise<{ success: boolean; data: PostStatsResponseDto }> {
     const stats = await this.postService.unlikePost(postId, req.user.userId);
     return { success: true, data: stats };
+  }
+
+  @Get('debug/count')
+  @ApiOperation({ summary: 'Compter tous les posts (debug)' })
+  @ApiResponse({ status: 200, description: 'Nombre de posts' })
+  async getPostsCount(): Promise<{ success: boolean; data: { total: number } }> {
+    try {
+      const total = await this.postService.countAllPosts();
+      return { success: true, data: { total } };
+    } catch (error) {
+      console.error('❌ [POST-CONTROLLER] Error counting posts:', error);
+      throw error;
+    }
+  }
+
+  @Post('debug/create-sample')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Créer un post de test (debug)' })
+  @ApiResponse({ status: 201, description: 'Post de test créé' })
+  async createSamplePost(@Request() req): Promise<{ success: boolean; data: any }> {
+    try {
+      console.log('🧪 [POST-CONTROLLER] Creating sample post for user:', req.user);
+      
+      // Create a sample post using the authenticated user
+      const samplePostData = {
+        title: 'Test Post',
+        content: 'This is a test post to verify user names are displayed correctly.',
+        communityId: '68f8ee2637b5ee4d903d9211', // Use the community ID from the request
+        tags: ['test', 'debug']
+      };
+
+      const post = await this.postService.create(samplePostData, req.user.userId || req.user.sub);
+      return { success: true, data: post };
+    } catch (error: any) {
+      console.error('❌ [POST-CONTROLLER] Error creating sample post:', error);
+      return { success: false, data: { error: error.message } };
+    }
+  }
+
+  @Get('debug/inspect/:communityId')
+  @ApiOperation({ summary: 'Inspecter les posts et utilisateurs (debug)' })
+  @ApiResponse({ status: 200, description: 'Informations de debug' })
+  async inspectCommunityPosts(@Param('communityId') communityId: string): Promise<{ success: boolean; data: any }> {
+    try {
+      console.log('🔍 [POST-CONTROLLER] Inspecting community posts:', communityId);
+      
+      // Step 1: Check basic counts
+      const totalPosts = await this.postService['postModel'].countDocuments({});
+      const communityPosts = await this.postService['postModel'].countDocuments({ communityId });
+      const totalUsers = await this.postService['userModel'].countDocuments({});
+      
+      console.log('📊 Basic counts:', { totalPosts, communityPosts, totalUsers });
+
+      // Step 2: Get raw posts without population
+      const rawPosts = await this.postService['postModel']
+        .find({ communityId })
+        .limit(3)
+        .exec();
+
+      console.log('📋 Raw posts:', rawPosts.map(p => ({
+        id: p.id,
+        title: p.title,
+        authorId: p.authorId,
+        authorIdType: typeof p.authorId,
+        authorIdString: p.authorId.toString()
+      })));
+
+      // Step 3: Get posts with population
+      const populatedPosts = await this.postService['postModel']
+        .find({ communityId })
+        .populate('authorId', 'name email profile_picture')
+        .limit(3)
+        .exec();
+
+      console.log('👥 Populated posts:', populatedPosts.map(p => ({
+        id: p.id,
+        title: p.title,
+        authorId: p.authorId,
+        authorType: typeof p.authorId,
+        authorName: (p.authorId as any)?.name,
+        authorEmail: (p.authorId as any)?.email,
+        isPopulated: typeof p.authorId === 'object' && (p.authorId as any).name
+      })));
+
+      // Step 4: Get sample users
+      const users = await this.postService['userModel']
+        .find({})
+        .select('name email _id')
+        .limit(5)
+        .exec();
+
+      console.log('👤 Sample users:', users.map(u => ({
+        id: u._id.toString(),
+        name: u.name,
+        email: u.email
+      })));
+
+      // Step 5: Manual lookup test
+      let manualLookupResults: any[] = [];
+      for (const post of rawPosts.slice(0, 2)) {
+        try {
+          const user = await this.postService['userModel']
+            .findById(post.authorId)
+            .select('name email profile_picture')
+            .exec();
+          
+          manualLookupResults.push({
+            postId: post.id,
+            authorId: (post.authorId as any).toString(),
+            userFound: !!user,
+            userName: user?.name,
+            userEmail: user?.email
+          });
+        } catch (error: any) {
+          manualLookupResults.push({
+            postId: post.id,
+            authorId: (post.authorId as any).toString(),
+            error: error.message
+          });
+        }
+      }
+
+      console.log('🔍 Manual lookup results:', manualLookupResults);
+
+      const debugInfo = {
+        step1_counts: { totalPosts, communityPosts, totalUsers },
+        step2_rawPosts: rawPosts.map(p => ({
+          id: p.id,
+          title: p.title,
+          authorId: p.authorId.toString(),
+          createdAt: p.createdAt
+        })),
+        step3_populatedPosts: populatedPosts.map(p => ({
+          id: p.id,
+          title: p.title,
+          authorId: typeof p.authorId === 'object' ? (p.authorId as any)._id?.toString() : (p.authorId as any)?.toString() || 'unknown',
+          authorName: (p.authorId as any)?.name || 'NOT_POPULATED',
+          isPopulated: typeof p.authorId === 'object'
+        })),
+        step4_sampleUsers: users.map(u => ({
+          id: u._id.toString(),
+          name: u.name,
+          email: u.email
+        })),
+        step5_manualLookup: manualLookupResults,
+        diagnosis: this.diagnoseIssue(totalPosts, totalUsers, populatedPosts, users)
+      };
+
+      console.log('🎯 [POST-CONTROLLER] Complete debug info:', debugInfo);
+      return { success: true, data: debugInfo };
+    } catch (error: any) {
+      console.error('❌ [POST-CONTROLLER] Error inspecting posts:', error);
+      return { success: false, data: { error: error.message } };
+    }
+  }
+
+  private diagnoseIssue(totalPosts: number, totalUsers: number, populatedPosts: any[], users: any[]): string {
+    if (totalPosts === 0) {
+      return 'NO_POSTS: No posts exist in database. Create test posts first.';
+    }
+    if (totalUsers === 0) {
+      return 'NO_USERS: No users exist in database. User registration issue.';
+    }
+    if (populatedPosts.length > 0 && !populatedPosts[0].isPopulated) {
+      return 'POPULATE_FAILED: Posts exist but population is not working. Check User model reference.';
+    }
+    if (populatedPosts.length > 0 && populatedPosts[0].isPopulated && !populatedPosts[0].authorName) {
+      return 'USER_NO_NAME: Users exist and populate works but users have no name field.';
+    }
+    if (populatedPosts.length > 0 && populatedPosts[0].authorName) {
+      return 'SUCCESS: Everything should work. Check frontend transformation logic.';
+    }
+    return 'UNKNOWN: Further investigation needed.';
+  }
+
+  @Get('debug/test-flow/:communityId')
+  @ApiOperation({ summary: 'Test le flux complet de transformation (debug)' })
+  @ApiResponse({ status: 200, description: 'Test du flux' })
+  async testCompleteFlow(@Param('communityId') communityId: string): Promise<{ success: boolean; data: any }> {
+    try {
+      console.log('🧪 [POST-CONTROLLER] Testing complete flow for community:', communityId);
+      
+      // Use the actual service method that the frontend calls
+      const result = await this.postService.findByCommunity(communityId, 1, 5);
+      
+      console.log('🎯 [POST-CONTROLLER] Service returned:', {
+        postsCount: result.posts.length,
+        samplePost: result.posts[0] ? {
+          id: result.posts[0].id,
+          title: result.posts[0].title,
+          authorName: result.posts[0].author.name,
+          authorId: result.posts[0].author.id
+        } : null
+      });
+
+      return { success: true, data: { serviceResult: result } };
+    } catch (error: any) {
+      console.error('❌ [POST-CONTROLLER] Error testing flow:', error);
+      return { success: false, data: { error: error.message } };
+    }
   }
 
   @Get(':id/stats')

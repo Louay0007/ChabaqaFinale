@@ -30,6 +30,154 @@ export class SessionService {
   ) {}
 
   /**
+   * Get sessions for a specific user (booked + created)
+   */
+  async getSessionsByUser(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    type: 'booked' | 'created' | 'all' = 'all',
+    timeFilter: 'upcoming' | 'past' | 'all' = 'all'
+  ) {
+    console.log('🔧 DEBUG - getSessionsByUser');
+    console.log(`   👤 User ID: ${userId}`);
+    console.log(`   📄 Page: ${page}, Limit: ${limit}, Type: ${type}, TimeFilter: ${timeFilter}`);
+
+    const skip = (page - 1) * limit;
+    let allSessions: any[] = [];
+    let totalCount = 0;
+    const now = new Date();
+
+    // Get booked sessions
+    if (type === 'booked' || type === 'all') {
+      const bookedSessions = await this.sessionModel
+        .find({ 'bookings.userId': new Types.ObjectId(userId) })
+        .populate('creatorId', 'name email profile_picture')
+        .populate('communityId', 'name slug')
+        .sort({ startTime: -1 })
+        .exec();
+
+      const transformedBooked = bookedSessions
+        .map(session => {
+          const booking = session.bookings.find(b => b.userId.toString() === userId);
+          const sessionData = session as any;
+          const startTime = new Date(sessionData.startTime || sessionData.dateTime);
+          const isUpcoming = startTime > now;
+          const isPast = startTime <= now;
+          
+          // Apply time filter
+          if (timeFilter === 'upcoming' && !isUpcoming) return null;
+          if (timeFilter === 'past' && !isPast) return null;
+          
+          return {
+            id: session._id.toString(),
+            title: sessionData.title || sessionData.name,
+            description: sessionData.description,
+            thumbnail: sessionData.thumbnail || sessionData.image || 'https://placehold.co/400x300?text=Session',
+            startTime: sessionData.startTime || sessionData.dateTime,
+            duration: sessionData.duration || 60,
+            status: isUpcoming ? 'upcoming' : 'past',
+            type: 'booked',
+            bookingStatus: booking?.status || 'confirmed',
+            bookedAt: (booking as any)?.bookedAt || (booking as any)?.createdAt,
+            creator: {
+              name: (session.creatorId as any)?.name || 'Unknown',
+              avatar: (session.creatorId as any)?.profile_picture || 'https://placehold.co/64x64?text=MM'
+            },
+            community: {
+              name: (session.communityId as any)?.name || 'Unknown',
+              slug: (session.communityId as any)?.slug || 'unknown'
+            }
+          };
+        })
+        .filter(Boolean);
+
+      allSessions = [...allSessions, ...transformedBooked];
+    }
+
+    // Get created sessions
+    if (type === 'created' || type === 'all') {
+      const createdSessions = await this.sessionModel
+        .find({ creatorId: new Types.ObjectId(userId) })
+        .populate('creatorId', 'name email profile_picture')
+        .populate('communityId', 'name slug')
+        .sort({ startTime: -1 })
+        .exec();
+
+      const transformedCreated = createdSessions
+        .map(session => {
+          const sessionData = session as any;
+          const startTime = new Date(sessionData.startTime || sessionData.dateTime);
+          const isUpcoming = startTime > now;
+          const isPast = startTime <= now;
+          
+          // Apply time filter
+          if (timeFilter === 'upcoming' && !isUpcoming) return null;
+          if (timeFilter === 'past' && !isPast) return null;
+          
+          return {
+            id: session._id.toString(),
+            title: sessionData.title || sessionData.name,
+            description: sessionData.description,
+            thumbnail: sessionData.thumbnail || sessionData.image || 'https://placehold.co/400x300?text=Session',
+            startTime: sessionData.startTime || sessionData.dateTime,
+            duration: sessionData.duration || 60,
+            status: isUpcoming ? 'upcoming' : 'past',
+            type: 'created',
+            bookingsCount: sessionData.bookings?.length || 0,
+            maxParticipants: sessionData.maxParticipants || sessionData.capacity,
+            createdAt: session.createdAt,
+            creator: {
+              name: (session.creatorId as any)?.name || 'Unknown',
+              avatar: (session.creatorId as any)?.profile_picture || 'https://placehold.co/64x64?text=MM'
+            },
+            community: {
+              name: (session.communityId as any)?.name || 'Unknown',
+              slug: (session.communityId as any)?.slug || 'unknown'
+            }
+          };
+        })
+        .filter(Boolean);
+
+      allSessions = [...allSessions, ...transformedCreated];
+    }
+
+    // Sort by start time (upcoming first, then past)
+    allSessions.sort((a, b) => {
+      const dateA = new Date(a.startTime);
+      const dateB = new Date(b.startTime);
+      
+      // If both are upcoming or both are past, sort by date
+      if ((dateA > now && dateB > now) || (dateA <= now && dateB <= now)) {
+        return dateA.getTime() - dateB.getTime();
+      }
+      
+      // Upcoming sessions come first
+      return dateA > now ? -1 : 1;
+    });
+
+    totalCount = allSessions.length;
+    const paginatedSessions = allSessions.slice(skip, skip + limit);
+
+    console.log(`   📊 Total sessions found: ${totalCount}`);
+    console.log(`   📄 Returning: ${paginatedSessions.length} sessions`);
+
+    return {
+      success: true,
+      message: 'User sessions retrieved successfully',
+      data: {
+        sessions: paginatedSessions,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      }
+    };
+  }
+
+  /**
    * Créer une nouvelle session
    */
   async create(createSessionDto: CreateSessionDto, creatorId: string): Promise<SessionResponseDto> {

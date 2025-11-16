@@ -1,7 +1,6 @@
 import { Download, Star, Users } from 'lucide-react-native';
 import React from 'react';
 import { Image, Text, TouchableOpacity, View } from 'react-native';
-import RatingSummary from '../../../../_components/RatingSummary';
 import { Product } from '../../../../../lib/mock-data';
 import { styles } from '../styles';
 
@@ -88,12 +87,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <Text style={styles.productTitle} numberOfLines={2}>
             {product.title}
           </Text>
-          <RatingSummary
-            relatedModel="Product"
-            relatedTo={product.id}
-            size="small"
-            showReviewCount={true}
-          />
+          <View style={styles.ratingContainer}>
+            <Star size={14} color="#f59e0b" />
+            <Text style={styles.ratingText}>
+              {product.rating || '4.8'} ({product.sales})
+            </Text>
+          </View>
         </View>
 
         <Text style={styles.productDescription} numberOfLines={2}>

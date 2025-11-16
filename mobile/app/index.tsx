@@ -5,13 +5,6 @@ import { ActivityIndicator, View, Text } from 'react-native';
 export default function Index() {
   const { isLoading, isAuthenticated, logout } = useAuth();
 
-  // 🧪 TESTING MODE: Always start with auth for testing
-  // Comment out the lines below when you want normal behavior
-  console.log('🧪 [INDEX] TESTING MODE: Always redirecting to auth for testing');
-  return <Redirect href="/(auth)/signin" />;
-
-  // 📝 NORMAL MODE: Uncomment this section for production behavior
-  /*
   // Show loader during authentication verification
   if (isLoading) {
     return (
@@ -31,5 +24,4 @@ export default function Index() {
     console.log('🔐 [INDEX] User not authenticated, redirecting to signin');
     return <Redirect href="/(auth)/signin" />;
   }
-  */
 }

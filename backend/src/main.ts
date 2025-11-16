@@ -14,6 +14,12 @@ async function bootstrap() {
   // Serve static files from public directory
   app.use(express.static('public'));
   
+  // ⚠️ DEVELOPMENT ONLY: Increased body size limit for file uploads (50MB)
+  // TODO: Reduce to 10MB for production or use direct file uploads instead of base64
+  // See DEVELOPMENT_CHANGES.md for details
+  app.use(express.json({ limit: '50mb' }));  // PROD: '10mb'
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));  // PROD: '10mb'
+  
   // Stripe webhook needs raw body
   app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
   

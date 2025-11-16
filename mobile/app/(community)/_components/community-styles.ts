@@ -38,8 +38,6 @@ export const communityStyles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray200,
     paddingBottom: spacing.sm,
   },
   bottomBar: {

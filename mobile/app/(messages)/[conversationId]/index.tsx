@@ -93,6 +93,11 @@ export default function ConversationScreen() {
 
       setHasMore(response.hasMore);
       
+      // Set conversation object from API response
+      if (response.conversation && !conversation) {
+        setConversation(response.conversation);
+      }
+      
       // Mark conversation as read when first loading
       if (!hasMarkedRead.current && response.messages.length > 0) {
         markAsRead();
@@ -115,7 +120,7 @@ export default function ConversationScreen() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [conversationId, page]);
+  }, [conversationId, page, conversation]);
 
   // Initial load
   useEffect(() => {
@@ -203,13 +208,22 @@ export default function ConversationScreen() {
     const showTimestamp = !nextMessage || 
       new Date(nextMessage.createdAt).getTime() - new Date(item.createdAt).getTime() > 300000; // 5 minutes
 
+    // Show sender name for help conversations when it's from admin and different from previous
+    const showSenderName = !isFromMe && conversation?.type === 'HELP_DM' && (
+      !previousMessage || 
+      isMyMessage(previousMessage, user?._id || '') || 
+      previousMessage.senderId !== item.senderId
+    );
+
     return (
       <MessageBubble
         message={item}
         isFromMe={isFromMe}
         showAvatar={showAvatar}
         showTimestamp={showTimestamp}
+        showSenderName={showSenderName}
         conversation={conversation}
+        currentUserId={user?._id || ''}
       />
     );
   };

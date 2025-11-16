@@ -9,6 +9,7 @@ import {
     getProfile,
     getRefreshToken
 } from '../lib/auth';
+import AuthMigration from '../lib/auth-migration';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -50,9 +51,12 @@ export const useAuth = () => {
               setIsAuthenticated(false);
             }
           })
-          .catch(() => {
+          .catch((error) => {
             // En cas d'erreur réseau, garder l'état en cache
-            console.log('Network error during background auth check');
+            // Silently fail - user can still use app with cached data
+            if (__DEV__) {
+              console.log('Background auth check failed (using cached data)');
+            }
           });
         
         setIsLoading(false);
@@ -122,20 +126,34 @@ export const useAuth = () => {
   // Charger l'utilisateur au montage du composant
   useEffect(() => {
     const initializeAuth = async () => {
-      // Vérification rapide des tokens pour éviter le flash
-      const hasTokens = await checkTokensExist();
-      const cachedUser = await getCachedUser();
-      
-      if (hasTokens && cachedUser) {
-        // Définir immédiatement l'état comme authentifié pour éviter le flash
-        setUser(cachedUser);
-        setIsAuthenticated(true);
-        setIsLoading(false);
+      try {
+        // Run migration first to handle any old storage format
+        await AuthMigration.migrateAuthData();
+
+        // Diagnostic in development mode
+        if (__DEV__) {
+          await AuthMigration.diagnoseAuthStorage();
+        }
+
+        // Vérification rapide des tokens pour éviter le flash
+        const hasTokens = await checkTokensExist();
+        const cachedUser = await getCachedUser();
         
-        // Puis vérifier en arrière-plan
-        loadUser();
-      } else {
-        // Pas de tokens ou d'utilisateur en cache, charger normalement
+        if (hasTokens && cachedUser) {
+          // Définir immédiatement l'état comme authentifié pour éviter le flash
+          setUser(cachedUser);
+          setIsAuthenticated(true);
+          setIsLoading(false);
+          
+          // Puis vérifier en arrière-plan
+          loadUser();
+        } else {
+          // Pas de tokens ou d'utilisateur en cache, charger normalement
+          loadUser();
+        }
+      } catch (error) {
+        console.error('💥 [USE-AUTH] Error during auth initialization:', error);
+        // Still try to load user even if migration fails
         loadUser();
       }
     };

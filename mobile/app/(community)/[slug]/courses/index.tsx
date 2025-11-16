@@ -1,15 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, ActivityIndicator, Text, RefreshControl, ScrollView, TouchableOpacity } from 'react-native';
-import { 
-  Course, 
-  getCoursesByCommunity, 
-  getMyEnrolledCourses,
-  CourseProgress,
-  getCourseProgress,
-  calculateProgressPercentage
-} from '../../../../lib/course-api';
-import { useAuth } from '../../../../hooks/use-auth';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { Course, Enrollment, Progress, Section, getCoursesByCommunity as getMockCourses, getUserEnrollments as getMockEnrollments } from '../../../../lib/course-utils';
+import { getCoursesByCommunitySlug, getUserEnrolledCourses } from '../../../../lib/course-api';
+import { getCommunityBySlug } from '../../../../lib/communities-api';
+import { ThemedText } from '../../../../_components/ThemedText';
 import BottomNavigation from '../../_components/BottomNavigation';
 import { CoursesHeader } from './_components/CoursesHeader';
 import { CoursesList } from './_components/CoursesList';
@@ -19,90 +14,119 @@ import { styles } from './styles';
 
 export default function CoursesScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const { isAuthenticated, user } = useAuth();
-  
-  // State management
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
-  const [allCourses, setAllCourses] = useState<Course[]>([]);
-  const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
+  
+  // Real data state
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-  const [communityId, setCommunityId] = useState<string>('');
-
-  // Fetch community ID from slug
-  // TODO: Implement getCommunityBySlug API call to get community ID
-  // For now, using slug as placeholder
+  const [error, setError] = useState<string | null>(null);
+  const [community, setCommunity] = useState<any>(null);
+  const [allCourses, setAllCourses] = useState<any[]>([]);
+  const [userEnrollments, setUserEnrollments] = useState<any[]>([]);
+  
+  // Fetch data on component mount
   useEffect(() => {
-    // In future: fetch community details by slug to get ID
-    // const fetchCommunity = async () => {
-    //   const community = await getCommunityBySlug(slug as string);
-    //   setCommunityId(community._id);
-    // };
-    // fetchCommunity();
-    
-    // Temporary: use slug as ID (will be replaced with real API call)
-    setCommunityId(slug as string);
+    fetchCoursesData();
   }, [slug]);
-
-  // Load courses from API
-  const loadCourses = useCallback(async (isRefresh = false) => {
+  
+  const fetchCoursesData = async () => {
     try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+      setLoading(true);
+      setError(null);
+      console.log('📚 Fetching courses for community:', slug);
+
+      // Fetch community data first
+      const communityResponse = await getCommunityBySlug(slug || '');
+      if (!communityResponse.success || !communityResponse.data) {
+        throw new Error('Community not found');
       }
-      setError('');
-
-      console.log('📚 [COURSES] Loading courses for community:', slug);
-
-      // Fetch all courses for this community
-      const response = await getCoursesByCommunity(communityId || '', {
+      
+      const communityData = {
+        id: communityResponse.data._id || communityResponse.data.id,
+        name: communityResponse.data.name,
+        slug: communityResponse.data.slug,
+      };
+      setCommunity(communityData);
+      
+      // Fetch courses for this community
+      const coursesResponse = await getCoursesByCommunitySlug(slug as string, {
         page: 1,
         limit: 50,
-        sort_by: 'popular',
+        published: true
       });
-
-      setAllCourses(response.courses);
-
-      // Fetch enrolled courses if authenticated
-      if (isAuthenticated) {
-        const enrolled = await getMyEnrolledCourses();
-        setEnrolledCourses(enrolled);
-        console.log('✅ [COURSES] Enrolled courses loaded:', enrolled.length);
+      
+      // Transform backend courses to match frontend interface
+      const transformedCourses = (coursesResponse.courses || []).map((course: any) => ({
+        id: course._id,
+        title: course.titre,
+        description: course.description,
+        shortDescription: course.description,
+        thumbnail: course.thumbnailUrl || course.thumbnail || 'https://via.placeholder.com/400x300',
+        communityId: communityData.id,
+        creatorId: course.creatorId._id || course.creatorId,
+        creator: course.creatorId,
+        price: course.prix || 0,
+        currency: course.devise || 'TND',
+        isPaid: course.isPaid,
+        isPublished: course.isPublished,
+        category: course.category,
+        level: course.niveau,
+        duration: course.duree,
+        enrollmentCount: course.enrollmentCount || 0,
+        rating: course.averageRating || 0,
+        sections: course.sections || [],
+        learningObjectives: course.learningObjectives || [],
+        prerequisites: course.prerequisites || [],
+        tags: course.tags || [],
+        createdAt: new Date(course.createdAt),
+        updatedAt: new Date(course.updatedAt),
+      }));
+      
+      setAllCourses(transformedCourses);
+      
+      // Fetch user's enrolled courses
+      try {
+        const enrolledCourses = await getUserEnrolledCourses();
+        const transformedEnrollments = enrolledCourses.map((enrollment: any) => ({
+          id: enrollment.enrollment?._id || enrollment._id,
+          courseId: enrollment.cours?._id || enrollment.course?._id,
+          userId: enrollment.enrollment?.user || enrollment.user,
+          enrolledAt: new Date(enrollment.enrollment?.inscritLe || enrollment.enrolledAt),
+          progress: enrollment.progress || [],
+          completionPercentage: enrollment.enrollment?.progressionPourcentage || 0,
+          isCompleted: enrollment.enrollment?.estTermine || false,
+          lastAccessedAt: enrollment.enrollment?.dernierAcces ? new Date(enrollment.enrollment.dernierAcces) : null,
+        }));
+        setUserEnrollments(transformedEnrollments);
+      } catch (enrollmentError) {
+        console.warn('⚠️ Could not fetch user enrollments:', enrollmentError);
+        setUserEnrollments([]);
       }
-
-      console.log('✅ [COURSES] Courses loaded successfully:', response.courses.length);
+      
+      console.log('✅ Courses loaded:', transformedCourses.length);
     } catch (err: any) {
-      console.error('💥 [COURSES] Error loading courses:', err);
-      setError(err.message || 'Failed to load courses. Please try again.');
+      console.error('❌ Error fetching courses:', err);
+      setError(err.message || 'Failed to load courses');
+      
+      // Fallback to mock data
+      console.log('⚠️ Falling back to mock data');
+      const mockCourses = getMockCourses('1');
+      const mockEnrollments = getMockEnrollments('2');
+      
+      setAllCourses(mockCourses);
+      setUserEnrollments(mockEnrollments);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }, [communityId, isAuthenticated]);
-
-  // Load courses on mount and when dependencies change
-  useEffect(() => {
-    if (communityId) {
-      loadCourses();
-    }
-  }, [communityId, loadCourses]);
-
-  // Handle refresh
-  const handleRefresh = () => {
-    loadCourses(true);
   };
 
-  // Filter courses based on active tab and search
-  const filteredCourses = allCourses.filter((course: Course) => {
+  // Filtrer les cours en fonction de l'onglet actif et de la recherche
+  const filteredCourses = allCourses.filter((course: any) => {
     const matchesSearch =
       course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const isEnrolled = enrolledCourses.some((e) => e._id === course._id);
+    const isEnrolled = userEnrollments.some((e: any) => e.courseId === course.id);
 
     if (activeTab === 'enrolled') {
       return matchesSearch && isEnrolled;
@@ -116,58 +140,41 @@ export default function CoursesScreen() {
     return matchesSearch;
   });
 
-  // Calculate enrollment progress for a course
+  // Calculer le progrès pour un cours
   const getEnrollmentProgress = (courseId: string) => {
-    const isEnrolled = enrolledCourses.some((c) => c._id === courseId);
-    if (!isEnrolled) return null;
+    const enrollment = userEnrollments.find((e: any) => e.courseId === courseId);
+    if (!enrollment) return null;
 
-    // In real implementation, this would fetch from API
-    // For now, return basic structure
-    const course = allCourses.find((c) => c._id === courseId);
+    const course = allCourses.find((c: any) => c.id === courseId);
     if (!course) return null;
 
-    const totalChapters = course.sections.reduce((acc, s) => acc + s.chapters.length, 0);
-    
-    // TODO: Fetch actual progress from API
+    const totalChapters = course.sections.reduce((acc: number, s: any) => acc + (s.chapters?.length || 0), 0);
+    const completed = enrollment.progress.filter((p: any) => p.isCompleted).length;
     return { 
-      completed: 0, 
+      completed, 
       total: totalChapters, 
-      percentage: 0
+      percentage: totalChapters > 0 ? (completed / totalChapters) * 100 : 0
     };
   };
 
-  // Render loading state
-  if (loading && !refreshing) {
+  if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#8e78fb" />
-        <Text style={{ marginTop: 16, color: '#666', fontSize: 16 }}>Loading courses...</Text>
-        <BottomNavigation slug={slug as string} currentTab="courses" />
+        <ThemedText style={{ marginTop: 16, opacity: 0.7 }}>Loading courses...</ThemedText>
       </View>
     );
   }
 
-  // Render error state
-  if (error && !refreshing) {
+  if (error) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-        <Text style={{ fontSize: 48, marginBottom: 16 }}>⚠️</Text>
-        <Text style={{ fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 8 }}>Oops!</Text>
-        <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 }}>
+      <View style={styles.container}>
+        <ThemedText style={{ color: '#ef4444', textAlign: 'center', margin: 20 }}>
           {error}
-        </Text>
-        <TouchableOpacity
-          onPress={() => loadCourses()}
-          style={{
-            backgroundColor: '#8e78fb',
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Try Again</Text>
-        </TouchableOpacity>
-        <BottomNavigation slug={slug as string} currentTab="courses" />
+        </ThemedText>
+        <ThemedText style={{ textAlign: 'center', opacity: 0.7 }}>
+          Community: {slug}
+        </ThemedText>
       </View>
     );
   }
@@ -176,7 +183,7 @@ export default function CoursesScreen() {
     <View style={styles.container}>
       <CoursesHeader 
         allCourses={allCourses} 
-        userEnrollments={enrolledCourses} 
+        userEnrollments={userEnrollments} 
       />
       
       <SearchBar 
@@ -188,24 +195,16 @@ export default function CoursesScreen() {
         activeTab={activeTab} 
         onTabChange={setActiveTab}
         allCourses={allCourses}
-        userEnrollments={enrolledCourses}
+        userEnrollments={userEnrollments}
       />
       
       <CoursesList
         filteredCourses={filteredCourses}
-        userEnrollments={enrolledCourses}
+        userEnrollments={userEnrollments}
         searchQuery={searchQuery}
         activeTab={activeTab}
         slug={slug as string}
         getEnrollmentProgress={getEnrollmentProgress}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor="#8e78fb"
-            colors={['#8e78fb']}
-          />
-        }
       />
       
       {/* Bottom Navigation */}

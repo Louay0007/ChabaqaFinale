@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import PlatformUtils from './platform-utils';
 
 /**
  * 🚀 Platform-Aware HTTP Client using Native Fetch
@@ -6,39 +7,48 @@ import { Platform } from 'react-native';
  */
 
 // Base URLs to try in order (platform-specific)
-const PRIMARY_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const PRIMARY_BASE_URL = PlatformUtils.getApiUrl();
 
 // Build platform-specific fallback list
 const BASE_URLS: string[] = (() => {
   const urls: string[] = [];
   
-  // Add primary URL from env
-  if (PRIMARY_BASE_URL) {
-    urls.push(PRIMARY_BASE_URL);
-  }
-  
-  // Platform-specific fallbacks
-  if (Platform.OS === 'web') {
-    // Web can use localhost directly
+  // Platform-specific fallbacks (prioritize fast local connections)
+  if (PlatformUtils.isWeb) {
+    // Web: prioritize localhost (fastest), then env URL
     urls.push('http://localhost:3000');
+    if (PRIMARY_BASE_URL !== 'http://localhost:3000') {
+      urls.push(PRIMARY_BASE_URL);
+    }
     urls.push('http://127.0.0.1:3000');
-  } else if (Platform.OS === 'ios') {
+  } else if (PlatformUtils.isIOS) {
     // iOS simulator can use localhost
     urls.push('http://localhost:3000');
+    if (PRIMARY_BASE_URL !== 'http://localhost:3000') {
+      urls.push(PRIMARY_BASE_URL);
+    }
     urls.push('http://127.0.0.1:3000');
-  } else if (Platform.OS === 'android') {
+  } else if (PlatformUtils.isAndroid) {
     // Android emulator special IPs
     urls.push('http://10.0.2.2:3000');
     urls.push('http://10.0.3.2:3000');
+    if (PRIMARY_BASE_URL !== 'http://10.0.2.2:3000') {
+      urls.push(PRIMARY_BASE_URL);
+    }
     urls.push('http://localhost:3000');
+  } else {
+    // Other platforms: use primary first
+    urls.push(PRIMARY_BASE_URL);
   }
   
   // Remove duplicates
   return [...new Set(urls)];
 })();
 
-console.log('🌐 [HTTP] Platform:', Platform.OS);
-console.log('🌐 [HTTP] Will try endpoints:', BASE_URLS);
+if (__DEV__) {
+  console.log(`🌐 [HTTP] Platform: ${PlatformUtils.getPlatformName()}`);
+  console.log('🌐 [HTTP] Will try endpoints:', BASE_URLS);
+}
 
 // Response interface
 interface HttpResponse<T = any> {
@@ -126,11 +136,11 @@ export async function tryEndpoints<T = any>(
         fetchOptions.body = JSON.stringify(config.data);
       }
 
-      // Make request with timeout
+      // Make request with timeout (shorter for faster failover)
       const response = await fetchWithTimeout(
         url,
         fetchOptions,
-        config.timeout || 30000
+        config.timeout || 5000  // Reduced from 30s to 5s for faster failover
       );
 
       const elapsed = Date.now() - startTime;

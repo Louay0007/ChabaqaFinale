@@ -25,12 +25,12 @@ import {
   Dimensions,
   Image,
   Modal,
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { modalStyles } from './modal-styles';
 
 interface SideMenuModalProps {
@@ -45,6 +45,7 @@ export default function SideMenuModal({ visible, onClose }: SideMenuModalProps) 
   const slug = params.slug;
   const currentUser = getCurrentUser();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Animation state
   const slideAnim = React.useRef(new Animated.Value(-300)).current;
@@ -232,13 +233,13 @@ export default function SideMenuModal({ visible, onClose }: SideMenuModalProps) 
   ];
 
   const renderSideMenuContent = () => (
-    <SafeAreaView style={modalStyles.sideMenuContainer}>
+    <View style={[modalStyles.sideMenuContainer, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 16) }]}>
       <ScrollView style={modalStyles.sideMenuScrollView}>
         {/* Profil de l'utilisateur */}
         <TouchableOpacity 
           style={modalStyles.profileSection}
           onPress={() => {
-            router.push('/profile');
+            router.push('/(profile)');
             onClose();
           }}
         >
@@ -310,7 +311,7 @@ export default function SideMenuModal({ visible, onClose }: SideMenuModalProps) 
         {/* Version de l'app */}
         <Text style={modalStyles.versionText}>Chabaqa v1.0.0</Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 
   return (

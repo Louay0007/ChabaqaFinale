@@ -279,6 +279,19 @@ export class ProductController {
     return { success: true, ...result };
   }
 
+  @Get('my-purchases')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Récupérer les produits achetés par l\'utilisateur' })
+  @ApiResponse({ status: 200, description: 'Produits achetés récupérés avec succès' })
+  @ApiResponse({ status: 401, description: 'Non autorisé' })
+  async getMyPurchases(
+    @Request() req
+  ): Promise<{ success: boolean; products: any[] }> {
+    const products = await this.productService.getMyPurchases(req.user.userId);
+    return { success: true, products };
+  }
+
   @Patch(':id/files/:fileId/status')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

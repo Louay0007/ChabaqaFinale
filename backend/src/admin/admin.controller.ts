@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpStatus, Res, ConflictException, HttpCode, Response as ExpressResponse, Req, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, HttpStatus, Res, ConflictException, HttpCode, Response as ExpressResponse, Req, UseGuards, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiExtraModels } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { CreateAdminDto } from 'src/dto-admin/create-admin.dto';
@@ -332,6 +332,45 @@ export class AdminController {
         status: 400,
         message: err.message,
         error: 'BAD_REQUEST'
+      });
+    }
+  }
+
+  // ⚠️ DANGER: Delete all database data
+  @Delete('cleanup-database')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: '⚠️ DANGER: Delete All Database Data',
+    description: 'Deletes ALL data from the database. Use with extreme caution!',
+    tags: ['Admin']
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Database cleaned successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        deletedCollections: { type: 'array', items: { type: 'string' } }
+      }
+    }
+  })
+  @HttpCode(HttpStatus.OK)
+  async cleanupDatabase(@Res() response) {
+    try {
+      const result = await this.adminService.cleanupDatabase();
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'Database cleaned successfully',
+        deletedCollections: result.deletedCollections,
+      });
+    } catch (err) {
+      return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        status: 500,
+        message: err.message,
+        error: 'INTERNAL_SERVER_ERROR'
       });
     }
   }

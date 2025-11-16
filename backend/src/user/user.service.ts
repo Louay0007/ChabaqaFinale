@@ -94,6 +94,19 @@ export class UserService {
     return user;
   }
 
+  // get user by username/handle (email local-part)
+  async getUserByUsername(handle: string): Promise<IUser> {
+    // Find user where email starts with handle@
+    const user = await this.userModel.findOne({
+      email: { $regex: `^${handle}@`, $options: 'i' }
+    });
+    if (!user) {
+      throw new NotFoundException(`User with handle '${handle}' not found`);
+    }
+    return user;
+  }
+
+
   // delete user
   async deleteUser(id: string): Promise<IUser> {
     const deletedUser = await this.userModel.findByIdAndDelete(id);

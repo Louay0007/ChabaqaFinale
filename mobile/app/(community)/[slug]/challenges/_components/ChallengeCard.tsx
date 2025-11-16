@@ -2,7 +2,6 @@ import { Challenge } from '@/lib/mock-data';
 import { Calendar, Trophy, Users } from 'lucide-react-native';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import RatingSummary from '../../../../_components/RatingSummary';
 import { styles } from '../styles';
 
 interface ChallengeCardProps {
@@ -35,12 +34,6 @@ export default function ChallengeCard({
           <Text style={styles.statusText}>{status}</Text>
         </View>
         <Text style={styles.cardTitle}>{challenge.title}</Text>
-        <RatingSummary
-          relatedModel="Challenge"
-          relatedTo={challenge.id}
-          size="small"
-          showReviewCount={true}
-        />
         <Text style={styles.cardDescription} numberOfLines={2}>
           {challenge.description}
         </Text>

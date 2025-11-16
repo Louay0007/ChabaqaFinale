@@ -594,4 +594,103 @@ export class ProductService {
       updatedAt: product.updatedAt.toISOString()
     };
   }
+
+  /**
+   * Récupérer les produits achetés par l'utilisateur
+   */
+  async getMyPurchases(userId: string): Promise<any[]> {
+    try {
+      // Chercher toutes les commandes de l'utilisateur pour des produits
+      const orders = await this.orderModel.find({
+        user: userId,
+        status: 'completed',
+        'items.type': 'product'
+      })
+      .populate({
+        path: 'items.itemId',
+        model: 'Product',
+        populate: [
+          {
+            path: 'communityId',
+            model: 'Community',
+            select: 'name slug'
+          },
+          {
+            path: 'creatorId',
+            model: 'User',
+            select: 'name email'
+          }
+        ]
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+
+      // Extraire les produits uniques des commandes
+      const purchasedProducts: any[] = [];
+      const seenProductIds = new Set();
+
+      for (const order of orders) {
+        for (const item of order.items) {
+          if (item.type === 'product' && item.itemId && !seenProductIds.has(item.itemId._id.toString())) {
+            seenProductIds.add(item.itemId._id.toString());
+            
+            const product = item.itemId;
+            
+            // Informations de la communauté
+            const communityInfo = product.communityId ? {
+              _id: product.communityId._id.toString(),
+              name: product.communityId.name,
+              slug: product.communityId.slug
+            } : null;
+
+            // Informations du créateur
+            const creatorInfo = product.creatorId ? {
+              _id: product.creatorId._id.toString(),
+              name: product.creatorId.name,
+              email: product.creatorId.email
+            } : null;
+
+            purchasedProducts.push({
+              _id: product._id.toString(),
+              title: product.title,
+              description: product.description,
+              short_description: product.description,
+              price: product.price,
+              currency: product.currency,
+              category: product.category,
+              type: product.type,
+              images: product.images || [],
+              thumbnail: product.images?.[0],
+              is_published: product.isPublished,
+              stock_quantity: product.inventory,
+              rating: product.rating || 0,
+              reviews_count: product.ratingCount || 0,
+              downloads_count: product.files?.reduce((total, file) => total + (file.downloadCount || 0), 0) || 0,
+              purchases_count: product.sales || 0,
+              variants: product.variants || [],
+              files: product.files || [],
+              tags: product.tags || [],
+              created_at: product.createdAt?.toISOString() || new Date().toISOString(),
+              updated_at: product.updatedAt?.toISOString() || new Date().toISOString(),
+              created_by: creatorInfo,
+              community_id: communityInfo,
+              // Détails de l'achat
+              purchase_details: {
+                order_id: order._id.toString(),
+                purchased_at: order.createdAt.toISOString(),
+                amount_paid: item.price,
+                currency: order.currency || 'TND',
+                quantity: item.quantity || 1
+              }
+            });
+          }
+        }
+      }
+
+      return purchasedProducts;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des achats:', error);
+      throw error;
+    }
+  }
 }

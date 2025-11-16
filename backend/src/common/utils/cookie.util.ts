@@ -7,7 +7,7 @@ export class CookieUtil {
   static readonly ACCESS_TOKEN_CONFIG = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production', // HTTPS en production
-    sameSite: 'strict' as const,
+    sameSite: 'lax' as const, // Changed to 'lax' to work across domains
     maxAge: 2 * 60 * 60 * 1000, // 2 heures (correspond à la durée du JWT)
     path: '/',
   };
@@ -18,7 +18,7 @@ export class CookieUtil {
   static readonly REFRESH_TOKEN_CONFIG = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production', // HTTPS en production
-    sameSite: 'strict' as const,
+    sameSite: 'lax' as const, // Changed to 'lax' to work across domains
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 jours (correspond à la durée du JWT)
     path: '/',
   };
@@ -27,8 +27,8 @@ export class CookieUtil {
    * Noms des cookies
    */
   static readonly COOKIE_NAMES = {
-    ACCESS_TOKEN: 'access_token',
-    REFRESH_TOKEN: 'refresh_token',
+    ACCESS_TOKEN: 'accessToken', // Changed to match frontend naming convention
+    REFRESH_TOKEN: 'refreshToken', // Changed to match frontend naming convention
   };
 
   /**
@@ -67,12 +67,25 @@ export class CookieUtil {
    * Supprime les cookies de tokens (pour la déconnexion)
    */
   static clearTokenCookies(res: Response): void {
+    // Clear current cookie names
     res.clearCookie(this.COOKIE_NAMES.ACCESS_TOKEN, {
       path: this.ACCESS_TOKEN_CONFIG.path,
       secure: this.ACCESS_TOKEN_CONFIG.secure,
       sameSite: this.ACCESS_TOKEN_CONFIG.sameSite,
     });
     res.clearCookie(this.COOKIE_NAMES.REFRESH_TOKEN, {
+      path: this.REFRESH_TOKEN_CONFIG.path,
+      secure: this.REFRESH_TOKEN_CONFIG.secure,
+      sameSite: this.REFRESH_TOKEN_CONFIG.sameSite,
+    });
+    
+    // Also clear legacy cookie names for complete cleanup
+    res.clearCookie('access_token', {
+      path: this.ACCESS_TOKEN_CONFIG.path,
+      secure: this.ACCESS_TOKEN_CONFIG.secure,
+      sameSite: this.ACCESS_TOKEN_CONFIG.sameSite,
+    });
+    res.clearCookie('refresh_token', {
       path: this.REFRESH_TOKEN_CONFIG.path,
       secure: this.REFRESH_TOKEN_CONFIG.secure,
       sameSite: this.REFRESH_TOKEN_CONFIG.sameSite,

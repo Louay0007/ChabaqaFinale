@@ -67,7 +67,9 @@ export class CommunityAffCreaJoinService {
       }
 
       // Validation des liens sociaux - au moins un lien requis
-      const socialLinks = communityDataAvecLogo.socialLinks;
+      const socialLinks = communityDataAvecLogo.socialLinks || {};
+      console.log('🔍 [SERVICE] Social links:', JSON.stringify(socialLinks, null, 2));
+      
       const hasAtLeastOneLink = Object.values(socialLinks).some(link => link && link.trim() !== '');
       
       if (!hasAtLeastOneLink) {
@@ -246,7 +248,12 @@ export class CommunityAffCreaJoinService {
       id: community._id.toString(),
       slug: community.slug,
       name: community.name,
-      creator: (community.createur as any)?.name || 'Unknown',
+      creator: {
+        id: community.createur.toString(),
+        name: (community.createur as any)?.name || 'Unknown Creator',
+        avatar: (community.createur as any)?.profile_picture || 'https://placehold.co/64x64?text=U',
+        verified: false, // TODO: Add verified status
+      },
       creatorId: community.createur.toString(),
       creatorAvatar: (community.createur as any)?.profile_picture || community.creatorAvatar,
       description: community.short_description,
@@ -407,19 +414,36 @@ export class CommunityAffCreaJoinService {
   }
 
   /**
-   * Obtenir une communauté par son ID
-   * @param communityId - ID de la communauté
+   * Obtenir une communauté par son ID ou slug
+   * @param idOrSlug - ID MongoDB ou slug de la communauté
    * @returns La communauté trouvée
    */
-  async getCommunityById(communityId: string): Promise<CommunityDocument> {
+  async getCommunityById(idOrSlug: string): Promise<CommunityDocument> {
     try {
-      const community = await this.communityModel
-        .findById(communityId)
-        .populate('createur', 'name email')
-        .populate('members', 'name email')
-        .populate('admins', 'name email')
-        .populate('moderateurs', 'name email')
-        .exec();
+      let community;
+
+      // Check if the input is a valid MongoDB ObjectId
+      const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(idOrSlug);
+
+      if (isValidObjectId) {
+        // Query by ID
+        community = await this.communityModel
+          .findById(idOrSlug)
+          .populate('createur', 'name email avatar photo bio')
+          .populate('members', 'name email avatar photo')
+          .populate('admins', 'name email avatar photo')
+          .populate('moderateurs', 'name email avatar photo')
+          .exec();
+      } else {
+        // Query by slug
+        community = await this.communityModel
+          .findOne({ slug: idOrSlug })
+          .populate('createur', 'name email avatar photo bio')
+          .populate('members', 'name email avatar photo')
+          .populate('admins', 'name email avatar photo')
+          .populate('moderateurs', 'name email avatar photo')
+          .exec();
+      }
 
       if (!community) {
         throw new NotFoundException('Communauté non trouvée');

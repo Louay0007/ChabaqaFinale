@@ -32,9 +32,6 @@ export class CoursService {
     private readonly notificationService: NotificationService,
   ) {}
 
-  /**
-   * Récupérer la liste des cours avec pagination et filtres
-   */
   async getCourses(page: number = 1, limit: number = 10, category?: string, niveau?: string, search?: string) {
     const query: any = { isPublished: true };
     
@@ -495,6 +492,120 @@ export class CoursService {
       page,
       limit,
       totalPages: Math.ceil(totalInscriptions / limit)
+    };
+  }
+
+  /**
+   * Obtenir les cours d'un utilisateur (inscrits + créés)
+   */
+  async obtenirCoursParUtilisateur(
+    userId: string, 
+    page: number = 1, 
+    limit: number = 10,
+    type: 'enrolled' | 'created' | 'all' = 'all'
+  ) {
+    console.log('🔧 DEBUG - obtenirCoursParUtilisateur');
+    console.log(`   👤 User ID: ${userId}`);
+    console.log(`   📄 Page: ${page}, Limit: ${limit}, Type: ${type}`);
+
+    const skip = (page - 1) * limit;
+    let allCourses: any[] = [];
+    let totalCount = 0;
+
+    // Get enrolled courses
+    if (type === 'enrolled' || type === 'all') {
+      const enrollments = await this.courseEnrollmentModel
+        .find({ userId: new Types.ObjectId(userId), isActive: true })
+        .populate({
+          path: 'courseId',
+          populate: {
+            path: 'creatorId',
+            select: 'name email profile_picture'
+          }
+        })
+        .sort({ enrolledAt: -1 })
+        .exec();
+
+      const enrolledCourses = enrollments
+        .filter(enrollment => enrollment.courseId)
+        .map(enrollment => {
+          const course = enrollment.courseId as any;
+          // Calculate progress
+          const totalChapters = course.sections?.reduce((acc: number, section: any) => 
+            acc + (section.chapitres?.length || 0), 0) || 0;
+          const completedChapters = enrollment.progression?.filter((p: any) => p.isCompleted).length || 0;
+          const progress = totalChapters > 0 ? Math.round((completedChapters / totalChapters) * 100) : 0;
+          
+          return {
+            id: course._id.toString(),
+            titre: course.titre,
+            description: course.description,
+            thumbnail: course.thumbnail || 'https://placehold.co/400x300?text=Course',
+            progress,
+            status: progress === 100 ? 'completed' : progress > 0 ? 'in_progress' : 'not_started',
+            type: 'enrolled',
+            enrolledAt: enrollment.enrolledAt,
+            creator: {
+              name: course.creatorId?.name || 'Unknown',
+              avatar: course.creatorId?.profile_picture || 'https://placehold.co/64x64?text=MM'
+            }
+          };
+        });
+
+      allCourses = [...allCourses, ...enrolledCourses];
+    }
+
+    // Get created courses
+    if (type === 'created' || type === 'all') {
+      const createdCourses = await this.coursModel
+        .find({ creatorId: new Types.ObjectId(userId) })
+        .populate('creatorId', 'name email profile_picture')
+        .sort({ createdAt: -1 })
+        .exec();
+
+      const transformedCreated = createdCourses.map(course => ({
+        id: course._id.toString(),
+        titre: course.titre,
+        description: course.description,
+        thumbnail: course.thumbnail || 'https://placehold.co/400x300?text=Course',
+        progress: 100, // Creator has full access
+        status: course.isPublished ? 'published' : 'draft',
+        type: 'created',
+        createdAt: course.createdAt,
+        creator: {
+          name: (course.creatorId as any)?.name || 'Unknown',
+          avatar: (course.creatorId as any)?.profile_picture || 'https://placehold.co/64x64?text=MM'
+        }
+      }));
+
+      allCourses = [...allCourses, ...transformedCreated];
+    }
+
+    // Sort by most recent activity
+    allCourses.sort((a, b) => {
+      const dateA = new Date(a.enrolledAt || a.createdAt || 0);
+      const dateB = new Date(b.enrolledAt || b.createdAt || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    totalCount = allCourses.length;
+    const paginatedCourses = allCourses.slice(skip, skip + limit);
+
+    console.log(`   📊 Total courses found: ${totalCount}`);
+    console.log(`   📄 Returning: ${paginatedCourses.length} courses`);
+
+    return {
+      success: true,
+      message: 'User courses retrieved successfully',
+      data: {
+        courses: paginatedCourses,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      }
     };
   }
 

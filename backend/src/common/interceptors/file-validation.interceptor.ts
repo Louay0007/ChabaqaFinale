@@ -22,11 +22,9 @@ export class FileValidationInterceptor implements NestInterceptor {
   async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<any>> {
     const request = context.switchToHttp().getRequest();
     
-    // Check if files were uploaded
+ 
     if (request.file || request.files) {
       const files = request.files || [request.file];
-      
-      // Validate each file
       for (const file of files) {
         if (file) {
           const validation = await this.fileValidationService.validateFile(

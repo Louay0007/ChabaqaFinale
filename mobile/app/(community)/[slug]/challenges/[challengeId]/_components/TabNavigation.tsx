@@ -12,7 +12,6 @@ const tabs = [
   { key: 'timeline', label: 'Timeline' },
   { key: 'leaderboard', label: 'Leaderboard' },
   { key: 'submissions', label: 'My Work' },
-  { key: 'reviews', label: 'Reviews' },
 ];
 
 export default function TabNavigation({ activeTab, onTabChange }: TabNavigationProps) {

@@ -2,8 +2,10 @@ import { useAuth } from '@/hooks/use-auth';
 import { useAdaptiveColors } from '@/hooks/useAdaptiveColors';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getMyJoinedCommunities } from '@/lib/communities-api';
 
 interface SidebarProps {
   isVisible: boolean;
@@ -19,89 +21,82 @@ interface MenuItem {
 }
 
 export default function Sidebar({ isVisible, onClose }: SidebarProps) {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated } = useAuth();
   const adaptiveColors = useAdaptiveColors();
+  const insets = useSafeAreaInsets();
+  const [joinedCommunities, setJoinedCommunities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  // Fetch joined communities when sidebar becomes visible
+  useEffect(() => {
+    if (isVisible && isAuthenticated) {
+      fetchJoinedCommunities();
+    }
+  }, [isVisible, isAuthenticated]);
+
+  const fetchJoinedCommunities = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Fetching joined communities for sidebar...');
+      
+      const response = await getMyJoinedCommunities();
+      if (response.success && response.data) {
+        // Transform communities for sidebar display
+        const transformedCommunities = response.data.map((community: any) => ({
+          id: community._id || community.id,
+          slug: community.slug,
+          name: community.name,
+          logo: community.logo || community.settings?.logo,
+          category: community.category,
+          members: community.membersCount || community.members,
+        }));
+        
+        setJoinedCommunities(transformedCommunities);
+        console.log('✅ Joined communities loaded:', transformedCommunities.length);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching joined communities:', error);
+      // Don't show error in sidebar, just log it
+    } finally {
+      setLoading(false);
+    }
+  };
   
   if (!isVisible) return null;
 
-  // Logout handler
-  const handleLogout = async () => {
-    try {
-      await logout();
-      onClose();
-      // Navigate to signin screen after logout
-      router.replace('/(auth)/signin');
-    } catch (error) {
-      console.error('Error during logout:', error);
-    }
-  };
-
   const menuItems: MenuItem[] = [
-    // MAIN NAVIGATION SECTION
-    {
-      id: 'discover',
-      title: 'Discover Communities',
-      icon: 'compass',
-      onPress: () => {
-        router.push('/(communities)');
-        onClose();
-      }
-    },
-    {
-      id: 'messages',
-      title: 'Messages & DMs',
-      icon: 'chatbubbles',
-      onPress: () => {
-        router.push('/(messages)');
-        onClose();
-      }
-    },
-    {
-      id: 'notifications',
-      title: 'Notifications',
-      icon: 'notifications',
-      onPress: () => {
-        router.push('/(notifications)');
-        onClose();
-      }
-    },
-    // USER ACTIONS SECTION
-    {
-      id: 'profile',
-      title: 'My Profile',
-      icon: 'person-circle',
-      onPress: () => {
-        router.push('/(profile)');
-        onClose();
-      }
-    },
     {
       id: 'create',
-      title: 'Create Community',
+      title: 'Create a community',
       icon: 'add-circle',
       onPress: () => {
         router.push('/(build_community)');
         onClose();
       }
     },
-    // MY COMMUNITIES SECTION (examples - these would be dynamically loaded)
     {
-      id: 'digital-marketing',
-      title: 'Digital Marketing Mastery',
-      logo: 'https://via.placeholder.com/24x24/6366f1/ffffff?text=DM',
+      id: 'discover',
+      title: 'Discover communities',
+      icon: 'compass',
       onPress: () => {
-        router.push('/(community)/digital-marketing-mastery/(loggedUser)/home');
         onClose();
       }
-    },
-    // ACCOUNT SECTION
-    {
-      id: 'logout',
-      title: 'Logout',
-      icon: 'log-out-outline',
-      onPress: handleLogout
     }
   ];
+
+  const generateCommunityLogo = (name: string, category?: string) => {
+    const firstLetter = name.charAt(0).toUpperCase();
+    const colors = {
+      'Marketing': '#8e78fb',
+      'Design': '#3b82f6',
+      'Fitness': '#10b981',
+      'Technology': '#f59e0b',
+      'Development': '#ef4444',
+      'Web Design': '#6366f1',
+    };
+    const color = colors[category as keyof typeof colors] || '#8e78fb';
+    return `https://placehold.co/24x24/${color.slice(1)}/ffffff?text=${firstLetter}`;
+  };
 
   return (
     <View style={{
@@ -118,9 +113,9 @@ export default function Sidebar({ isVisible, onClose }: SidebarProps) {
       <View style={{
         width: 280,
         backgroundColor: adaptiveColors.isDark ? '#1f2937' : '#ffffff',
-        paddingTop: 60,
+        paddingTop: Math.max(insets.top, 20),
+        paddingBottom: Math.max(insets.bottom, 24),
         paddingHorizontal: 16,
-        paddingBottom: 24,
         elevation: 1001,
         zIndex: 10000,
         shadowColor: '#000',
@@ -146,100 +141,193 @@ export default function Sidebar({ isVisible, onClose }: SidebarProps) {
             />
           </View>
 
-          {/* Menu Items with Sections */}
-          {menuItems
-            .filter((item) => {
-              // Show profile and logout only when authenticated
-              if ((item.id === 'profile' || item.id === 'logout') && !isAuthenticated) return false;
-              return true;
-            })
-            .map((item, index) => (
-            <React.Fragment key={item.id}>
-              {/* Section Headers */}
-              {item.id === 'profile' && (
-                <Text style={{
-                  fontSize: 12,
-                  fontWeight: '600',
-                  color: adaptiveColors.isDark ? '#9ca3af' : '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                  marginTop: 20,
-                  marginBottom: 8,
-                  paddingHorizontal: 8,
-                }}>
-                  Your Account
-                </Text>
-              )}
-              {item.id === 'digital-marketing' && (
-                <Text style={{
-                  fontSize: 12,
-                  fontWeight: '600',
-                  color: adaptiveColors.isDark ? '#9ca3af' : '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                  marginTop: 20,
-                  marginBottom: 8,
-                  paddingHorizontal: 8,
-                }}>
-                  My Communities
-                </Text>
-              )}
-              
-              {/* Separator before Logout item */}
-              {item.id === 'logout' && (
+          {/* Main Menu Items */}
+          {menuItems.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 12,
+                paddingHorizontal: 8,
+                borderRadius: 8,
+                marginBottom: 4,
+              }}
+              onPress={item.onPress}
+            >
+              <View style={{ marginRight: 12 }}>
+                {item.logo ? (
+                  <Image
+                    source={{ uri: item.logo }}
+                    style={{ width: 20, height: 20, borderRadius: 4 }}
+                  />
+                ) : (
+                  <Ionicons 
+                    name={item.icon as any} 
+                    size={20} 
+                    color={adaptiveColors.isDark ? '#9ca3af' : '#6b7280'} 
+                  />
+                )}
+              </View>
+              <Text style={{
+                fontSize: 16,
+                color: adaptiveColors.isDark ? '#ffffff' : '#1f2937',
+                fontWeight: '500',
+              }}>
+                {item.title}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          {/* Joined Communities Section */}
+          {isAuthenticated && (
+            <>
+              <View style={{
+                marginTop: 24,
+                marginBottom: 16,
+                paddingTop: 16,
+                borderTopWidth: 1,
+                borderTopColor: adaptiveColors.isDark ? '#374151' : '#e5e7eb',
+              }}>
                 <View style={{
-                  height: 1,
-                  backgroundColor: adaptiveColors.isDark ? '#374151' : '#e5e7eb',
-                  marginVertical: 12,
-                }} />
-              )}
-              
-              <TouchableOpacity
-                style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  paddingVertical: 12,
-                  paddingHorizontal: 8,
-                  borderRadius: 8,
-                  marginBottom: 4,
-                  backgroundColor: item.id === 'discover' ? 
-                    (adaptiveColors.isDark ? 'rgba(142, 120, 251, 0.1)' : 'rgba(142, 120, 251, 0.05)') : 'transparent',
-                }}
-                onPress={item.onPress}
-              >
-                <View style={{ marginRight: 12 }}>
-                  {item.logo ? (
-                    <Image
-                      source={{ uri: item.logo }}
-                      style={{ width: 20, height: 20, borderRadius: 4 }}
-                    />
-                  ) : (
-                    <Ionicons 
-                      name={item.icon as any} 
-                      size={20} 
-                      color={item.id === 'logout' 
-                        ? '#ef4444' 
-                        : item.id === 'discover'
-                        ? '#8e78fb'
-                        : (adaptiveColors.isDark ? '#9ca3af' : '#6b7280')
-                      } 
-                    />
+                  justifyContent: 'space-between',
+                  marginBottom: 12,
+                }}>
+                  <Text style={{
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: adaptiveColors.isDark ? '#9ca3af' : '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}>
+                    My Communities
+                  </Text>
+                  {loading && (
+                    <ActivityIndicator size="small" color={adaptiveColors.isDark ? '#9ca3af' : '#6b7280'} />
                   )}
                 </View>
-                <Text style={{
-                  fontSize: 16,
-                  color: item.id === 'logout' 
-                    ? '#ef4444' 
-                    : item.id === 'discover'
-                    ? '#8e78fb'
-                    : (adaptiveColors.isDark ? '#ffffff' : '#1f2937'),
-                  fontWeight: item.id === 'discover' ? '600' : '500',
-                }}>
-                  {item.title}
-                </Text>
-              </TouchableOpacity>
-            </React.Fragment>
-          ))}
+              </View>
+
+              {/* Joined Communities List */}
+              {joinedCommunities.length > 0 ? (
+                joinedCommunities.map((community) => (
+                  <TouchableOpacity
+                    key={community.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 10,
+                      paddingHorizontal: 8,
+                      borderRadius: 8,
+                      marginBottom: 2,
+                      backgroundColor: 'transparent',
+                    }}
+                    onPress={() => {
+                      // Navigate to logged user community home page
+                      router.push(`/(community)/${community.slug}/(loggedUser)/home`);
+                      onClose();
+                    }}
+                  >
+                    <View style={{ marginRight: 12 }}>
+                      <Image
+                        source={{ 
+                          uri: community.logo || generateCommunityLogo(community.name, community.category)
+                        }}
+                        style={{ 
+                          width: 20, 
+                          height: 20, 
+                          borderRadius: 4,
+                          backgroundColor: '#f3f4f6'
+                        }}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text 
+                        style={{
+                          fontSize: 14,
+                          color: adaptiveColors.isDark ? '#ffffff' : '#1f2937',
+                          fontWeight: '500',
+                        }}
+                        numberOfLines={1}
+                      >
+                        {community.name}
+                      </Text>
+                      <Text 
+                        style={{
+                          fontSize: 12,
+                          color: adaptiveColors.isDark ? '#9ca3af' : '#6b7280',
+                          marginTop: 2,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {community.members ? `${community.members} members` : community.category}
+                      </Text>
+                    </View>
+                    <Ionicons 
+                      name="chevron-forward" 
+                      size={16} 
+                      color={adaptiveColors.isDark ? '#6b7280' : '#9ca3af'} 
+                    />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                !loading && (
+                  <View style={{
+                    paddingVertical: 16,
+                    paddingHorizontal: 8,
+                    alignItems: 'center',
+                  }}>
+                    <Ionicons 
+                      name="people-outline" 
+                      size={24} 
+                      color={adaptiveColors.isDark ? '#6b7280' : '#9ca3af'} 
+                    />
+                    <Text style={{
+                      fontSize: 12,
+                      color: adaptiveColors.isDark ? '#6b7280' : '#9ca3af',
+                      textAlign: 'center',
+                      marginTop: 8,
+                    }}>
+                      No communities joined yet.{"\n"}Discover some communities!
+                    </Text>
+                  </View>
+                )
+              )}
+            </>
+          )}
+          {/* Refresh Button */}
+          {isAuthenticated && (
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 6,
+                marginTop: 12,
+                backgroundColor: adaptiveColors.isDark ? '#374151' : '#f3f4f6',
+              }}
+              onPress={fetchJoinedCommunities}
+              disabled={loading}
+            >
+              <Ionicons 
+                name={loading ? 'hourglass' : 'refresh'} 
+                size={14} 
+                color={adaptiveColors.isDark ? '#9ca3af' : '#6b7280'} 
+              />
+              <Text style={{
+                fontSize: 12,
+                color: adaptiveColors.isDark ? '#9ca3af' : '#6b7280',
+                marginLeft: 6,
+                fontWeight: '500',
+              }}>
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </View>
       

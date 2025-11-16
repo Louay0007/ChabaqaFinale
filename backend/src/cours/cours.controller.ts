@@ -283,7 +283,75 @@ export class CoursController {
 		@Req() req,
 	) {
 		const user = req.user as AuthenticatedUser;
-		return await this.coursService.obtenirCoursParCreateur(user._id, Number(page) || 1, Number(limit) || 10);
+		const result = await this.coursService.obtenirCoursParCreateur(user._id, Number(page) || 1, Number(limit) || 10);
+		return {
+			success: true,
+			message: 'Courses retrieved successfully',
+			data: {
+				courses: result.cours,
+				pagination: {
+					page: result.page,
+					limit: result.limit,
+					total: result.total,
+					totalPages: result.totalPages
+				}
+			}
+		};
+	}
+
+	// Get courses for a specific user (for profile viewing)
+	@Get('by-user/:userId')
+	@ApiOperation({ 
+		summary: 'Get courses for a specific user',
+		description: 'Retrieve courses associated with a user (enrolled + created)'
+	})
+	@ApiParam({ name: 'userId', description: 'User ID', type: 'string' })
+	@ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+	@ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+	@ApiQuery({ name: 'type', required: false, enum: ['enrolled', 'created', 'all'], description: 'Course type filter' })
+	@ApiResponse({
+		status: 200,
+		description: 'User courses retrieved successfully',
+		content: {
+			'application/json': {
+				example: {
+					success: true,
+					message: 'User courses retrieved successfully',
+					data: {
+						courses: [
+							{
+								id: '1',
+								titre: 'React Fundamentals',
+								description: 'Learn React basics',
+								thumbnail: 'https://example.com/thumb.jpg',
+								progress: 75,
+								status: 'in_progress',
+								type: 'enrolled'
+							}
+						],
+						pagination: {
+							page: 1,
+							limit: 10,
+							total: 5,
+							totalPages: 1
+						}
+					}
+				}
+			}
+		}
+	})
+	async getCoursesByUser(
+		@Param('userId') userId: string,
+		@Query('page') page = '1',
+		@Query('limit') limit = '10',
+		@Query('type') type: 'enrolled' | 'created' | 'all' = 'all'
+	) {
+		return await this.coursService.obtenirCoursParUtilisateur(
+			userId, 
+			Number(page) || 1, 
+			Number(limit) || 10,
+			type
+		);
 	}
 
 	// Obtenir un cours par ID

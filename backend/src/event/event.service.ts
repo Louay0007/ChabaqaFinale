@@ -722,4 +722,88 @@ export class EventService {
       updatedAt: (event as any).updatedAt?.toISOString() || new Date().toISOString()
     };
   }
+
+  /**
+   * Récupérer les événements auxquels l'utilisateur est inscrit
+   */
+  async getMyRegistrations(userId: string): Promise<any[]> {
+    try {
+      // Chercher tous les événements où l'utilisateur est inscrit comme participant
+      const events = await this.eventModel.find({
+        'attendees.userId': new Types.ObjectId(userId),
+        isPublished: true,
+        isActive: true
+      })
+      .populate('communityId', 'name slug')
+      .populate('creatorId', 'name email')
+      .sort({ startDate: 1 })
+      .exec();
+
+      // Transformer les événements pour la réponse
+      const transformedEvents = await Promise.all(
+        events.map(async (event) => {
+          // Trouver les détails de l'inscription de l'utilisateur
+          const userRegistration = event.attendees.find(
+            attendee => attendee.userId.toString() === userId
+          );
+
+          // Informations de la communauté
+          const communityInfo = event.communityId ? {
+            id: (event.communityId as any)._id.toString(),
+            name: (event.communityId as any).name,
+            slug: (event.communityId as any).slug
+          } : null;
+
+          // Informations du créateur
+          const creatorInfo = event.creatorId ? {
+            id: (event.creatorId as any)._id.toString(),
+            name: (event.creatorId as any).name,
+            email: (event.creatorId as any).email
+          } : null;
+
+          return {
+            _id: (event as any)._id.toString(),
+            id: event.id,
+            title: event.title,
+            description: event.description,
+            start_date: event.startDate.toISOString(),
+            end_date: event.endDate?.toISOString(),
+            start_time: event.startTime,
+            end_time: event.endTime,
+            location: event.location,
+            venue: event.location,
+            onlineUrl: event.onlineUrl,
+            category: event.category,
+            type: event.type,
+            is_active: event.isActive,
+            is_published: event.isPublished,
+            attendees_count: event.attendees.length,
+            max_attendees: event.tickets.reduce((total, ticket) => total + (ticket.quantity || 0), 0),
+            thumbnail: event.image,
+            cover_image: event.image,
+            tickets: event.tickets,
+            sessions: event.sessions,
+            speakers: event.speakers,
+            tags: event.tags,
+            created_at: (event as any).createdAt?.toISOString() || new Date().toISOString(),
+            updated_at: (event as any).updatedAt?.toISOString() || new Date().toISOString(),
+            created_by: creatorInfo,
+            community_id: communityInfo,
+            // Détails de l'inscription de l'utilisateur
+            user_registration: {
+              ticket_type: userRegistration?.ticketType,
+              registered_at: userRegistration?.registeredAt?.toISOString(),
+              checked_in: userRegistration?.checkedIn,
+              checked_in_at: userRegistration?.checkedInAt?.toISOString()
+            }
+          };
+        })
+      );
+
+      return transformedEvents;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des inscriptions:', error);
+      throw error;
+    }
+  }
 }

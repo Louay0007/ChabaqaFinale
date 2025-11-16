@@ -1,7 +1,8 @@
 import { Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { Model } from 'mongoose';
+import { Model, Connection } from 'mongoose';
+import { InjectConnection } from '@nestjs/mongoose';
 import { Admin, AdminDocument } from 'src/schema/admin.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { CreateAdminDto } from 'src/dto-admin/create-admin.dto';
@@ -25,6 +26,7 @@ export class AdminService {
     private readonly emailService: EmailService,
     private readonly tokenBlacklistService: TokenBlacklistService,
     @InjectModel('VerificationCode') private verificationCodeModel: Model<VerificationCodeDocument>,
+    @InjectConnection() private connection: Connection,
   ) {}
 
   // check if admin exists
@@ -342,5 +344,29 @@ export class AdminService {
     // Supprimer tous les codes de vérification pour cet email
     await this.verificationCodeModel.deleteMany({ email: email.toLowerCase() });
     return { message: 'Mot de passe réinitialisé avec succès' };
+  }
+
+  // ⚠️ DANGER: Delete all database data
+  async cleanupDatabase(): Promise<{ deletedCollections: string[] }> {
+    try {
+      if (!this.connection.db) {
+        throw new BadRequestException('Database connection not available');
+      }
+
+      const collections = await this.connection.db.listCollections().toArray();
+      const deletedCollections: string[] = [];
+
+      for (const collection of collections) {
+        const collectionName = collection.name;
+        if (collectionName && this.connection.db) {
+          await this.connection.db.collection(collectionName).deleteMany({});
+          deletedCollections.push(collectionName);
+        }
+      }
+
+      return { deletedCollections };
+    } catch (error) {
+      throw new BadRequestException(`Failed to cleanup database: ${error.message}`);
+    }
   }
 }

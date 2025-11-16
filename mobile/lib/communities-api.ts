@@ -13,36 +13,62 @@ export interface Community {
   id: string;
   slug: string;
   name: string;
-  logo: string;
-  coverImage: string;
-  shortDescription: string;
+  logo?: string;
+  coverImage?: string;
+  image?: string; // Main image field from backend
+  photo_de_couverture?: string; // Backend cover image field
+  shortDescription?: string;
+  description?: string; // Alternative description field
+  short_description?: string; // Backend field name
   longDescription?: string;
+  long_description?: any[]; // Backend long description array
   creator: {
     id: string;
     name: string;
     avatar: string;
     bio?: string;
-  } | string; // Can be populated object or just ID
+  } | string; // Can be populated object or just string name
+  createur?: any; // Backend creator field (populated object)
+  creatorId?: string;
+  creatorAvatar?: string; // Direct avatar field from backend
   category: string;
   type?: string;
-  priceType: 'free' | 'paid' | 'monthly' | 'yearly' | 'hourly';
+  priceType: 'free' | 'paid' | 'monthly' | 'yearly' | 'hourly' | 'one-time';
   price: number;
   fees_of_join?: number; // Backend field name
-  currency: string;
-  membersCount: number;
-  members?: any[]; // Array of member IDs or populated members
-  averageRating: number;
-  ratingCount: number;
+  currency?: string;
+  membersCount?: number;
+  members?: number | any[]; // Can be count or array
+  averageRating?: number;
+  rating?: number; // Alternative rating field
+  ratingCount?: number;
   tags: string[];
   featured: boolean;
-  isVerified: boolean;
+  isVerified?: boolean;
+  verified?: boolean; // Alternative verified field
   socialLinks?: {
     website?: string;
     twitter?: string;
     linkedin?: string;
+    instagram?: string;
+    facebook?: string;
+    youtube?: string;
+    tiktok?: string;
+    discord?: string;
+    behance?: string;
+    github?: string;
   };
+  settings?: any; // Community settings object
+  stats?: any; // Community stats object
+  isActive?: boolean;
+  isPrivate?: boolean;
+  rank?: number;
+  inviteCode?: string;
+  inviteLink?: string;
   createdAt: string;
   updatedAt?: string;
+  createdDate?: string;
+  updatedDate?: string;
 }
 
 export interface Pagination {
@@ -496,6 +522,53 @@ export const getCommunityRanking = async (): Promise<{
   }
 };
 
+/**
+ * Join a community by ID
+ * @param communityId - ID of the community to join
+ * @param message - Optional message for joining
+ * @returns Promise with join result
+ */
+export const joinCommunity = async (
+  communityId: string,
+  message?: string
+): Promise<{
+  success: boolean;
+  message: string;
+  data?: any;
+}> => {
+  try {
+    console.log('🤝 [COMMUNITIES] Joining community:', communityId);
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      throw new Error('Not authenticated');
+    }
+
+    const resp = await tryEndpoints<{
+      success: boolean;
+      message: string;
+      data?: any;
+    }>(`/api/community-aff-crea-join/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      data: {
+        communityId,
+        message: message || undefined,
+      },
+      timeout: 30000,
+    });
+
+    console.log('✅ [COMMUNITIES] Community joined successfully');
+    return resp.data;
+  } catch (error: any) {
+    console.error('💥 [COMMUNITIES] Error joining community:', error);
+    throw new Error(error.message || 'Failed to join community');
+  }
+};
+
 export default {
   getCommunities,
   getCommunityBySlug,
@@ -505,6 +578,7 @@ export default {
   getSearchSuggestions,
   getMyJoinedCommunities,
   getCommunityRanking,
+  joinCommunity,
   formatPrice,
   formatMemberCount,
   formatRating,

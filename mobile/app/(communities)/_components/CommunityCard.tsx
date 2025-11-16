@@ -2,7 +2,6 @@ import { Card } from '@/_components/ui/card';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Image, Text, TouchableOpacity, View } from 'react-native';
-import RatingSummary from '../../_components/RatingSummary';
 import { communityStyles } from '../_styles';
 
 interface CommunityCardProps {
@@ -185,12 +184,10 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
                     <Ionicons name="people" size={12} color="#8e78fb" />
                     <Text style={communityStyles.communityCardStatText}>{formatMembers(community.members)}</Text>
                   </View>
-                  <RatingSummary
-                    relatedModel="Community"
-                    relatedTo={community.id}
-                    size="small"
-                    showReviewCount={false}
-                  />
+                  <View style={communityStyles.communityCardStatItem}>
+                    <Ionicons name="star" size={12} color="#f59e0b" />
+                    <Text style={communityStyles.communityCardStatText}>{community.rating}</Text>
+                  </View>
                   <View style={[
                     communityStyles.typeBadge, 
                     { 

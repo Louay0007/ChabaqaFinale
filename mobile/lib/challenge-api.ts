@@ -490,6 +490,52 @@ export function formatChallengeDateRange(startDate: string, endDate: string): st
 }
 
 /**
+ * Get user's challenge participations
+ * 
+ * @param communitySlug - Optional community slug to filter by
+ * @param status - Optional status filter ('active', 'completed', 'all')
+ * @returns Promise with user participations
+ */
+export async function getUserParticipations(
+  communitySlug?: string,
+  status: string = 'all'
+): Promise<ChallengeParticipation[]> {
+  try {
+    const token = await getAccessToken();
+    if (!token) {
+      return [];
+    }
+
+    console.log('📊 [CHALLENGE-API] Fetching user participations');
+
+    const params = new URLSearchParams();
+    if (communitySlug) params.append('communitySlug', communitySlug);
+    if (status && status !== 'all') params.append('status', status);
+
+    const resp = await tryEndpoints<any>(
+      `/api/challenges/user/my-participations?${params.toString()}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        timeout: 30000,
+      }
+    );
+
+    if (resp.status >= 200 && resp.status < 300) {
+      console.log('✅ [CHALLENGE-API] User participations fetched:', resp.data.data?.participations?.length || 0);
+      return resp.data.data?.participations || [];
+    }
+
+    return [];
+  } catch (error: any) {
+    console.error('💥 [CHALLENGE-API] Error fetching user participations:', error);
+    return [];
+  }
+}
+
+/**
  * Calculate completion percentage
  * 
  * @param completedTasks - Number of completed tasks

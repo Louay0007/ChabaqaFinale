@@ -1,7 +1,8 @@
 "use client"
 
-import * as SecureStore from 'expo-secure-store';
+import { SecureStorage, setSecureItem, getSecureItem, removeSecureItem } from './secure-storage';
 import { tryEndpoints } from './http';
+import PlatformUtils from './platform-utils';
 
 // Interface pour l'utilisateur (full profile from database + JWT fields)
 export interface User {
@@ -44,15 +45,21 @@ const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_KEY = 'user_data';
 
-// URL de base de l'API
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.180:3000";
+// URL de base de l'API (platform-aware)
+const API_BASE_URL = PlatformUtils.getApiUrl();
+
+// Log platform info for debugging auth system
+if (__DEV__) {
+  console.log('🔐 [AUTH] Initializing authentication system...');
+  PlatformUtils.logPlatformInfo();
+}
 
 // Fonctions de stockage sécurisé
 export const storeTokens = async (accessToken: string, refreshToken?: string): Promise<void> => {
   try {
-    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
+    await setSecureItem(ACCESS_TOKEN_KEY, accessToken);
     if (refreshToken) {
-      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+      await setSecureItem(REFRESH_TOKEN_KEY, refreshToken);
     }
   } catch (error) {
     console.error('Error storing tokens:', error);
@@ -61,7 +68,7 @@ export const storeTokens = async (accessToken: string, refreshToken?: string): P
 
 export const getAccessToken = async (): Promise<string | null> => {
   try {
-    return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+    return await getSecureItem(ACCESS_TOKEN_KEY);
   } catch (error) {
     console.error('Error getting access token:', error);
     return null;
@@ -70,7 +77,7 @@ export const getAccessToken = async (): Promise<string | null> => {
 
 export const getRefreshToken = async (): Promise<string | null> => {
   try {
-    return await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    return await getSecureItem(REFRESH_TOKEN_KEY);
   } catch (error) {
     console.error('Error getting refresh token:', error);
     return null;
@@ -79,7 +86,7 @@ export const getRefreshToken = async (): Promise<string | null> => {
 
 export const storeUser = async (user: User): Promise<void> => {
   try {
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+    await setSecureItem(USER_KEY, JSON.stringify(user));
   } catch (error) {
     console.error('Error storing user:', error);
   }
@@ -87,7 +94,7 @@ export const storeUser = async (user: User): Promise<void> => {
 
 export const getStoredUser = async (): Promise<User | null> => {
   try {
-    const userData = await SecureStore.getItemAsync(USER_KEY);
+    const userData = await getSecureItem(USER_KEY);
     return userData ? JSON.parse(userData) : null;
   } catch (error) {
     console.error('Error getting stored user:', error);
@@ -97,9 +104,9 @@ export const getStoredUser = async (): Promise<User | null> => {
 
 export const clearAllTokens = async (): Promise<void> => {
   try {
-    await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
-    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-    await SecureStore.deleteItemAsync(USER_KEY);
+    await removeSecureItem(ACCESS_TOKEN_KEY);
+    await removeSecureItem(REFRESH_TOKEN_KEY);
+    await removeSecureItem(USER_KEY);
   } catch (error) {
     console.error('Error clearing tokens:', error);
   }
@@ -188,7 +195,9 @@ export const getProfile = async (): Promise<User | null> => {
 
     return null;
   } catch (error) {
-    console.error("💥 [AUTH] Exception lors de la récupération du profil:", error);
+    if (__DEV__) {
+      console.error("💥 [AUTH] Exception lors de la récupération du profil:", error);
+    }
     return null;
   }
 };

@@ -20,13 +20,15 @@ export class PolicyService {
   async getEffectiveLimitsForCreator(creatorId: Types.ObjectId | string): Promise<EffectiveLimits> {
     const sub = await this.subModel.findOne({ creatorId: new Types.ObjectId(creatorId as any) }).lean();
     if (!sub) {
-      // Default to STARTER-like safe baseline if no subscription
+      // ⚠️ DEVELOPMENT ONLY: Generous limits for development (no subscription)
+      // TODO: Revert to restrictive limits before production deployment
+      // See DEVELOPMENT_CHANGES.md for production values
       return {
-        communitiesMax: 1,
-        membersMax: 100,
-        coursesActivationMax: 3,
-        storageGB: 2,
-        adminsMax: 0,
+        communitiesMax: 10,  // PROD: 1
+        membersMax: 1000,    // PROD: 100
+        coursesActivationMax: 50,  // PROD: 3
+        storageGB: 10,       // PROD: 2
+        adminsMax: 5,        // PROD: 0
       };
     }
     return {

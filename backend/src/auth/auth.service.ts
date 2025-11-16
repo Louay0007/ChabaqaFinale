@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -16,6 +16,8 @@ import { RegisterDto } from '../dto-user/register.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+  
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private jwtService: JwtService,
@@ -355,6 +357,20 @@ export class AuthService {
       return null;
     }
   }
+  
+  /**
+   * Decodes a JWT token without verifying its signature or expiration
+   * Used for debugging and token inspection only - not for authentication
+   */
+  decodeToken(token: string): any {
+    try {
+      // This only decodes the token without verifying signature or expiration
+      return this.jwtService.decode(token);
+    } catch (error) {
+      console.error(`Failed to decode token: ${error.message}`);
+      return null;
+    }
+  }
 
   /**
    * Déconnexion avec révocation des tokens
@@ -528,6 +544,46 @@ export class AuthService {
     } catch (error) {
       // Handle potential database errors (e.g., unique index conflicts)
       throw new BadRequestException('Impossible de créer l\'utilisateur.');
+    }
+  }
+
+  /**
+   * Register a new creator user
+   */
+  async registerCreator(registerDto: RegisterDto): Promise<{ success: boolean; message: string; user?: any; error?: string }> {
+    const { name, email, password, numtel, date_naissance } = registerDto;
+
+    // Check if user already exists
+    const existingUser = await this.userModel.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      throw new BadRequestException('Un utilisateur avec cet email existe déjà.');
+    }
+
+    // Hash password
+    const hashedPassword = await this.hashPassword(password);
+
+    try {
+      const newUser = await this.userModel.create({
+        name,
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        numtel,
+        date_naissance,
+        role: 'creator', // Creator role
+      });
+
+      // Omit password from the returned user object
+      const userObject: any = newUser.toObject();
+      delete userObject.password;
+
+      return {
+        success: true,
+        message: 'Créateur créé avec succès.',
+        user: userObject,
+      };
+    } catch (error) {
+      // Handle potential database errors (e.g., unique index conflicts)
+      throw new BadRequestException('Impossible de créer le créateur.');
     }
   }
 }

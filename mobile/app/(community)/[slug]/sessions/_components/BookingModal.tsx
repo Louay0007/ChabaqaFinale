@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
 import React from 'react';
-import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { styles } from '../styles';
 import { SessionType } from './SessionCard';
 
@@ -11,7 +11,6 @@ interface BookingModalProps {
   selectedDate: Date | null;
   selectedTime: string;
   sessionNotes: string;
-  booking?: boolean;
   onClose: () => void;
   onConfirm: () => void;
   onDateSelect: (date: Date) => void;
@@ -28,7 +27,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   selectedDate,
   selectedTime,
   sessionNotes,
-  booking = false,
   onClose,
   onConfirm,
   onDateSelect,
@@ -214,21 +212,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           <TouchableOpacity 
             style={[
               styles.confirmButton,
-              (!selectedDate || !selectedTime || booking) && styles.disabledButton
+              (!selectedDate || !selectedTime) && styles.disabledButton
             ]}
             onPress={onConfirm}
-            disabled={!selectedDate || !selectedTime || booking}
+            disabled={!selectedDate || !selectedTime}
           >
-            {booking ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.confirmButtonText}>Booking...</Text>
-              </View>
-            ) : (
-              <Text style={styles.confirmButtonText}>
-                Confirm Booking - ${selectedSession?.price}
-              </Text>
-            )}
+            <Text style={styles.confirmButtonText}>
+              Confirm Booking - ${selectedSession?.price}
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </View>

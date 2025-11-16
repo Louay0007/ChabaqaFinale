@@ -49,6 +49,120 @@ export class ChallengeService {
   ) {}
 
   /**
+   * Get challenges for a specific user (participated + created)
+   */
+  async getChallengesByUser(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    type: 'participated' | 'created' | 'all' = 'all'
+  ) {
+    console.log('🔧 DEBUG - getChallengesByUser');
+    console.log(`   👤 User ID: ${userId}`);
+    console.log(`   📄 Page: ${page}, Limit: ${limit}, Type: ${type}`);
+
+    const skip = (page - 1) * limit;
+    let allChallenges: any[] = [];
+    let totalCount = 0;
+
+    // Get participated challenges
+    if (type === 'participated' || type === 'all') {
+      const participatedChallenges = await this.challengeModel
+        .find({ 'participants.userId': new Types.ObjectId(userId) })
+        .populate('creatorId', 'name email profile_picture')
+        .populate('communityId', 'name slug')
+        .sort({ createdAt: -1 })
+        .exec();
+
+      const transformedParticipated = participatedChallenges.map(challenge => {
+        const participant = challenge.participants.find(p => p.userId.toString() === userId);
+        const progress = participant && challenge.tasks && challenge.tasks.length > 0 ? 
+          Math.round((Number(participant.completedTasks || 0) / challenge.tasks.length) * 100) : 0;
+        
+        return {
+          id: challenge._id.toString(),
+          title: challenge.title,
+          description: challenge.description,
+          thumbnail: challenge.thumbnail || 'https://placehold.co/400x300?text=Challenge',
+          progress,
+          status: progress === 100 ? 'completed' : progress > 0 ? 'active' : 'not_started',
+          type: 'participated',
+          category: challenge.category,
+          difficulty: challenge.difficulty,
+          startDate: challenge.startDate,
+          endDate: challenge.endDate,
+          joinedAt: participant?.joinedAt,
+          creator: {
+            name: (challenge.creatorId as any)?.name || 'Unknown',
+            avatar: (challenge.creatorId as any)?.profile_picture || 'https://placehold.co/64x64?text=MM'
+          }
+        };
+      });
+
+      allChallenges = [...allChallenges, ...transformedParticipated];
+    }
+
+    // Get created challenges
+    if (type === 'created' || type === 'all') {
+      const createdChallenges = await this.challengeModel
+        .find({ creatorId: new Types.ObjectId(userId) })
+        .populate('creatorId', 'name email profile_picture')
+        .populate('communityId', 'name slug')
+        .sort({ createdAt: -1 })
+        .exec();
+
+      const transformedCreated = createdChallenges.map(challenge => ({
+        id: challenge._id.toString(),
+        title: challenge.title,
+        description: challenge.description,
+        thumbnail: challenge.thumbnail || 'https://placehold.co/400x300?text=Challenge',
+        progress: 100, // Creator has full access
+        status: challenge.isActive ? 'active' : 'inactive',
+        type: 'created',
+        category: challenge.category,
+        difficulty: challenge.difficulty,
+        startDate: challenge.startDate,
+        endDate: challenge.endDate,
+        createdAt: challenge.createdAt,
+        participantsCount: challenge.participants?.length || 0,
+        creator: {
+          name: (challenge.creatorId as any)?.name || 'Unknown',
+          avatar: (challenge.creatorId as any)?.profile_picture || 'https://placehold.co/64x64?text=MM'
+        }
+      }));
+
+      allChallenges = [...allChallenges, ...transformedCreated];
+    }
+
+    // Sort by most recent activity
+    allChallenges.sort((a, b) => {
+      const dateA = new Date(a.joinedAt || a.createdAt || 0);
+      const dateB = new Date(b.joinedAt || b.createdAt || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    totalCount = allChallenges.length;
+    const paginatedChallenges = allChallenges.slice(skip, skip + limit);
+
+    console.log(`   📊 Total challenges found: ${totalCount}`);
+    console.log(`   📄 Returning: ${paginatedChallenges.length} challenges`);
+
+    return {
+      success: true,
+      message: 'User challenges retrieved successfully',
+      data: {
+        challenges: paginatedChallenges,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      }
+    };
+  }
+
+  /**
    * Récupérer les participations de l'utilisateur aux défis
    */
   async getUserParticipations(

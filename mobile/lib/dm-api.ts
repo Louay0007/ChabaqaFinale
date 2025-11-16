@@ -48,7 +48,10 @@ export interface ConversationParticipant {
   name: string;
   email: string;
   profile_picture?: string;
+  photo_profil?: string; // Admin profile picture field
   role?: string;
+  poste?: string; // Admin position
+  departement?: string; // Admin department
 }
 
 /**
@@ -95,6 +98,7 @@ export interface ConversationListResponse {
  */
 export interface MessagesListResponse {
   messages: DMMessage[];
+  conversation?: DMConversation;
   total: number;
   page: number;
   limit: number;
@@ -235,7 +239,7 @@ export async function getInbox(
         total: resp.data.total || 0,
         page: resp.data.page || 1,
         limit: resp.data.limit || 20,
-        hasMore: (resp.data.page || 1) < (resp.data.totalPages || 1),
+        hasMore: resp.data.hasMore || false,
       };
     }
 
@@ -262,10 +266,12 @@ export async function getMessages(
   try {
     const token = await getAccessToken();
     if (!token) {
+      console.error('❌ [DM-API] No access token available');
       throw new Error('Authentication required to access messages');
     }
 
     console.log('💬 [DM-API] Fetching messages:', { conversationId, page, limit });
+    console.log('🔑 [DM-API] Token length:', token.length, 'chars');
 
     const params = new URLSearchParams();
     params.append('page', page.toString());
@@ -286,14 +292,27 @@ export async function getMessages(
       console.log('✅ [DM-API] Messages fetched:', resp.data.messages?.length || 0);
       return {
         messages: resp.data.messages || [],
+        conversation: resp.data.conversation,
         total: resp.data.total || 0,
         page: resp.data.page || 1,
         limit: resp.data.limit || 30,
-        hasMore: (resp.data.page || 1) < (resp.data.totalPages || 1),
+        hasMore: resp.data.hasMore || false,
       };
     }
 
-    throw new Error(resp.data.message || 'Failed to fetch messages');
+    // Handle different error statuses
+    if (resp.status === 403) {
+      console.error('🚫 [DM-API] Access forbidden - user not authorized for this conversation');
+      console.error('   Response:', resp.data);
+      throw new Error('You do not have permission to access this conversation');
+    }
+
+    if (resp.status === 401) {
+      console.error('🔒 [DM-API] Authentication failed');
+      throw new Error('Authentication failed - please login again');
+    }
+
+    throw new Error(resp.data.message || `Request failed with status ${resp.status}`);
   } catch (error: any) {
     console.error('💥 [DM-API] Error fetching messages:', error);
     throw new Error(error.message || 'Failed to fetch messages');
@@ -438,26 +457,32 @@ export async function markConversationRead(conversationId: string): Promise<{ su
 
 /**
  * Get conversation display name
- * 
+ *
  * @param conversation - Conversation object
  * @param currentUserId - Current user ID
  * @returns Display name for the conversation
  */
 export function getConversationDisplayName(conversation: DMConversation, currentUserId: string): string {
   if (conversation.type === 'HELP_DM') {
+    // For help conversations, show admin name and role if assigned
+    if (conversation.participantB) {
+      const adminName = conversation.participantB.name || 'Support Agent';
+      const adminRole = conversation.participantB.poste ? ` (${conversation.participantB.poste})` : '';
+      return `${adminName}${adminRole}`;
+    }
     return 'Support Team';
   }
 
   if (conversation.type === 'COMMUNITY_DM') {
     if (conversation.communityId) {
-      return conversation.communityId.name;
+      return `${conversation.communityId.name} Support`;
     }
-    
+
     // Fallback to other participant name
-    const otherParticipant = conversation.participantA._id === currentUserId 
-      ? conversation.participantB 
+    const otherParticipant = conversation.participantA._id === currentUserId
+      ? conversation.participantB
       : conversation.participantA;
-    
+
     return otherParticipant?.name || 'Community Creator';
   }
 
@@ -466,13 +491,17 @@ export function getConversationDisplayName(conversation: DMConversation, current
 
 /**
  * Get conversation avatar/image
- * 
+ *
  * @param conversation - Conversation object
  * @param currentUserId - Current user ID
  * @returns Avatar URL for the conversation
  */
 export function getConversationAvatar(conversation: DMConversation, currentUserId: string): string | undefined {
   if (conversation.type === 'HELP_DM') {
+    // For help conversations, show admin avatar if assigned
+    if (conversation.participantB) {
+      return conversation.participantB.photo_profil || conversation.participantB.profile_picture;
+    }
     return undefined; // Will use default support icon
   }
 
@@ -480,13 +509,13 @@ export function getConversationAvatar(conversation: DMConversation, currentUserI
     if (conversation.communityId?.logo) {
       return conversation.communityId.logo;
     }
-    
+
     // Fallback to other participant avatar
-    const otherParticipant = conversation.participantA._id === currentUserId 
-      ? conversation.participantB 
+    const otherParticipant = conversation.participantA._id === currentUserId
+      ? conversation.participantB
       : conversation.participantA;
-    
-    return otherParticipant?.profile_picture;
+
+    return otherParticipant?.profile_picture || otherParticipant?.photo_profil;
   }
 
   return undefined;
@@ -551,4 +580,69 @@ export function formatMessagePreview(message: string, maxLength: number = 50): s
   if (message.length <= maxLength) return message;
   
   return message.substring(0, maxLength - 3) + '...';
+}
+
+/**
+ * Get admin information for help conversation
+ *
+ * @param conversationId - Conversation ID
+ * @returns Promise with admin details
+ */
+export async function getHelpConversationAdmin(conversationId: string): Promise<ConversationParticipant | null> {
+  try {
+    const token = await getAccessToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    console.log('👤 [DM-API] Getting help conversation admin:', conversationId);
+
+    const resp = await tryEndpoints<any>(
+      `/api/dm/${conversationId}/admin`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        timeout: 30000,
+      }
+    );
+
+    if (resp.status >= 200 && resp.status < 300) {
+      console.log('✅ [DM-API] Admin info fetched');
+      return resp.data.admin;
+    }
+
+    throw new Error(resp.data.message || 'Failed to get admin info');
+  } catch (error: any) {
+    console.error('💥 [DM-API] Error getting admin info:', error);
+    return null;
+  }
+}
+
+/**
+ * Get sender display name for message
+ *
+ * @param message - Message object
+ * @param currentUserId - Current user ID
+ * @param conversation - Conversation object
+ * @returns Sender display name
+ */
+export function getSenderDisplayName(
+  message: DMMessage, 
+  currentUserId: string, 
+  conversation: DMConversation | null
+): string {
+  if (isMyMessage(message, currentUserId)) {
+    return 'You';
+  }
+
+  if (conversation?.type === 'HELP_DM' && conversation.participantB?._id === message.senderId) {
+    // Admin message
+    const adminName = conversation.participantB.name || 'Support Agent';
+    return adminName;
+  }
+
+  // Default fallback
+  return 'Support Agent';
 }

@@ -373,6 +373,16 @@ export class CreateCommunityDto {
   category?: string;
 
   @ApiPropertyOptional({
+    description: 'Type de contenu (pour compatibilité UI)',
+    example: 'community',
+    enum: ['community', 'course', 'challenge', 'product', 'oneToOne', 'event'],
+    default: 'community'
+  })
+  @IsOptional()
+  @IsEnum(['community', 'course', 'challenge', 'product', 'oneToOne', 'event'])
+  type?: string;
+
+  @ApiPropertyOptional({
     description: 'Tags de la communauté',
     example: ['JavaScript', 'React', 'Node.js'],
     type: [String]

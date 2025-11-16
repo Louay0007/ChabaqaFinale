@@ -17,7 +17,7 @@ export class DmController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Démarrer une conversation avec le créateur de la communauté' })
   async startCommunityConversation(@Body('communityId') communityId: string, @Request() req: any) {
-    const conv = await this.dmService.startCommunityConversation(req.user.userId, communityId);
+    const conv = await this.dmService.startCommunityConversation(req.user._id || req.user.userId, communityId);
     return { conversation: conv };
   }
 
@@ -26,7 +26,7 @@ export class DmController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Démarrer une conversation d'aide avec un admin" })
   async startHelpConversation(@Request() req: any) {
-    const conv = await this.dmService.startHelpConversation(req.user.userId);
+    const conv = await this.dmService.startHelpConversation(req.user._id || req.user.userId);
     return { conversation: conv };
   }
 
@@ -35,7 +35,7 @@ export class DmController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lister les conversations' })
   async listInbox(@Query('type') type: 'community' | 'help', @Query('page') page = 1, @Query('limit') limit = 20, @Request() req: any) {
-    return this.dmService.listInbox(req.user.userId, type, Number(page), Number(limit));
+    return this.dmService.listInbox(req.user._id || req.user.userId, type, Number(page), Number(limit));
   }
 
   @Get(':conversationId/messages')
@@ -43,7 +43,8 @@ export class DmController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lister les messages d\'une conversation' })
   async listMessages(@Param('conversationId') conversationId: string, @Query('page') page = 1, @Query('limit') limit = 30, @Request() req: any) {
-    return this.dmService.listMessages(conversationId, req.user.userId, Number(page), Number(limit));
+    const isAdmin = req.user?.role === 'admin' || req.user?.isAdmin === true;
+    return this.dmService.listMessages(conversationId, req.user._id || req.user.userId, Number(page), Number(limit), { isAdmin });
   }
 
   @Post(':conversationId/messages')
@@ -53,7 +54,7 @@ export class DmController {
   @Throttle({ default: { ttl: 60, limit: 20 } } as any)
   async sendMessage(@Param('conversationId') conversationId: string, @Body() body: { text?: string; attachments?: { url: string; type: 'image' | 'file' | 'video'; size: number }[] }, @Request() req: any) {
     const isAdmin = req.user?.role === 'admin' || req.user?.isAdmin === true;
-    const message = await this.dmService.sendMessage(conversationId, req.user.userId, body, { isAdmin });
+    const message = await this.dmService.sendMessage(conversationId, req.user._id || req.user.userId, body, { isAdmin });
     return { message };
   }
 
@@ -71,11 +72,11 @@ export class DmController {
       return { message: 'Aucun fichier' };
     }
     const uniqueName = this.uploadService.generateFilename(file.originalname);
-    const processed = await this.uploadService.processUploadedFile(file, uniqueName, { userId: req.user.userId });
+    const processed = await this.uploadService.processUploadedFile(file, uniqueName, { userId: req.user._id || req.user.userId });
     const attachmentType: 'image' | 'file' | 'video' =
       processed.type === FileType.IMAGE ? 'image' : processed.type === FileType.VIDEO ? 'video' : 'file';
     const isAdmin = req.user?.role === 'admin' || req.user?.isAdmin === true;
-    const message = await this.dmService.sendMessage(conversationId, req.user.userId, {
+    const message = await this.dmService.sendMessage(conversationId, req.user._id || req.user.userId, {
       attachments: [{ url: processed.url, type: attachmentType, size: processed.size }]
     }, { isAdmin });
     return { message };
@@ -86,7 +87,7 @@ export class DmController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Marquer comme lu' })
   async markRead(@Param('conversationId') conversationId: string, @Request() req: any) {
-    return this.dmService.markRead(conversationId, req.user.userId);
+    return this.dmService.markRead(conversationId, req.user._id || req.user.userId);
   }
 
   @Get('help/queue')
@@ -103,7 +104,16 @@ export class DmController {
   @ApiOperation({ summary: 'Assigner un fil d\'aide (admin)' })
   async assignHelp(@Param('conversationId') conversationId: string, @Request() req: any) {
     // Assumes req.user has role 'admin' (role guard can be added later)
-    return this.dmService.assignHelpThread(conversationId, req.user.userId);
+    return this.dmService.assignHelpThread(conversationId, req.user._id || req.user.userId);
+  }
+
+  @Get(':conversationId/admin')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtenir les informations de l\'admin pour une conversation d\'aide' })
+  async getHelpAdmin(@Param('conversationId') conversationId: string) {
+    const admin = await this.dmService.getHelpConversationAdmin(conversationId);
+    return { admin };
   }
 }
 

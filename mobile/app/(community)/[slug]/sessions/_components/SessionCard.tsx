@@ -1,7 +1,6 @@
 import React from 'react';
 import { Image, Text, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from '../../../../../_components/ThemedText';
-import RatingSummary from '../../../../_components/RatingSummary';
 import { Mentor } from '../../../../../lib/session-utils';
 import { styles } from '../styles';
 
@@ -34,12 +33,6 @@ export const SessionCard: React.FC<SessionCardProps> = ({
         <View style={styles.sessionInfo}>
           <ThemedText style={styles.sessionTitle}>{session.title}</ThemedText>
           <ThemedText style={styles.sessionDuration}>{session.duration} minutes</ThemedText>
-          <RatingSummary
-            relatedModel="Session"
-            relatedTo={session.id}
-            size="small"
-            showReviewCount={true}
-          />
           <View style={styles.priceContainer}>
             <ThemedText style={styles.price}>${session.price}</ThemedText>
           </View>

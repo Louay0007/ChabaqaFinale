@@ -17,7 +17,6 @@ import { styles } from '../styles';
 import ChallengeHeader from './_components/ChallengeHeader';
 import LeaderboardTab from './_components/LeaderboardTab';
 import OverviewTab from './_components/OverviewTab';
-import ReviewsTab from './_components/ReviewsTab';
 import SubmissionsTab from './_components/SubmissionsTab';
 import TabNavigation from './_components/TabNavigation';
 import TimelineTab from './_components/TimelineTab';
@@ -124,10 +123,6 @@ export default function ChallengeDetailScreen() {
                 feedback: 'Great work! Your solution was innovative and well-executed.'
               }))}
           />
-        )}
-
-        {activeTab === 'reviews' && (
-          <ReviewsTab challenge={challenge} />
         )}
       </ScrollView>
     </ThemedView>

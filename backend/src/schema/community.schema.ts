@@ -448,6 +448,15 @@ export class Community {
   featured: boolean;
 
   /**
+   * Type de contenu (pour compatibilité UI)
+   */
+  @Prop({
+    enum: ['community', 'course', 'challenge', 'product', 'oneToOne', 'event'],
+    default: 'community'
+  })
+  type: string;
+
+  /**
    * Paramètres de personnalisation de la communauté
    */
   @Prop({
@@ -666,6 +675,14 @@ export class Community {
   longDescription?: string;
 
   /**
+   * Description courte (alias pour UI compatibility)
+   */
+  @Prop({
+    trim: true
+  })
+  description?: string;
+
+  /**
    * Image de couverture (pour compatibilité frontend)
    */
   @Prop({
@@ -693,6 +710,23 @@ export class Community {
     min: 0
   })
   price: number;
+
+  /**
+   * Statut vérifié (alias pour UI compatibility)
+   */
+  @Prop({
+    type: Boolean,
+    default: false
+  })
+  verified?: boolean;
+
+  /**
+   * Nom du créateur (pour compatibilité UI)
+   */
+  @Prop({
+    trim: true
+  })
+  creator?: string;
 
   /**
    * Date de création (format string pour compatibilité frontend)

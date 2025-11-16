@@ -15,6 +15,7 @@ export interface CommunityFilters {
   page: number;
   limit: number;
   featured?: boolean;
+  creatorId?: string;
 }
 
 export interface PaginationOptions {
@@ -31,9 +32,131 @@ export class CommunitiesService {
   ) {}
 
   /**
+   * Get communities for a specific user (joined + created)
+   */
+  async getCommunitiesByUser(
+    userId: string,
+    options: {
+      page: number;
+      limit: number;
+      type: 'joined' | 'created' | 'all';
+    }
+  ) {
+    console.log('🔧 DEBUG - getCommunitiesByUser');
+    console.log(`   👤 User ID: ${userId}`);
+    console.log(`   📄 Page: ${options.page}, Limit: ${options.limit}, Type: ${options.type}`);
+
+    const skip = (options.page - 1) * options.limit;
+    let allCommunities: any[] = [];
+    let totalCount = 0;
+
+    // Get joined communities
+    if (options.type === 'joined' || options.type === 'all') {
+      const joinedCommunities = await this.communityModel
+        .find({ members: new Types.ObjectId(userId) })
+        .populate('createur', 'name email profile_picture')
+        .sort({ createdAt: -1 })
+        .exec();
+
+      const transformedJoined = joinedCommunities.map(community => {
+        const communityData = community as any;
+        // Determine user role in community
+        let role = 'member';
+        if (communityData.createur?._id?.toString() === userId) {
+          role = 'owner';
+        } else if (communityData.admins?.includes(userId)) {
+          role = 'admin';
+        } else if (communityData.moderators?.includes(userId)) {
+          role = 'moderator';
+        }
+        
+        return {
+          id: community._id.toString(),
+          slug: communityData.slug,
+          name: communityData.name || communityData.nom,
+          logo: communityData.logo || communityData.image,
+          coverImage: communityData.coverImage || communityData.cover || communityData.image,
+          shortDescription: communityData.shortDescription || communityData.description,
+          membersCount: communityData.members?.length || 0,
+          role,
+          type: 'joined',
+          joinedAt: communityData.createdAt, // Approximate join date
+          creator: {
+            name: communityData.createur?.name || 'Unknown',
+            avatar: communityData.createur?.profile_picture || 'https://placehold.co/64x64?text=MM'
+          }
+        };
+      });
+
+      allCommunities = [...allCommunities, ...transformedJoined];
+    }
+
+    // Get created communities
+    if (options.type === 'created' || options.type === 'all') {
+      const createdCommunities = await this.communityModel
+        .find({ createur: new Types.ObjectId(userId) })
+        .populate('createur', 'name email profile_picture')
+        .sort({ createdAt: -1 })
+        .exec();
+
+      const transformedCreated = createdCommunities.map(community => {
+        const communityData = community as any;
+        
+        return {
+          id: community._id.toString(),
+          slug: communityData.slug,
+          name: communityData.name || communityData.nom,
+          logo: communityData.logo || communityData.image,
+          coverImage: communityData.coverImage || communityData.cover || communityData.image,
+          shortDescription: communityData.shortDescription || communityData.description,
+          membersCount: communityData.members?.length || 0,
+          role: 'owner',
+          type: 'created',
+          createdAt: community.createdAt,
+          creator: {
+            name: communityData.createur?.name || 'Unknown',
+            avatar: communityData.createur?.profile_picture || 'https://placehold.co/64x64?text=MM'
+          }
+        };
+      });
+
+      allCommunities = [...allCommunities, ...transformedCreated];
+    }
+
+    // Remove duplicates (in case user is both creator and member)
+    const uniqueCommunities = allCommunities.filter((community, index, self) => 
+      index === self.findIndex(c => c.id === community.id)
+    );
+
+    // Sort by most recent activity
+    uniqueCommunities.sort((a, b) => {
+      const dateA = new Date(a.joinedAt || a.createdAt || 0);
+      const dateB = new Date(b.joinedAt || b.createdAt || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    totalCount = uniqueCommunities.length;
+    const paginatedCommunities = uniqueCommunities.slice(skip, skip + options.limit);
+
+    console.log(`   📊 Total communities found: ${totalCount}`);
+    console.log(`   📄 Returning: ${paginatedCommunities.length} communities`);
+
+    return {
+      communities: paginatedCommunities,
+      pagination: {
+        page: options.page,
+        limit: options.limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / options.limit)
+      }
+    };
+  }
+
+  /**
    * Get communities with filters and pagination
    */
   async getCommunities(filters: CommunityFilters) {
+    try {
     const {
       search,
       category,
@@ -43,7 +166,8 @@ export class CommunitiesService {
       sortBy,
       page,
       limit,
-      featured
+      featured,
+      creatorId
     } = filters;
 
     // Build query
@@ -105,6 +229,11 @@ export class CommunitiesService {
       query.featured = featured;
     }
 
+    // Creator filter
+    if (creatorId) {
+      query.createur = new Types.ObjectId(creatorId);
+    }
+
     // Build sort
     let sort: any = { createdAt: -1 };
     if (sortBy) {
@@ -133,6 +262,11 @@ export class CommunitiesService {
     // Calculate pagination
     const skip = (page - 1) * limit;
 
+    // Debug logging
+    console.log('🔍 [COMMUNITIES SERVICE] Query:', JSON.stringify(query, null, 2));
+    console.log('🔍 [COMMUNITIES SERVICE] Sort:', sort);
+    console.log('🔍 [COMMUNITIES SERVICE] Page:', page, 'Limit:', limit, 'Skip:', skip);
+
     // Execute query
     const [communities, total] = await Promise.all([
       this.communityModel
@@ -145,6 +279,8 @@ export class CommunitiesService {
         .exec(),
       this.communityModel.countDocuments(query)
     ]);
+
+    console.log('✅ [COMMUNITIES SERVICE] Found', communities.length, 'communities out of', total, 'total');
 
     // Transform communities to match frontend format
     const transformedCommunities = communities.map((community, index) => ({
@@ -188,6 +324,10 @@ export class CommunitiesService {
         ]
       }
     };
+    } catch (error) {
+      console.error('❌ [COMMUNITIES SERVICE] Error:', error);
+      throw error;
+    }
   }
 
   /**

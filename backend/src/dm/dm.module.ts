@@ -11,6 +11,7 @@ import { UploadModule } from '../upload/upload.module';
 import { PolicyModule } from '../common/modules/policy.module';
 import { Community, CommunitySchema } from '../schema/community.schema';
 import { User, UserSchema } from '../schema/user.schema';
+import { Admin, AdminSchema } from '../schema/admin.schema';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { User, UserSchema } from '../schema/user.schema';
       { name: Message.name, schema: MessageSchema },
       { name: Community.name, schema: CommunitySchema },
       { name: User.name, schema: UserSchema },
+      { name: Admin.name, schema: AdminSchema },
     ]),
     AuthModule,
     UploadModule,

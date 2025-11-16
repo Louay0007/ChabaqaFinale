@@ -296,6 +296,19 @@ export class EventController {
     return { success: true, ...result };
   }
 
+  @Get('my-registrations')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Récupérer les événements auxquels l\'utilisateur est inscrit' })
+  @ApiResponse({ status: 200, description: 'Événements récupérés avec succès', type: EventListResponseDto })
+  @ApiResponse({ status: 401, description: 'Non autorisé' })
+  async getMyRegistrations(
+    @Request() req
+  ): Promise<{ success: boolean; events: any[] }> {
+    const events = await this.eventService.getMyRegistrations(req.user.userId);
+    return { success: true, events };
+  }
+
   @Patch(':id/toggle-published')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

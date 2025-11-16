@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { FlatList, RefreshControl } from 'react-native';
+import { FlatList } from 'react-native';
 import { styles } from '../styles';
 import { CourseCard } from './CourseCard';
 import { EmptyState } from './EmptyState';
@@ -12,7 +12,6 @@ interface CoursesListProps {
   activeTab: string;
   slug: string;
   getEnrollmentProgress: (courseId: string) => any;
-  refreshControl?: any; // RefreshControl component for pull-to-refresh
 }
 
 export const CoursesList: React.FC<CoursesListProps> = ({
@@ -22,7 +21,6 @@ export const CoursesList: React.FC<CoursesListProps> = ({
   activeTab,
   slug,
   getEnrollmentProgress,
-  refreshControl,
 }) => {
   const router = useRouter();
 
@@ -59,7 +57,6 @@ export const CoursesList: React.FC<CoursesListProps> = ({
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.courseList}
       showsVerticalScrollIndicator={false}
-      refreshControl={refreshControl}
     />
   );
 };

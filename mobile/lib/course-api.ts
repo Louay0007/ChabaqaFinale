@@ -546,6 +546,82 @@ export function formatCourseDuration(seconds: number): string {
 }
 
 /**
+ * Get user's enrolled courses (using backend endpoint)
+ * 
+ * @returns Promise with list of enrolled courses with progress
+ */
+export async function getUserEnrolledCourses(): Promise<any[]> {
+  try {
+    const token = await getAccessToken();
+    if (!token) {
+      return [];
+    }
+
+    console.log('📚 [COURSE-API] Fetching user enrolled courses');
+
+    const resp = await tryEndpoints<any>(
+      `/api/cours/user/mes-cours`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        timeout: 30000,
+      }
+    );
+
+    if (resp.status >= 200 && resp.status < 300) {
+      console.log('✅ [COURSE-API] User enrolled courses fetched:', resp.data.data?.courses?.length || 0);
+      return resp.data.data?.courses || [];
+    }
+
+    return [];
+  } catch (error: any) {
+    console.error('💥 [COURSE-API] Error fetching user enrolled courses:', error);
+    return [];
+  }
+}
+
+/**
+ * Get courses by community slug (using correct backend endpoint)
+ * 
+ * @param communitySlug - Community slug
+ * @param filters - Additional filters
+ * @returns Promise with course list
+ */
+export async function getCoursesByCommunitySlug(
+  communitySlug: string,
+  filters: { page?: number; limit?: number; published?: boolean } = {}
+): Promise<any> {
+  try {
+    console.log('📚 [COURSE-API] Fetching courses for community:', communitySlug);
+
+    const params = new URLSearchParams();
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.limit) params.append('limit', filters.limit.toString());
+    if (filters.published !== undefined) params.append('published', filters.published.toString());
+
+    const resp = await tryEndpoints<any>(
+      `/api/cours/community/${communitySlug}?${params.toString()}`,
+      {
+        method: 'GET',
+        timeout: 30000,
+      }
+    );
+
+    if (resp.status >= 200 && resp.status < 300) {
+      console.log('✅ [COURSE-API] Community courses fetched:', resp.data.data?.courses?.length || 0);
+      return resp.data.data || resp.data;
+    }
+
+    throw new Error(resp.data.message || 'Failed to fetch community courses');
+  } catch (error: any) {
+    console.error('💥 [COURSE-API] Error fetching community courses:', error);
+    throw new Error(error.message || 'Failed to fetch community courses');
+  }
+}
+
+/**
  * Calculate course progress percentage
  * 
  * @param completedChapters - Number of completed chapters

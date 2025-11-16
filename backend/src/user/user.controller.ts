@@ -295,6 +295,83 @@ export class UserController {
         });
       }
     }
+
+  //get user by username/handle
+  @Get('by-username/:handle')
+  @ApiOperation({
+    summary: 'Get User by Username/Handle',
+    description: 'Fetch user profile by username (email local-part)',
+    tags: ['Users']
+  })
+  @ApiParam({
+    name: 'handle',
+    description: 'Username/handle (email local-part)',
+    example: 'john'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile fetched successfully',
+    content: {
+      'application/json': {
+        example: {
+          success: true,
+          message: 'User profile fetched successfully',
+          user: {
+            _id: '64a1b2c3d4e5f6789abcdef0',
+            name: 'John Doe',
+            email: 'john@example.com',
+            role: 'user',
+            avatar: 'https://example.com/avatar.jpg',
+            ville: 'Tunis',
+            pays: 'Tunisia',
+            bio: 'Software developer',
+            createdAt: '2023-07-01T10:00:00.000Z'
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+    content: {
+      'application/json': {
+        example: {
+          success: false,
+          status: 404,
+          message: "User with handle 'john' not found",
+          error: 'NOT_FOUND'
+        }
+      }
+    }
+  })
+  async getUserByUsername(@Res() response, @Param('handle') handle: string) {
+    try {
+      const user = await this.userService.getUserByUsername(handle);
+      return response.status(HttpStatus.OK).json({
+        success: true,
+        message: 'User profile fetched successfully',
+        user,
+      });
+    } catch (err) {
+      if (err.status === 404) {
+        return response.status(HttpStatus.NOT_FOUND).json({
+          success: false,
+          status: 404,
+          message: err.message,
+          error: 'NOT_FOUND'
+        });
+      }
+      return response.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        status: 400,
+        message: 'Error fetching user profile',
+        error: 'BAD_REQUEST',
+        details: err.message
+      });
+    }
+  }
+
     
     //delete user by id
     @Delete('user/:id')

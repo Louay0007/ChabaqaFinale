@@ -217,6 +217,11 @@ export class AuthController {
           type: 'string',
           description: 'Refresh token (optional if provided via cookie)',
           example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        },
+        refreshToken: { // Add support for camelCase frontend naming
+          type: 'string',
+          description: 'Refresh token (optional if provided via cookie)',
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
         }
       }
     },
@@ -224,7 +229,7 @@ export class AuthController {
       'With Refresh Token': {
         summary: 'Refresh with token in body',
         value: {
-          refresh_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+          refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
         }
       },
       'Without Refresh Token': {
@@ -240,6 +245,7 @@ export class AuthController {
       'application/json': {
         example: {
           access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+          accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...", // Added for frontend compatibility
           expires_in: 7200
         }
       }
@@ -257,25 +263,57 @@ export class AuthController {
       }
     }
   })
-  async refreshToken(@Body() body: { refresh_token?: string }, @Req() req, @Res({ passthrough: true }) res: Response) {
-    // Récupérer le refresh token depuis le cookie ou le body
-    const refreshToken = body.refresh_token || req.cookies[CookieUtil.COOKIE_NAMES.REFRESH_TOKEN];
+  async refreshToken(@Body() body: { refresh_token?: string, refreshToken?: string }, @Req() req, @Res({ passthrough: true }) res: Response) {
+    console.log('AUTH DEBUG - refreshToken');
+    console.log('  Cookies:', req.cookies);
+    
+    // Récupérer le refresh token depuis le cookie ou le body (support both naming conventions)
+    const refreshToken = 
+      body.refreshToken || // Frontend camelCase
+      body.refresh_token || // Backend snake_case
+      req.cookies[CookieUtil.COOKIE_NAMES.REFRESH_TOKEN] || // New cookie name
+      req.cookies['refresh_token']; // Old cookie name
     
     if (!refreshToken) {
+      console.log('  ERROR: No refresh token found');
       return {
+        success: false,
         error: 'Refresh token manquant',
         message: 'Veuillez fournir un refresh token dans le body ou via cookie'
       };
     }
     
-    const result = await this.authService.refreshToken(refreshToken);
-    
-    // Définir le nouveau access token dans un cookie
-    if (result.access_token) {
-      CookieUtil.setAccessTokenCookie(res, result.access_token, false); // Refresh ne change pas le "Remember Me"
+    try {
+      console.log('  Attempting token refresh');
+      let result = await this.authService.refreshToken(refreshToken);
+      
+      // Add both access_token and accessToken for frontend compatibility
+      const resultWithBoth: any = { ...result };
+      if (!resultWithBoth.accessToken && resultWithBoth.access_token) {
+        resultWithBoth.accessToken = resultWithBoth.access_token;
+      }
+      if (!resultWithBoth.access_token && resultWithBoth.accessToken) {
+        resultWithBoth.access_token = resultWithBoth.accessToken;
+      }
+      
+      // Use the enhanced result
+      result = resultWithBoth;
+      
+      // Définir le nouveau access token dans un cookie
+      if (result.access_token) {
+        console.log('  Setting new access token cookie');
+        CookieUtil.setAccessTokenCookie(res, result.access_token, false); // Refresh ne change pas le "Remember Me"
+      }
+      
+      return result;
+    } catch (error) {
+      console.log('  Refresh error:', error.message);
+      return {
+        success: false,
+        error: 'Refresh token invalide',
+        message: error.message || 'Impossible de rafraîchir le token'
+      };
     }
-    
-    return result;
   }
 
   /**
@@ -321,21 +359,41 @@ export class AuthController {
       }
     }
   })
-  async getProfile(@Req() req) {
-    // Get fresh user data from database instead of JWT payload
-    const userId = req.user.sub || req.user._id;
-    const user = await this.authService.getUserById(userId);
+  async getProfile(@Req() req, @Res({ passthrough: true }) res: Response) {
+    // Add debug info for troubleshooting
+    console.log('AUTH DEBUG - getProfile')
+    console.log('  JWT User:', req.user);
+    console.log('  Cookies:', req.cookies);
+    console.log('  Headers:', req.headers.authorization ? 'Has Auth Header' : 'No Auth Header');
     
-    if (!user) {
+    // Get fresh user data from database instead of JWT payload
+    const userId = req.user.sub || req.user._id || req.user.userId;
+    console.log('  Using user ID:', userId);
+    
+    if (!userId) {
       return {
-        user: req.user,  // Fallback to JWT data if user not found
-        message: 'Token valide',
+        error: "No valid user ID found in token",
+        code: "INVALID_TOKEN",
       };
     }
     
+    const user = await this.authService.getUserById(userId);
+    
+    if (!user) {
+      console.log('  WARNING: User not found in database:', userId);
+      return {
+        user: req.user,  // Fallback to JWT data if user not found
+        message: 'Token valide (user not in DB)',
+      };
+    }
+    
+    console.log('  Found user in DB:', user.email);
+    
     return {
-      user: {
+      success: true,
+      data: {
         _id: user._id,
+        id: user._id, // For frontend compatibility
         name: user.name,
         email: user.email,
         role: user.role,
@@ -368,7 +426,7 @@ export class AuthController {
     description: 'Logout user and revoke all tokens.',
     tags: ['Authentication']
   })
-  @ApiBearerAuth('JWT-auth')
+  // Remove @UseGuards to allow logout without a valid token
   @ApiResponse({
     status: 200,
     description: 'Logout successful',
@@ -382,32 +440,35 @@ export class AuthController {
       }
     }
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Invalid token',
-    content: {
-      'application/json': {
-        example: {
-          statusCode: 401,
-          message: 'Unauthorized',
-          error: 'Unauthorized'
-        }
+  async logout(@Req() req, @Res({ passthrough: true }) res: Response) {
+    console.log('AUTH DEBUG - logout');
+    console.log('  Cookies:', req.cookies);
+    console.log('  Headers:', req.headers.authorization ? 'Has Auth Header' : 'No Auth Header');
+    
+    // Récupérer les tokens depuis les headers ou cookies (check both new and old cookie names)
+    const accessToken = req.headers.authorization?.replace('Bearer ', '') || 
+                       req.cookies[CookieUtil.COOKIE_NAMES.ACCESS_TOKEN] || 
+                       req.cookies['access_token'];
+                       
+    const refreshToken = req.cookies[CookieUtil.COOKIE_NAMES.REFRESH_TOKEN] || 
+                        req.cookies['refresh_token'];
+    
+    let logoutResult = { message: 'No tokens to revoke', revokedTokens: 0 };
+    
+    if (accessToken || refreshToken) {
+      try {
+        // Révoquer les tokens côté serveur
+        logoutResult = await this.authService.logout(accessToken, refreshToken);
+      } catch (error) {
+        console.log('  Error during token revocation:', error.message);
       }
     }
-  })
-  async logout(@Req() req, @Res({ passthrough: true }) res: Response) {
-    // Récupérer les tokens depuis les headers ou cookies
-    const accessToken = req.headers.authorization?.replace('Bearer ', '') || 
-                       req.cookies[CookieUtil.COOKIE_NAMES.ACCESS_TOKEN];
-    const refreshToken = req.cookies[CookieUtil.COOKIE_NAMES.REFRESH_TOKEN];
-
-    // Révoquer les tokens côté serveur
-    const logoutResult = await this.authService.logout(accessToken, refreshToken);
     
-    // Supprimer les cookies côté client
+    // Supprimer les cookies côté client (always clear cookies, even if token revocation fails)
     CookieUtil.clearTokenCookies(res);
     
     return {
+      success: true,
       message: logoutResult.message,
       revokedTokens: logoutResult.revokedTokens,
       details: 'Tokens révoqués côté serveur et cookies supprimés côté client'
@@ -426,7 +487,7 @@ export class AuthController {
     description: 'Revoke all tokens for current user across all devices.',
     tags: ['Authentication']
   })
-  @ApiBearerAuth('JWT-auth')
+  // Remove @UseGuards to allow token revocation without JWT
   @ApiResponse({
     status: 200,
     description: 'All tokens revoked successfully',
@@ -439,32 +500,61 @@ export class AuthController {
       }
     }
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Invalid token',
-    content: {
-      'application/json': {
-        example: {
-          statusCode: 401,
-          message: 'Unauthorized',
-          error: 'Unauthorized'
-        }
+  async revokeAllTokens(@Body() body: { userId?: string }, @Req() req, @Res({ passthrough: true }) res: Response) {
+    console.log('AUTH DEBUG - revokeAllTokens');
+    
+    // Get userId from JWT if available, or body parameter
+    let userId = req.user?.sub || req.user?._id || req.user?.userId || body.userId;
+    
+    // If we have an access token in cookies, try to extract userId
+    const accessToken = req.cookies[CookieUtil.COOKIE_NAMES.ACCESS_TOKEN] || req.cookies['access_token'];
+    if (accessToken && !userId) {
+      try {
+        // Use the JWT service or similar to decode token instead of a non-existent method
+        // This is a safer way to get userId without creating new methods
+        const decoded = this.authService.decodeToken(accessToken);
+        userId = decoded?.sub || decoded?._id || decoded?.userId;
+      } catch (error) {
+        console.log('  Invalid access token in cookie, cannot extract userId');
       }
     }
-  })
-  async revokeAllTokens(@Req() req, @Res({ passthrough: true }) res: Response) {
-    const userId = req.user.sub;
     
-    // Révoquer tous les tokens de l'utilisateur
-    const result = await this.authService.revokeAllTokens(userId);
+    if (!userId) {
+      console.log('  No userId found, clearing cookies only');
+      CookieUtil.clearTokenCookies(res);
+      return {
+        success: true,
+        message: 'Cookies cleared',
+        details: 'No user ID provided to revoke server-side tokens'
+      };
+    }
     
-    // Supprimer les cookies côté client
-    CookieUtil.clearTokenCookies(res);
+    console.log(`  Revoking tokens for user: ${userId}`);
     
-    return {
-      message: result.message,
-      details: 'Tous les tokens de l\'utilisateur ont été révoqués sur tous les appareils'
-    };
+    try {
+      // Révoquer tous les tokens de l'utilisateur
+      const result = await this.authService.revokeAllTokens(userId);
+      
+      // Supprimer les cookies côté client
+      CookieUtil.clearTokenCookies(res);
+      
+      return {
+        success: true,
+        message: result.message,
+        details: 'Tous les tokens de l\'utilisateur ont été révoqués sur tous les appareils'
+      };
+    } catch (error) {
+      console.log('  Error revoking tokens:', error.message);
+      // Still clear cookies even if server-side token revocation fails
+      CookieUtil.clearTokenCookies(res);
+      
+      return {
+        success: false,
+        message: 'Error revoking tokens',
+        error: error.message,
+        details: 'Cookies have been cleared'
+      };
+    }
   }
 
   /**
@@ -596,5 +686,41 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Bad request - validation errors or user already exists' })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
+  }
+
+  /**
+   * Endpoint de création de compte créateur
+   * POST /auth/register-creator
+   */
+  @Post('register-creator')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Creator Registration',
+    description: 'Create a new creator account with creator role.',
+    tags: ['Authentication']
+  })
+  @ApiBody({ type: RegisterDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Creator created successfully',
+    content: {
+      'application/json': {
+        example: {
+          success: true,
+          message: 'Créateur créé avec succès.',
+          user: {
+            _id: '64a1b2c3d4e5f6789abcdef0',
+            name: 'John Creator',
+            email: 'creator@example.com',
+            role: 'creator',
+            createdAt: '2023-07-01T10:00:00.000Z'
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - validation errors or user already exists' })
+  async registerCreator(@Body() registerDto: RegisterDto) {
+    return this.authService.registerCreator(registerDto);
   }
 } 

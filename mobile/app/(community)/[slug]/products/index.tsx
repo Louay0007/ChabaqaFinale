@@ -1,15 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator } from 'react-native';
 import { ThemedText } from '../../../../_components/ThemedText';
 import { ThemedView } from '../../../../_components/ThemedView';
-import {
-  Product,
-  getProductsByCommunity,
-  getMyPurchasedProducts,
-  hasPurchasedProduct
-} from '../../../../lib/product-api';
-import { useAuth } from '../../../../hooks/use-auth';
+import { getCommunityBySlug as getMockCommunity, getUserPurchases, Product as MockProduct, Purchase } from '../../../../lib/mock-data';
+import { getCommunityBySlug } from '../../../../lib/communities-api';
+import { getProductsByCommunity as getBackendProducts, getMyPurchasedProducts, Product as BackendProduct } from '../../../../lib/product-api';
 import BottomNavigation from '../../_components/BottomNavigation';
 import { ProductsHeader } from './_components/ProductsHeader';
 import { ProductsList } from './_components/ProductsList';
@@ -20,79 +16,115 @@ import { styles } from './styles';
 export default function ProductsScreen() {
   const router = useRouter();
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const { isAuthenticated } = useAuth();
-  
-  // State management
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [userPurchases, setUserPurchases] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-  const [communityId, setCommunityId] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [community, setCommunity] = useState<any>(null);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [userPurchases, setUserPurchases] = useState<any[]>([]);
 
-  // Set community ID from slug
+  // Fetch community and products data
   useEffect(() => {
-    setCommunityId(slug as string);
+    fetchData();
   }, [slug]);
 
-  // Load products
-  const loadProducts = useCallback(async (isRefresh = false) => {
+  const fetchData = async () => {
     try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+      setLoading(true);
+      setError(null);
+      console.log('📯 Fetching products for community:', slug);
+
+      // Fetch community data first
+      const communityResponse = await getCommunityBySlug(slug || '');
+      if (!communityResponse.success || !communityResponse.data) {
+        throw new Error('Community not found');
       }
-      setError('');
-
-      console.log('🛍️ [PRODUCTS] Loading products for community:', slug);
-
-      // Fetch all products for this community
-      const response = await getProductsByCommunity(communityId || '', {
+      
+      const communityData = {
+        id: communityResponse.data._id || communityResponse.data.id,
+        name: communityResponse.data.name,
+        slug: communityResponse.data.slug,
+      };
+      setCommunity(communityData);
+      
+      // Fetch products for this community
+      const productsResponse = await getBackendProducts(communityData.id, {
         page: 1,
         limit: 50,
       });
-
-      setAllProducts(response.products);
-
-      // Fetch user's purchases if authenticated
-      if (isAuthenticated) {
-        const purchases = await getMyPurchasedProducts();
-        setUserPurchases(purchases);
-        console.log('✅ [PRODUCTS] Purchased products loaded:', purchases.length);
+      
+      // Transform backend products to match frontend interface
+      const transformedProducts = productsResponse.products.map((product: BackendProduct) => ({
+        id: product._id,
+        title: product.title,
+        description: product.description,
+        shortDescription: product.short_description || product.description,
+        price: product.price,
+        currency: product.currency,
+        category: product.category,
+        type: product.type,
+        images: product.images || [],
+        thumbnail: product.thumbnail || product.images?.[0],
+        creator: product.created_by,
+        communityId: communityData.id,
+        isPublished: product.is_published,
+        stockQuantity: product.stock_quantity,
+        rating: product.rating || 0,
+        tags: product.tags || [],
+        variants: product.variants || [],
+        files: product.files || [],
+        createdAt: product.created_at,
+        updatedAt: product.updated_at,
+      }));
+      
+      setAllProducts(transformedProducts);
+      
+      // Fetch user's purchased products
+      try {
+        const purchasedProducts = await getMyPurchasedProducts();
+        const transformedPurchases = purchasedProducts.map(product => ({
+          id: Date.now().toString() + Math.random(),
+          userId: 'current-user',
+          productId: product._id,
+          product: product,
+          purchasedAt: new Date(),
+          downloadCount: 0,
+          amount: product.price,
+          currency: product.currency,
+        }));
+        setUserPurchases(transformedPurchases);
+      } catch (purchaseError) {
+        console.warn('⚠️ Could not fetch purchases (user may not be logged in):', purchaseError);
+        setUserPurchases([]);
       }
-
-      console.log('✅ [PRODUCTS] Products loaded successfully:', response.products.length);
+      
+      console.log('✅ Products loaded:', transformedProducts.length);
     } catch (err: any) {
-      console.error('💥 [PRODUCTS] Error loading products:', err);
+      console.error('❌ Error fetching products:', err);
       setError(err.message || 'Failed to load products');
+      
+      // Fallback to mock data
+      console.log('⚠️ Falling back to mock data');
+      const mockCommunity = getMockCommunity(slug || '');
+      if (mockCommunity) {
+        setCommunity(mockCommunity);
+        // Use mock products as fallback - keeping original functionality
+        setAllProducts([]);
+        setUserPurchases([]);
+      }
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }, [communityId, isAuthenticated, slug]);
-
-  // Load on mount
-  useEffect(() => {
-    if (communityId) {
-      loadProducts();
-    }
-  }, [communityId, loadProducts]);
-
-  // Handle refresh
-  const handleRefresh = () => {
-    loadProducts(true);
   };
 
   // Filter products based on search and active tab
-  const filteredProducts = allProducts.filter((product: Product) => {
+  const filteredProducts = allProducts.filter((product: any) => {
     const matchesSearch =
       product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const isPurchased = userPurchases.some((p) => p._id === product._id);
+    const isPurchased = userPurchases.some((p: any) => p.productId === product.id);
 
     if (activeTab === 'purchased') {
       return matchesSearch && isPurchased;
@@ -109,8 +141,8 @@ export default function ProductsScreen() {
   // Calculate counts for tabs and header
   const totalProducts = allProducts.length;
   const purchasedCount = userPurchases.length;
-  const freeCount = allProducts.filter((p: Product) => p.price === 0).length;
-  const premiumCount = allProducts.filter((p: Product) => p.price > 0).length;
+  const freeCount = allProducts.filter((p: any) => p.price === 0).length;
+  const premiumCount = allProducts.filter((p: any) => p.price > 0).length;
 
   // Create tabs data
   const tabs = [
@@ -125,114 +157,44 @@ export default function ProductsScreen() {
     router.push(`/(community)/${slug}/products/${productId}`);
   };
 
-  // Convert API products to component-compatible format
-  const convertedProducts = filteredProducts.map(product => ({
-    ...product,
-    id: product._id, // Add id field for compatibility
-    communityId: product.community_id?._id || '',
-    creatorId: product.created_by._id,
-    creator: {
-      ...product.created_by,
-      id: product.created_by._id,
-      role: 'creator' as const,
-      verified: true,
-      communities: [],
-      createdAt: new Date(product.created_at),
-      updatedAt: new Date(product.updated_at)
-    },
-    image: product.thumbnail || product.images?.[0] || '',
-    downloadUrl: product.files?.[0]?.file_url || '',
-    sales: product.purchases_count || 0,
-    isPublished: product.is_published,
-    createdAt: product.created_at,
-    updatedAt: product.updated_at,
-    tags: product.tags || []
-  }));
-
-  // Convert purchases for compatibility
-  const convertedPurchases = userPurchases.map(product => ({
-    id: product._id,
-    userId: 'current-user', // This would come from auth context
-    user: {
-      id: 'current-user',
-      name: 'Current User',
-      email: 'user@example.com',
-      role: 'member' as const,
-      verified: true,
-      communities: [],
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    productId: product._id,
-    product: {
-      ...product,
-      id: product._id,
-      communityId: product.community_id?._id || '',
-      creatorId: product.created_by._id,
-      creator: {
-        ...product.created_by,
-        id: product.created_by._id,
-        role: 'creator' as const,
-        verified: true,
-        communities: [],
-        createdAt: new Date(product.created_at),
-        updatedAt: new Date(product.updated_at)
-      },
-      image: product.thumbnail || product.images?.[0] || '',
-      downloadUrl: product.files?.[0]?.file_url || '',
-      sales: product.purchases_count || 0,
-      isPublished: product.is_published,
-      createdAt: product.created_at,
-      updatedAt: product.updated_at,
-      tags: product.tags || []
-    },
-    purchasedAt: new Date().toISOString(),
-    amount: product.price,
-    currency: product.currency,
-    status: 'completed' as const,
-    downloadCount: product.downloads_count || 0
-  }));
-
-  const handlePurchase = (product: Product) => {
-    console.log('Purchase product:', product._id);
-    // Handle purchase logic
+  const handlePurchase = (product: any) => {
+    console.log('Purchase product:', product.id);
+    // TODO: Implement real purchase logic with backend API
+    // This will call the purchase API endpoint
   };
 
-  const handleDownload = (product: Product) => {
-    console.log('Download product:', product._id);
-    // Handle download logic
+  const handleDownload = (product: any) => {
+    console.log('Download product:', product.id);
+    // TODO: Implement real download logic with backend API
+    // This will call the download API endpoint
   };
 
-  // Loading state
-  if (loading && !refreshing) {
+  if (loading) {
     return (
       <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#8e78fb" />
-        <Text style={{ marginTop: 16, color: '#666', fontSize: 16 }}>Loading products...</Text>
+        <ThemedText style={{ marginTop: 16, opacity: 0.7 }}>Loading products...</ThemedText>
       </ThemedView>
     );
   }
 
-  // Error state
-  if (error && !refreshing) {
+  if (error) {
     return (
-      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-        <Text style={{ fontSize: 48, marginBottom: 16 }}>⚠️</Text>
-        <Text style={{ fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 8 }}>Oops!</Text>
-        <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 }}>
+      <ThemedView style={styles.container}>
+        <ThemedText style={{ color: '#ef4444', textAlign: 'center', margin: 20 }}>
           {error}
-        </Text>
-        <TouchableOpacity
-          onPress={() => loadProducts()}
-          style={{
-            backgroundColor: '#8e78fb',
-            paddingHorizontal: 24,
-            paddingVertical: 12,
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Try Again</Text>
-        </TouchableOpacity>
+        </ThemedText>
+        <ThemedText style={{ textAlign: 'center', opacity: 0.7 }}>
+          Community: {slug}
+        </ThemedText>
+      </ThemedView>
+    );
+  }
+
+  if (!community) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText>Community not found</ThemedText>
       </ThemedView>
     );
   }
@@ -259,12 +221,12 @@ export default function ProductsScreen() {
       />
 
       <ProductsList
-        products={convertedProducts as any}
-        userPurchases={convertedPurchases as any}
+        products={filteredProducts}
+        userPurchases={userPurchases}
         searchQuery={searchQuery}
         onProductPress={navigateToProductDetails}
-        onPurchase={(product) => handlePurchase(filteredProducts.find(p => p._id === product.id)!)}
-        onDownload={(product) => handleDownload(filteredProducts.find(p => p._id === product.id)!)}
+        onPurchase={handlePurchase}
+        onDownload={handleDownload}
       />
 
       <BottomNavigation slug={slug as string} currentTab="products" />

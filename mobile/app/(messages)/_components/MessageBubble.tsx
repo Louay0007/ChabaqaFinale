@@ -23,6 +23,7 @@ import {
   MessageAttachment,
   formatMessageTime,
   isMyMessage,
+  getSenderDisplayName,
 } from '../../../lib/dm-api';
 import { colors, spacing, borderRadius, fontSize, fontWeight } from '../../../lib/design-tokens';
 
@@ -31,7 +32,9 @@ interface MessageBubbleProps {
   isFromMe: boolean;
   showAvatar: boolean;
   showTimestamp: boolean;
+  showSenderName?: boolean;
   conversation: DMConversation | null;
+  currentUserId: string;
 }
 
 export default function MessageBubble({ 
@@ -39,8 +42,12 @@ export default function MessageBubble({
   isFromMe, 
   showAvatar, 
   showTimestamp,
-  conversation 
+  showSenderName = false,
+  conversation,
+  currentUserId 
 }: MessageBubbleProps) {
+
+  const senderName = getSenderDisplayName(message, currentUserId, conversation);
 
   const handleAttachmentPress = async (attachment: MessageAttachment) => {
     try {
@@ -134,18 +141,28 @@ export default function MessageBubble({
   const renderAvatar = () => {
     if (!showAvatar || isFromMe) return <View style={styles.avatarSpacer} />;
 
+    // Check if we have admin photo for help conversation
+    const avatarUrl = conversation?.type === 'HELP_DM' && conversation.participantB?.photo_profil;
+    
     return (
       <View style={styles.avatarContainer}>
         <LinearGradient
           colors={
             conversation?.type === 'HELP_DM'
-              ? ['#ffa726', '#ff9800']
+              ? ['#4CAF50', '#45a049'] // Green for support
               : [colors.primary, '#9c88ff']
           }
           style={styles.avatarGradient}
         >
           <View style={styles.avatar}>
-            <User size={16} color={colors.white} />
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <User size={16} color={colors.white} />
+            )}
           </View>
         </LinearGradient>
       </View>
@@ -183,10 +200,21 @@ export default function MessageBubble({
         styles.messageWrapper,
         isFromMe ? styles.myMessageWrapper : styles.theirMessageWrapper
       ]}>
+        {/* Sender Name */}
+        {showSenderName && !isFromMe && (
+          <Text style={styles.senderName}>
+            {senderName}
+            {conversation?.type === 'HELP_DM' && conversation.participantB?.poste && (
+              <Text style={styles.senderRole}> • {conversation.participantB.poste}</Text>
+            )}
+          </Text>
+        )}
+
         {/* Message Bubble */}
         <View style={[
           styles.messageBubble,
-          isFromMe ? styles.myMessageBubble : styles.theirMessageBubble
+          isFromMe ? styles.myMessageBubble : styles.theirMessageBubble,
+          conversation?.type === 'HELP_DM' && !isFromMe ? styles.helpMessageBubble : null
         ]}>
           {isFromMe ? (
             <LinearGradient
@@ -278,6 +306,12 @@ const styles = {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
+    overflow: 'hidden' as const,
+  },
+  avatarImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
 
   // Message Wrapper
@@ -445,5 +479,26 @@ const styles = {
     fontSize: fontSize.xs - 1,
     color: colors.white,
     fontWeight: fontWeight.medium as any,
+  },
+
+  // Sender Name Styles
+  senderName: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold as any,
+    color: colors.gray700,
+    marginBottom: 4,
+    marginLeft: spacing.xs,
+  },
+  senderRole: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.normal as any,
+    color: colors.gray500,
+  },
+
+  // Help Message Styles
+  helpMessageBubble: {
+    borderWidth: 1,
+    borderColor: '#E8F5E8',
+    backgroundColor: '#F1F8E9',
   },
 };

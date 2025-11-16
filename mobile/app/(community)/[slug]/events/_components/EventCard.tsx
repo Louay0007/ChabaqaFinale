@@ -3,7 +3,6 @@ import { Event } from '@/lib/mock-data';
 import { X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import RatingSummary from '../../../../_components/RatingSummary';
 
 interface EventCardProps {
   event: Event;
@@ -67,12 +66,6 @@ export default function EventCard({
               <Text style={styles.badgeText}>{event.type}</Text>
             </View>
           </View>
-          <RatingSummary
-            relatedModel="Event"
-            relatedTo={event.id}
-            size="small"
-            showReviewCount={true}
-          />
           <ThemedText style={styles.description} numberOfLines={2}>
             {event.description}
           </ThemedText>

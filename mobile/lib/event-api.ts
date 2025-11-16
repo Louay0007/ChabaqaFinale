@@ -351,11 +351,12 @@ export async function getMyRegisteredEvents(): Promise<Event[]> {
   try {
     const token = await getAccessToken();
     if (!token) {
+      console.log('⚠️ [EVENT-API] No auth token - returning empty registrations');
       return [];
     }
 
     console.log('🎉 [EVENT-API] Fetching registered events');
-
+    
     const resp = await tryEndpoints<any>(
       `/api/events/my-registrations`,
       {
