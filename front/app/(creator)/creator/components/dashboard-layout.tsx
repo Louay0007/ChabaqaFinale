@@ -2,10 +2,10 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardSidebar } from "./dashboard-sidebar"
-import { mockUsers } from "@/lib/mock-data"
+import { useAuthContext } from "@/app/providers/auth-provider"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -13,25 +13,15 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const { user, loading, isAuthenticated, logout } = useAuthContext()
 
   useEffect(() => {
-    const authStatus = localStorage.getItem("isAuthenticated")
-    if (authStatus === "true") {
-      setIsAuthenticated(true)
-    } else {
-      router.push("/login")
+    if (!loading && !isAuthenticated) {
+      router.push("/signin")
     }
-    setIsLoading(false)
-  }, [router])
+  }, [loading, isAuthenticated, router])
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated")
-    router.push("/login")
-  }
-
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-chabaqa-primary"></div>
@@ -43,13 +33,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return null
   }
 
-  const currentUser = mockUsers[0]
-
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
       <div className="w-64 flex-shrink-0">
-        <DashboardSidebar user={currentUser} onLogout={handleLogout} />
+        <DashboardSidebar user={user} onLogout={logout} />
       </div>
 
       {/* Main Content */}

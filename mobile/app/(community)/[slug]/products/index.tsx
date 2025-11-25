@@ -33,57 +33,73 @@ export default function ProductsScreen() {
     try {
       setLoading(true);
       setError(null);
-      console.log('📯 Fetching products for community:', slug);
+      console.log('�️ [PRODUCTS] Fetching products for community:', slug);
 
       // Fetch community data first
       const communityResponse = await getCommunityBySlug(slug || '');
       if (!communityResponse.success || !communityResponse.data) {
         throw new Error('Community not found');
       }
-      
+
       const communityData = {
         id: communityResponse.data._id || communityResponse.data.id,
         name: communityResponse.data.name,
         slug: communityResponse.data.slug,
       };
       setCommunity(communityData);
-      
+
       // Fetch products for this community
+      console.log('🛍️ [PRODUCTS] Fetching products for community ID:', communityData.id);
       const productsResponse = await getBackendProducts(communityData.id, {
         page: 1,
         limit: 50,
       });
-      
+
+      console.log('📦 [PRODUCTS] Response:', {
+        total: productsResponse.total,
+        count: productsResponse.products?.length,
+        page: productsResponse.page,
+        limit: productsResponse.limit
+      });
+
       // Transform backend products to match frontend interface
-      const transformedProducts = productsResponse.products.map((product: BackendProduct) => ({
-        id: product._id,
-        title: product.title,
-        description: product.description,
-        shortDescription: product.short_description || product.description,
-        price: product.price,
-        currency: product.currency,
-        category: product.category,
-        type: product.type,
-        images: product.images || [],
-        thumbnail: product.thumbnail || product.images?.[0],
-        creator: product.created_by,
-        communityId: communityData.id,
-        isPublished: product.is_published,
-        stockQuantity: product.stock_quantity,
-        rating: product.rating || 0,
-        tags: product.tags || [],
-        variants: product.variants || [],
-        files: product.files || [],
-        createdAt: product.created_at,
-        updatedAt: product.updated_at,
-      }));
-      
+      console.log('🔄 [PRODUCTS] Transforming', productsResponse.products.length, 'products');
+      const transformedProducts = (productsResponse.products || []).map((product: BackendProduct) => {
+        console.log('   → Product:', product.title);
+        return {
+          id: product._id,
+          title: product.title,
+          description: product.description,
+          shortDescription: product.short_description || product.description,
+          price: product.price,
+          currency: product.currency,
+          category: product.category,
+          type: product.type,
+          images: product.images || [],
+          thumbnail: product.thumbnail || product.images?.[0] || 'https://via.placeholder.com/400x300',
+          creator: product.created_by,
+          communityId: communityData.id,
+          isPublished: product.is_published,
+          stockQuantity: product.stock_quantity,
+          rating: product.rating || 0,
+          tags: product.tags || [],
+          variants: product.variants || [],
+          files: product.files || [],
+          createdAt: product.created_at,
+          updatedAt: product.updated_at,
+        };
+      });
+
+      console.log('✅ [PRODUCTS] Transformed products:', transformedProducts.length);
       setAllProducts(transformedProducts);
-      
+
       // Fetch user's purchased products
+      console.log('📊 [PRODUCTS] Fetching user purchases');
       try {
         const purchasedProducts = await getMyPurchasedProducts();
-        const transformedPurchases = purchasedProducts.map(product => ({
+        console.log('📊 [PRODUCTS] User purchases response:', purchasedProducts?.length || 0);
+
+        const transformedPurchases = (purchasedProducts || []).map(product => ({
           id: Date.now().toString() + Math.random(),
           userId: 'current-user',
           productId: product._id,
@@ -93,19 +109,21 @@ export default function ProductsScreen() {
           amount: product.price,
           currency: product.currency,
         }));
+
+        console.log('✅ [PRODUCTS] Transformed purchases:', transformedPurchases.length);
         setUserPurchases(transformedPurchases);
-      } catch (purchaseError) {
-        console.warn('⚠️ Could not fetch purchases (user may not be logged in):', purchaseError);
+      } catch (purchaseError: any) {
+        console.warn('⚠️ [PRODUCTS] Could not fetch purchases:', purchaseError.message);
         setUserPurchases([]);
       }
-      
-      console.log('✅ Products loaded:', transformedProducts.length);
+
+      console.log('✅ [PRODUCTS] Products loaded:', transformedProducts.length);
     } catch (err: any) {
-      console.error('❌ Error fetching products:', err);
+      console.error('❌ [PRODUCTS] Error fetching products:', err);
       setError(err.message || 'Failed to load products');
-      
+
       // Fallback to mock data
-      console.log('⚠️ Falling back to mock data');
+      console.log('⚠️ [PRODUCTS] Falling back to mock data');
       const mockCommunity = getMockCommunity(slug || '');
       if (mockCommunity) {
         setCommunity(mockCommunity);

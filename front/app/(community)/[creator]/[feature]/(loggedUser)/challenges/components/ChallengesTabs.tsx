@@ -6,17 +6,17 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Search, Filter, Zap } from "lucide-react"
 import ChallengeCard from "@/app/(community)/[creator]/[feature]/(loggedUser)/challenges/components/challenge-card"
-import { getUserChallengeParticipation } from "@/lib/mock-data"
-
 interface Challenge {
   id: string
   title: string
   description: string
-  startDate: Date
-  endDate: Date
+  startDate: string | Date
+  endDate: string | Date
+  isParticipating?: boolean
 }
 
 interface ChallengesTabsProps {
+  creatorSlug: string
   slug: string
   allChallenges: Challenge[]
   searchQuery: string
@@ -27,6 +27,7 @@ interface ChallengesTabsProps {
 }
 
 export default function ChallengesTabs({
+  creatorSlug,
   slug,
   allChallenges,
   searchQuery,
@@ -35,23 +36,23 @@ export default function ChallengesTabs({
   setActiveTab,
   setSelectedChallenge
 }: ChallengesTabsProps) {
-  const currentUserId = "2" // Mock current user ID
-
   const filteredChallenges = allChallenges.filter((challenge) => {
     const matchesSearch =
-      challenge.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      challenge.description.toLowerCase().includes(searchQuery.toLowerCase())
+      challenge.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      challenge.description?.toLowerCase().includes(searchQuery.toLowerCase())
 
     const now = new Date()
-    const isParticipating = getUserChallengeParticipation(currentUserId, challenge.id)
+    const startDate = new Date(challenge.startDate)
+    const endDate = new Date(challenge.endDate)
+    const isParticipating = challenge.isParticipating || false
 
     switch (activeTab) {
       case "active":
-        return matchesSearch && challenge.startDate <= now && challenge.endDate >= now
+        return matchesSearch && startDate <= now && endDate >= now
       case "upcoming":
-        return matchesSearch && challenge.startDate > now
+        return matchesSearch && startDate > now
       case "completed":
-        return matchesSearch && challenge.endDate < now
+        return matchesSearch && endDate < now
       case "joined":
         return matchesSearch && isParticipating
       case "browse":
@@ -77,7 +78,7 @@ export default function ChallengesTabs({
             Completed ({allChallenges.filter((c) => getChallengeStatus(c) === "completed").length})
           </TabsTrigger>
           <TabsTrigger value="joined" className="flex-shrink-0">
-            Joined ({allChallenges.filter((c) => getUserChallengeParticipation(currentUserId, c.id)).length})
+            Joined ({allChallenges.filter((c) => c.isParticipating).length})
           </TabsTrigger>
         </TabsList>
 
@@ -117,6 +118,7 @@ export default function ChallengesTabs({
             {filteredChallenges.map((challenge) => (
               <ChallengeCard
                 key={challenge.id}
+                creatorSlug={creatorSlug}
                 slug={slug}
                 challenge={challenge}
                 setSelectedChallenge={setSelectedChallenge}

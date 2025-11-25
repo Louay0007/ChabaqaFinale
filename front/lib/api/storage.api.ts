@@ -1,25 +1,25 @@
-import { apiClient, ApiSuccessResponse } from './client';
+import { apiClient } from './client';
 import type { UploadedFile } from './types';
 
 // Storage API
 export const storageApi = {
   // Upload single file
-  upload: async (file: File): Promise<ApiSuccessResponse<UploadedFile>> => {
-    return apiClient.uploadFile<ApiSuccessResponse<UploadedFile>>('/storage/upload', file);
+  upload: async (file: File): Promise<UploadedFile> => {
+    return apiClient.uploadFile<UploadedFile>('/upload/single', file);
   },
 
   // Upload multiple files
-  uploadMultiple: async (files: File[]): Promise<ApiSuccessResponse<UploadedFile[]>> => {
-    return apiClient.uploadFiles<ApiSuccessResponse<UploadedFile[]>>('/storage/upload/multiple', files);
+  uploadMultiple: async (files: File[]): Promise<{ files: UploadedFile[]; totalFiles: number; successCount: number; errorCount: number }> => {
+    return apiClient.uploadFiles<{ files: UploadedFile[]; totalFiles: number; successCount: number; errorCount: number }>('/upload/multiple', files);
   },
 
   // Delete file
-  delete: async (fileId: string): Promise<ApiSuccessResponse<void>> => {
-    return apiClient.delete<ApiSuccessResponse<void>>(`/storage/${fileId}`);
+  delete: async (filename: string): Promise<{ success: boolean; message: string }> => {
+    return apiClient.delete<{ success: boolean; message: string }>(`/upload/${filename}`);
   },
 
-  // Get file
-  getFile: async (fileId: string): Promise<ApiSuccessResponse<UploadedFile>> => {
-    return apiClient.get<ApiSuccessResponse<UploadedFile>>(`/storage/${fileId}`);
+  // Get file info
+  getFile: async (filename: string): Promise<UploadedFile> => {
+    return apiClient.get<UploadedFile>(`/upload/${filename}/info`);
   },
 };

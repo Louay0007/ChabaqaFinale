@@ -81,6 +81,18 @@ export const authApi = {
     }
   },
 
+  verifyTwoFactorCode: async (userId: string, code: string): Promise<ApiSuccessResponse<AuthResponse>> => {
+    try {
+      const response = await apiClient.post<ApiSuccessResponse<AuthResponse>>('/auth/verify-2fa', { userId, code });
+      return response;
+    } catch (error: any) {
+      if (error.statusCode === 401) {
+        throw new AuthApiError(401, 'Invalid or expired verification code', error.data);
+      }
+      throw error;
+    }
+  },
+
   /**
    * Logout user
    */

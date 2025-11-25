@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +16,7 @@ interface JoinCommunityModalProps {
 }
 
 export function JoinCommunityModal({ community, onClose }: JoinCommunityModalProps) {
+  const router = useRouter()
   const [step, setStep] = useState<"details" | "payment" | "success">("details")
   const [isProcessing, setIsProcessing] = useState(false)
   const [formData, setFormData] = useState({
@@ -286,7 +288,14 @@ export function JoinCommunityModal({ community, onClose }: JoinCommunityModalPro
 
                 <Button
                   size="lg"
-                  onClick={onClose}
+                  onClick={() => {
+                    const slug = (community as any)?.slug
+                    if (slug) {
+                      router.push(`/community/${slug}/home`)
+                    } else {
+                      onClose()
+                    }
+                  }}
                   className="bg-gradient-to-r from-chabaqa-primary to-chabaqa-secondary1 text-white px-8"
                 >
                   Start Exploring

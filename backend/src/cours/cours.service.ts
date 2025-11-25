@@ -15,6 +15,7 @@ import { TrackableContentType } from '../schema/content-tracking.schema';
 import { FeeService } from '../common/services/fee.service';
 import { PromoService } from '../common/services/promo.service';
 import { NotificationService } from '../notification/notification.service';
+import { AchievementService } from '../achievement/achievement.service';
 
 @Injectable()
 export class CoursService {
@@ -30,28 +31,29 @@ export class CoursService {
     private readonly feeService: FeeService,
     private readonly promoService: PromoService,
     private readonly notificationService: NotificationService,
-  ) {}
+    private readonly achievementService: AchievementService,
+  ) { }
 
   async getCourses(page: number = 1, limit: number = 10, category?: string, niveau?: string, search?: string) {
     const query: any = { isPublished: true };
-    
+
     if (category) {
       query.category = category;
     }
-    
+
     if (niveau) {
       query.niveau = niveau;
     }
-    
+
     if (search) {
       query.$or = [
         { titre: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } }
       ];
     }
-    
+
     const skip = (page - 1) * limit;
-    
+
     const [courses, total] = await Promise.all([
       this.coursModel
         .find(query)
@@ -63,7 +65,7 @@ export class CoursService {
         .exec(),
       this.coursModel.countDocuments(query)
     ]);
-    
+
     const transformedCourses = courses.map(course => ({
       id: course._id.toString(),
       titre: course.titre,
@@ -80,7 +82,7 @@ export class CoursService {
       createdAt: course.createdAt,
       image: course.thumbnail || 'https://placehold.co/400x300?text=Course'
     }));
-    
+
     return {
       success: true,
       message: 'Cours récupérés avec succès',
@@ -105,10 +107,10 @@ export class CoursService {
     console.log('🔍 DEBUG - verifierAdminCommunaute:');
     console.log('   userId:', userId, 'type:', typeof userId);
     console.log('   communityIdentifier:', communityIdentifier);
-    
+
     // ÉTAPE 1: Trouver la communauté (par slug OU par _id)
     let community: CommunityDocument | null = null;
-    
+
     if (Types.ObjectId.isValid(communityIdentifier)) {
       console.log('   → Recherche par _id (ObjectId valide)');
       community = await this.communityModel.findById(communityIdentifier);
@@ -116,7 +118,7 @@ export class CoursService {
       console.log('   → Recherche par slug');
       community = await this.communityModel.findOne({ slug: communityIdentifier });
     }
-    
+
     if (!community) {
       console.log('❌ DEBUG - Communauté non trouvée pour:', communityIdentifier);
       throw new NotFoundException('Communauté introuvable');
@@ -138,20 +140,20 @@ export class CoursService {
       console.log('❌ DEBUG - Erreur conversion userId:', error.message);
       throw new BadRequestException('Format userId invalide');
     }
-    
+
     // ÉTAPE 3: Vérifier les permissions dans CETTE communauté spécifique
     const estCreateur = community.createur?.equals(userObjectId);
     const estAdmin = community.admins?.some(adminId => adminId.equals(userObjectId));
-    
+
     console.log('   → Est créateur:', estCreateur);
     console.log('   → Est admin:', estAdmin);
-    
+
     // Debug comparaison des ObjectIds
     console.log('   → Comparaison détaillée:');
     console.log('     Créateur BD:', community.createur?.toString());
     console.log('     User actuel:', userObjectId.toString());
     console.log('     Match créateur:', community.createur?.toString() === userObjectId.toString());
-    
+
     if (!estCreateur && !estAdmin) {
       console.log('❌ DEBUG - Utilisateur NON AUTORISÉ pour cette communauté');
       console.log('   Community ID:', community._id.toString());
@@ -168,18 +170,18 @@ export class CoursService {
    */
   private async verifierMembreCommunaute(userId: string, communitySlug: string): Promise<CommunityDocument> {
     const community = await this.communityModel.findOne({ slug: communitySlug });
-    
+
     if (!community) {
       throw new NotFoundException('Communauté introuvable');
     }
 
     const userObjectId = new Types.ObjectId(userId);
-    
+
     // Vérifier si l'utilisateur est le créateur, admin ou membre de la communauté
     const estCreateur = community.createur.equals(userObjectId);
     const estAdmin = community.admins.some(adminId => adminId.equals(userObjectId));
     const estMembre = community.members.some(memberId => memberId.equals(userObjectId));
-    
+
     if (!estCreateur && !estAdmin && !estMembre) {
       throw new ForbiddenException('Seuls les membres de la communauté peuvent accéder à cette ressource');
     }
@@ -195,15 +197,15 @@ export class CoursService {
     console.log('   userId:', userId);
     console.log('   Titre:', createCoursDto.titre);
     console.log('   DTO complet:', JSON.stringify(createCoursDto, null, 2));
-    
+
     // Validation de sécurité
     if (!createCoursDto.sections) {
       console.log('⚠️ Aucune section fournie, initialisation avec tableau vide');
       createCoursDto.sections = [];
     }
-    
+
     console.log('   Sections:', createCoursDto.sections.length);
-    
+
     // Vérifier les permissions d'admin
     const community = await this.verifierAdminCommunaute(userId, createCoursDto.communitySlug);
 
@@ -253,14 +255,14 @@ export class CoursService {
 
     // Créer les sections et chapitres directement
     console.log(`🏗️ Création directe de ${createCoursDto.sections.length} sections`);
-    
+
     const sectionsCompletes = createCoursDto.sections.map((sectionDto, sectionIndex) => {
       console.log(`📁 Section ${sectionIndex + 1}: "${sectionDto.titre}" avec ${sectionDto.chapitres.length} chapitres`);
-      
+
       // Créer tous les chapitres de cette section
       const chapitresSection = sectionDto.chapitres.map((chapitreDto, chapitreIndex) => {
         console.log(`   📄 Chapitre ${chapitreIndex + 1}: "${chapitreDto.titre}"`);
-        
+
         return {
           id: new Types.ObjectId().toString(),
           titre: chapitreDto.titre,
@@ -277,15 +279,15 @@ export class CoursService {
           createdAt: new Date()
         };
       });
-      
+
       // Créer la section avec ses chapitres
       const sectionId = new Types.ObjectId().toString();
-      
+
       // Assigner l'ID de la section à tous ses chapitres
       chapitresSection.forEach(chapitre => {
         chapitre.sectionId = sectionId;
       });
-      
+
       return {
         id: sectionId,
         titre: sectionDto.titre,
@@ -296,13 +298,13 @@ export class CoursService {
         createdAt: new Date()
       };
     });
-    
+
     // Assigner toutes les sections au cours
     coursEnregistre.sections = sectionsCompletes;
-    
+
     // Sauvegarder avec toutes les sections et chapitres
     await coursEnregistre.save();
-    
+
     console.log('✅ Résultat final:');
     console.log(`   📚 Cours: "${coursEnregistre.titre}"`);
     console.log(`   📁 ${coursEnregistre.sections.length} sections créées`);
@@ -330,12 +332,25 @@ export class CoursService {
     console.log(`   📋 Cours ID: ${coursId}`);
     console.log(`   👤 User ID: ${userId}`);
 
-    const cours = await this.coursModel.findById(coursId)
-      .populate('creatorId', 'nom prenom email avatar')
-      .exec();
+    let cours: CoursDocument | null = null;
+
+    // Essayer de trouver par _id (MongoDB ID)
+    if (Types.ObjectId.isValid(coursId)) {
+      cours = await this.coursModel.findById(coursId)
+        .populate('creatorId', 'name email profile_picture')
+        .exec();
+    }
+
+    // Si non trouvé, essayer de trouver par le champ 'id' personnalisé
+    if (!cours) {
+      console.log(`   ⚠️ Non trouvé par _id, recherche par champ 'id': ${coursId}`);
+      cours = await this.coursModel.findOne({ id: coursId })
+        .populate('creatorId', 'name email profile_picture')
+        .exec();
+    }
 
     if (!cours) {
-      console.log('   ❌ Cours non trouvé');
+      console.log('   ❌ Cours non trouvé (ni par _id ni par id)');
       throw new NotFoundException('Cours introuvable');
     }
 
@@ -361,14 +376,14 @@ export class CoursService {
    * Obtenir tous les cours d'une communauté
    */
   async obtenirCoursParCommunaute(
-    communitySlug: string, 
-    page: number = 1, 
+    communitySlug: string,
+    page: number = 1,
     limit: number = 10,
     seulementsPublies: boolean = true,
     userId?: string
   ) {
     const skip = (page - 1) * limit;
-    
+
     console.log('🔧 DEBUG - obtenirCoursParCommunaute');
     console.log(`   🏢 Community Slug: ${communitySlug}`);
     console.log(`   👤 User ID: ${userId}`);
@@ -383,12 +398,12 @@ export class CoursService {
 
     console.log(`   ✅ Communauté trouvée: ${community.name}`);
     console.log(`   🆔 Community ID: ${community._id}`);
-    
+
     // 2. Si un userId est fourni, vérifier que l'utilisateur est membre de la communauté
     if (userId) {
       await this.verifierMembreCommunaute(userId, community.slug);
     }
-    
+
     // 3. Construire les filtres avec l'ID de la communauté
     const filtres: any = { communityId: community._id.toString() };
     if (seulementsPublies) {
@@ -400,7 +415,7 @@ export class CoursService {
     const [cours, total] = await Promise.all([
       this.coursModel
         .find(filtres)
-        .populate('creatorId', 'nom prenom email avatar')
+        .populate('creatorId', 'name email profile_picture')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -432,7 +447,7 @@ export class CoursService {
     const [cours, total] = await Promise.all([
       this.coursModel
         .find({ creatorId: new Types.ObjectId(creatorId) })
-        .populate('creatorId', 'nom prenom email avatar')
+        .populate('creatorId', 'name email profile_picture')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -469,7 +484,7 @@ export class CoursService {
           path: 'courseId',
           populate: {
             path: 'creatorId',
-            select: 'nom prenom email avatar'
+            select: 'name email profile_picture'
           }
         })
         .sort({ enrolledAt: -1 })
@@ -499,8 +514,8 @@ export class CoursService {
    * Obtenir les cours d'un utilisateur (inscrits + créés)
    */
   async obtenirCoursParUtilisateur(
-    userId: string, 
-    page: number = 1, 
+    userId: string,
+    page: number = 1,
     limit: number = 10,
     type: 'enrolled' | 'created' | 'all' = 'all'
   ) {
@@ -531,11 +546,11 @@ export class CoursService {
         .map(enrollment => {
           const course = enrollment.courseId as any;
           // Calculate progress
-          const totalChapters = course.sections?.reduce((acc: number, section: any) => 
+          const totalChapters = course.sections?.reduce((acc: number, section: any) =>
             acc + (section.chapitres?.length || 0), 0) || 0;
           const completedChapters = enrollment.progression?.filter((p: any) => p.isCompleted).length || 0;
           const progress = totalChapters > 0 ? Math.round((completedChapters / totalChapters) * 100) : 0;
-          
+
           return {
             id: course._id.toString(),
             titre: course.titre,
@@ -661,11 +676,11 @@ export class CoursService {
 
     // Supprimer le cours
     await this.coursModel.findByIdAndDelete(coursId);
-    
+
     return {
       message: 'Cours supprimé avec succès'
     }
-    
+
   }
 
   /**
@@ -675,11 +690,11 @@ export class CoursService {
     console.log('🚨🚨🚨 DEBUT _creerSectionsEtChapitres 🚨🚨🚨');
     console.log(`🏗️ Création de ${sections.length} sections`);
     console.log('📋 Sections reçues:', JSON.stringify(sections.map(s => ({ titre: s.titre, chapitres: s.chapitres?.length || 0 })), null, 2));
-    
+
     for (let i = 0; i < sections.length; i++) {
       const sectionDto = sections[i];
       console.log(`📁 Section ${i + 1}: "${sectionDto.titre}" (${sectionDto.chapitres.length} chapitres)`);
-      
+
       // Créer la section
       const nouvelleSection = {
         id: new Types.ObjectId().toString(),
@@ -690,16 +705,16 @@ export class CoursService {
         chapitres: [],
         createdAt: new Date()
       };
-      
+
       // Ajouter la section au cours
       cours.ajouterSection(nouvelleSection);
-      
+
       // Créer et ajouter chaque chapitre à cette section
       for (let j = 0; j < sectionDto.chapitres.length; j++) {
         const chapitreDto = sectionDto.chapitres[j];
         console.log(`   📄 Chapitre ${j + 1}: "${chapitreDto.titre}"`);
         console.log(`      🔧 Données du chapitre:`, JSON.stringify(chapitreDto, null, 2));
-        
+
         const nouveauChapitre = {
           id: new Types.ObjectId().toString(),
           titre: chapitreDto.titre,
@@ -715,16 +730,16 @@ export class CoursService {
           sectionId: nouvelleSection.id,
           createdAt: new Date()
         };
-        
+
         console.log(`      🏗️  Chapitre créé:`, JSON.stringify({
           id: nouveauChapitre.id,
           titre: nouveauChapitre.titre,
           ordre: nouveauChapitre.ordre,
           sectionId: nouveauChapitre.sectionId
         }, null, 2));
-        
+
         console.log(`      📎 Appel de ajouterChapitreASection avec sectionId: "${nouvelleSection.id}"`);
-        
+
         // Ajouter le chapitre à la section
         try {
           cours.ajouterChapitreASection(nouvelleSection.id, nouveauChapitre);
@@ -734,10 +749,10 @@ export class CoursService {
         }
       }
     }
-    
+
     // Sauvegarder le cours avec toutes les sections et chapitres
     await cours.save();
-    
+
     // Vérifier le résultat final
     console.log('📊 Résultat final:');
     console.log(`   ✅ ${cours.sections.length} sections créées`);
@@ -753,7 +768,7 @@ export class CoursService {
     // Récupérer la communauté pour avoir accès au slug
     const community = await this.communityModel.findById(cours.communityId);
     // Extraire tous les chapitres de toutes les sections pour la compatibilité
-    const tousLesChapitres = cours.sections.flatMap(section => 
+    const tousLesChapitres = cours.sections.flatMap(section =>
       section.chapitres.map(chapitre => ({
         id: chapitre.id,
         titre: chapitre.titre,
@@ -826,12 +841,11 @@ export class CoursService {
       ressources: cours.ressources,
       createdAt: cours.createdAt.toISOString(),
       updatedAt: cours.updatedAt.toISOString(),
-      creator: cours.creatorId && (cours.creatorId as any).nom ? {
+      creator: cours.creatorId && (cours.creatorId as any).name ? {
         id: (cours.creatorId as any)._id.toString(),
-        nom: (cours.creatorId as any).nom,
-        prenom: (cours.creatorId as any).prenom,
+        name: (cours.creatorId as any).name,
         email: (cours.creatorId as any).email,
-        avatar: (cours.creatorId as any).avatar
+        avatar: (cours.creatorId as any).profile_picture || (cours.creatorId as any).photo_profil
       } : undefined
     };
   }
@@ -870,7 +884,7 @@ export class CoursService {
         ordre: addSectionDto.ordre,
         chapitresCount: addSectionDto.chapitres?.length || 0
       });
-      
+
       const nouvelleSection = {
         id: new Types.ObjectId().toString(),
         titre: addSectionDto.titre,
@@ -922,11 +936,11 @@ export class CoursService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de l\'ajout de la section:', error);
-             throw new BadRequestException('Erreur lors de l\'ajout de la section');
-     }
-   }
+      throw new BadRequestException('Erreur lors de l\'ajout de la section');
+    }
+  }
 
   /**
    * Ajouter un chapitre à une section spécifique d'un cours
@@ -937,9 +951,9 @@ export class CoursService {
    * @returns Cours mis à jour avec le nouveau chapitre
    */
   async ajouterChapitreASection(
-    coursId: string, 
-    sectionId: string, 
-    addChapitreDto: AddChapitreToSectionDto, 
+    coursId: string,
+    sectionId: string,
+    addChapitreDto: AddChapitreToSectionDto,
     userId: string
   ): Promise<CoursResponseDto> {
     console.log('🔧 DEBUG - Début ajouterChapitreASection');
@@ -1016,7 +1030,7 @@ export class CoursService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de l\'ajout du chapitre:', error);
       throw new BadRequestException('Erreur lors de l\'ajout du chapitre');
     }
@@ -1076,7 +1090,7 @@ export class CoursService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de la suppression de la section:', error);
       throw new BadRequestException('Erreur lors de la suppression de la section');
     }
@@ -1091,9 +1105,9 @@ export class CoursService {
    * @returns Cours mis à jour sans le chapitre supprimé
    */
   async supprimerChapitre(
-    coursId: string, 
-    sectionId: string, 
-    chapitreId: string, 
+    coursId: string,
+    sectionId: string,
+    chapitreId: string,
     userId: string
   ): Promise<CoursResponseDto> {
     console.log('🔧 DEBUG - Début supprimerChapitre');
@@ -1155,7 +1169,7 @@ export class CoursService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de la suppression du chapitre:', error);
       throw new BadRequestException('Erreur lors de la suppression du chapitre');
     }
@@ -1210,7 +1224,7 @@ export class CoursService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de la mise à jour du thumbnail:', error);
       throw new BadRequestException('Erreur lors de la mise à jour du thumbnail');
     }
@@ -1226,10 +1240,10 @@ export class CoursService {
    * @returns Cours mis à jour
    */
   async mettreAJourVideoUrl(
-    coursId: string, 
-    sectionId: string, 
-    chapitreId: string, 
-    videoUrl: string, 
+    coursId: string,
+    sectionId: string,
+    chapitreId: string,
+    videoUrl: string,
     userId: string
   ): Promise<CoursResponseDto> {
     console.log('🔧 DEBUG - Début mettreAJourVideoUrl');
@@ -1273,7 +1287,7 @@ export class CoursService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de la mise à jour de l\'URL vidéo:', error);
       throw new BadRequestException('Erreur lors de la mise à jour de l\'URL vidéo');
     }
@@ -1289,10 +1303,10 @@ export class CoursService {
    * @returns Cours mis à jour
    */
   async ajouterRessourceAChapitre(
-    coursId: string, 
-    sectionId: string, 
-    chapitreId: string, 
-    ressource: any, 
+    coursId: string,
+    sectionId: string,
+    chapitreId: string,
+    ressource: any,
     userId: string
   ): Promise<CoursResponseDto> {
     console.log('🔧 DEBUG - Début ajouterRessourceAChapitre');
@@ -1353,7 +1367,7 @@ export class CoursService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de l\'ajout de la ressource:', error);
       throw new BadRequestException('Erreur lors de l\'ajout de la ressource');
     }
@@ -1373,7 +1387,7 @@ export class CoursService {
 
     // Vérifier que l'utilisateur est admin de la communauté du cours
     await this.verifierAdminCommunaute(userId, cours.communityId.toString());
-    
+
     return true;
   }
 
@@ -1385,8 +1399,8 @@ export class CoursService {
    * @returns Cours créé avec fichiers
    */
   async creerCoursAvecFichiers(
-    createCoursDto: CreateCoursDto, 
-    uploadedFiles: { thumbnail?: string; videos: any; ressources: any }, 
+    createCoursDto: CreateCoursDto,
+    uploadedFiles: { thumbnail?: string; videos: any; ressources: any },
     userId: string
   ): Promise<CoursResponseDto> {
     console.log('🚀 Création de cours avec fichiers intégrés');
@@ -1441,10 +1455,10 @@ export class CoursService {
       for (const [chapitreIndex, chapitre] of section.chapitres.entries()) {
         const chapitreKey = `${sectionIndex}-${chapitreIndex}`;
         const tempRessources = tempRessourcesMap.get(chapitreKey);
-        
+
         if (tempRessources && tempRessources.length > 0) {
           console.log(`💾 Ajout de ${tempRessources.length} ressource(s) au chapitre ${chapitre.titre}`);
-          
+
           for (const ressource of tempRessources) {
             const nouvellRessource = {
               titre: ressource.titre,
@@ -1453,13 +1467,13 @@ export class CoursService {
               type: ressource.type,
               ordre: chapitre.ressources ? chapitre.ressources.length + 1 : 1
             };
-            
+
             try {
               const coursUpdated = await this.ajouterRessourceAChapitre(
-                cours.id, 
-                section.id, 
-                chapitre.id, 
-                nouvellRessource, 
+                cours.id,
+                section.id,
+                chapitre.id,
+                nouvellRessource,
                 userId
               );
               // Mettre à jour les ressources localement
@@ -1528,10 +1542,10 @@ export class CoursService {
    * @returns Cours mis à jour
    */
   async ajouterChapitreASectionAvecFichiers(
-    coursId: string, 
-    sectionId: string, 
-    addChapitreDto: AddChapitreToSectionDto, 
-    uploadedFiles: { thumbnail?: string; videos: any; ressources: any }, 
+    coursId: string,
+    sectionId: string,
+    addChapitreDto: AddChapitreToSectionDto,
+    uploadedFiles: { thumbnail?: string; videos: any; ressources: any },
     userId: string
   ): Promise<CoursResponseDto> {
     // Intégrer la vidéo dans les données du chapitre
@@ -1548,13 +1562,13 @@ export class CoursService {
       const section = cours.sections.find(s => s.id === sectionId);
       if (section) {
         const chapitre = section.chapitres[section.chapitres.length - 1]; // Dernier chapitre ajouté
-        
+
         for (const ressource of uploadedFiles.ressources['default']) {
           await this.ajouterRessourceAChapitre(
-            coursId, 
-            sectionId, 
-            chapitre.id, 
-            ressource, 
+            coursId,
+            sectionId,
+            chapitre.id,
+            ressource,
             userId
           );
         }
@@ -1573,9 +1587,9 @@ export class CoursService {
    * @returns Cours mis à jour
    */
   async ajouterSectionAvecFichiers(
-    coursId: string, 
-    addSectionDto: AddSectionDto, 
-    uploadedFiles: { thumbnail?: string; videos: any; ressources: any }, 
+    coursId: string,
+    addSectionDto: AddSectionDto,
+    uploadedFiles: { thumbnail?: string; videos: any; ressources: any },
     userId: string
   ): Promise<CoursResponseDto> {
     // Intégrer les vidéos dans les chapitres de la section
@@ -1598,13 +1612,13 @@ export class CoursService {
         if (uploadedFiles.ressources[ressourcesKey]) {
           const section = cours.sections[cours.sections.length - 1]; // Dernière section ajoutée
           const chapitre = section.chapitres[i];
-          
+
           for (const ressource of uploadedFiles.ressources[ressourcesKey]) {
             await this.ajouterRessourceAChapitre(
-              coursId, 
-              section.id, 
-              chapitre.id, 
-              ressource, 
+              coursId,
+              section.id,
+              chapitre.id,
+              ressource,
               userId
             );
           }
@@ -1619,16 +1633,16 @@ export class CoursService {
    * Ajouter des ressources aux chapitres après création du cours
    */
   private async ajouterRessourcesAuxChapitres(
-    cours: CoursResponseDto, 
+    cours: CoursResponseDto,
     ressources: { [key: string]: Array<{ url: string; titre: string; type: string }> }
   ): Promise<void> {
     for (const [key, ressourcesList] of Object.entries(ressources)) {
       const [sectionIndex, chapitreIndex] = key.split('-').map(Number);
-      
+
       if (cours.sections[sectionIndex] && cours.sections[sectionIndex].chapitres[chapitreIndex]) {
         const section = cours.sections[sectionIndex];
         const chapitre = section.chapitres[chapitreIndex];
-        
+
         for (const ressource of ressourcesList) {
           // Ici on pourrait appeler ajouterRessourceAChapitre si nécessaire
           // Pour l'instant on les intègre directement
@@ -1666,7 +1680,7 @@ export class CoursService {
       // 2. Trouver le chapitre dans toutes les sections
       let chapitre: any = null;
       let section: any = null;
-      
+
       for (const s of cours.sections) {
         const ch = s.chapitres.find((c: any) => c.id === chapitreId);
         if (ch) {
@@ -1744,7 +1758,7 @@ export class CoursService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de la vérification d\'accès au chapitre:', error);
       throw new BadRequestException('Erreur lors de la vérification d\'accès au chapitre');
     }
@@ -1859,7 +1873,7 @@ export class CoursService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de l\'inscription au cours:', error);
       throw new BadRequestException('Erreur lors de l\'inscription au cours');
     }
@@ -1885,7 +1899,20 @@ export class CoursService {
    * Marquer un cours comme terminé
    */
   async trackCoursComplete(coursId: string, userId: string) {
-    return await this.trackingService.trackComplete(userId, coursId, TrackableContentType.COURSE);
+    const result = await this.trackingService.trackComplete(userId, coursId, TrackableContentType.COURSE);
+
+    // Check for achievements after completing a course
+    try {
+      const cours = await this.coursModel.findById(coursId);
+      if (cours) {
+        await this.achievementService.checkAchievements(userId, cours.communityId);
+      }
+    } catch (error) {
+      console.error('Error checking achievements after course completion:', error);
+      // Don't fail the tracking if achievement check fails
+    }
+
+    return result;
   }
 
   /**
@@ -1976,9 +2003,9 @@ export class CoursService {
    * @returns Cours mis à jour
    */
   async updateSequentialProgression(
-    coursId: string, 
-    enabled: boolean, 
-    unlockMessage: string | undefined, 
+    coursId: string,
+    enabled: boolean,
+    unlockMessage: string | undefined,
     userId: string
   ): Promise<CoursResponseDto> {
     console.log('🔧 DEBUG - updateSequentialProgression');
@@ -2015,7 +2042,7 @@ export class CoursService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de la mise à jour de la progression séquentielle:', error);
       throw new BadRequestException('Erreur lors de la mise à jour de la progression séquentielle');
     }
@@ -2029,8 +2056,8 @@ export class CoursService {
    * @returns Informations sur l'accès au chapitre
    */
   async checkChapterAccessWithSequential(
-    coursId: string, 
-    chapitreId: string, 
+    coursId: string,
+    chapitreId: string,
     userId: string
   ): Promise<{
     hasAccess: boolean;
@@ -2104,7 +2131,7 @@ export class CoursService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de la vérification d\'accès au chapitre:', error);
       throw new BadRequestException('Erreur lors de la vérification d\'accès au chapitre');
     }
@@ -2206,7 +2233,7 @@ export class CoursService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors de la récupération des chapitres déverrouillés:', error);
       throw new BadRequestException('Erreur lors de la récupération des chapitres déverrouillés');
     }
@@ -2221,9 +2248,9 @@ export class CoursService {
    * @returns Message de confirmation
    */
   async unlockChapterManually(
-    coursId: string, 
-    chapitreId: string, 
-    userId: string, 
+    coursId: string,
+    chapitreId: string,
+    userId: string,
     creatorId: string
   ): Promise<{ message: string }> {
     console.log('🔧 DEBUG - unlockChapterManually');
@@ -2255,7 +2282,7 @@ export class CoursService {
 
       // 4. Créer ou mettre à jour la progression pour ce chapitre
       let progression = enrollment.progression.find(p => p.chapterId === chapitreId);
-      
+
       if (!progression) {
         progression = {
           id: new Types.ObjectId().toString(),
@@ -2285,7 +2312,7 @@ export class CoursService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('❌ Erreur lors du déverrouillage manuel du chapitre:', error);
       throw new BadRequestException('Erreur lors du déverrouillage manuel du chapitre');
     }

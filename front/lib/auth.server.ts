@@ -3,6 +3,28 @@ import type { User } from "@/lib/api/types"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
+export async function authenticatedFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const cookieStore = await cookies()
+  const accessToken = cookieStore.get("accessToken")
+
+  const headers = new Headers(options.headers || {})
+  
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken.value}`)
+  }
+  
+  headers.set("Content-Type", "application/json")
+
+  return fetch(url, {
+    ...options,
+    headers,
+    cache: options.cache || 'no-store'
+  })
+}
+
 export async function getProfileServer(): Promise<User | null> {
   try {
     const cookieStore = await cookies()

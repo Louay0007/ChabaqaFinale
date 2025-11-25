@@ -69,7 +69,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         <View style={styles.courseStats}>
           <View style={styles.courseStatItem}>
             <BookOpen size={12} color="#6b7280" />
-            <Text style={styles.statText}>{course.sections.length} sections</Text>
+            <Text style={styles.statText}>{(course.sections || []).length} sections</Text>
           </View>
           <View style={styles.courseStatItem}>
             <Clock size={12} color="#6b7280" />
@@ -77,7 +77,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
           </View>
           <View style={styles.courseStatItem}>
             <Users size={12} color="#6b7280" />
-            <Text style={styles.statText}>{course.enrollments.length} students</Text>
+            <Text style={styles.statText}>{course.enrollmentCount || (course.enrollments || []).length} students</Text>
           </View>
           {course.level && (
             <View style={styles.levelBadge}>
@@ -109,11 +109,11 @@ export const CourseCard: React.FC<CourseCardProps> = ({
           <View style={styles.creatorContainer}>
             <Image
               source={{
-                uri: course.creator.avatar || 'https://randomuser.me/api/portraits/lego/1.jpg',
+                uri: course.creator?.avatar || 'https://randomuser.me/api/portraits/lego/1.jpg',
               }}
               style={styles.creatorAvatar}
             />
-            <Text style={styles.creatorName}>{course.creator.name}</Text>
+            <Text style={styles.creatorName}>{course.creator?.name || 'Unknown'}</Text>
           </View>
 
           <TouchableOpacity
@@ -132,8 +132,8 @@ export const CourseCard: React.FC<CourseCardProps> = ({
               {isEnrolled
                 ? 'Continue'
                 : course.price === 0
-                ? 'Enroll Free'
-                : `Enroll $${course.price}`}
+                  ? 'Enroll Free'
+                  : `Enroll $${course.price}`}
             </Text>
           </TouchableOpacity>
         </View>

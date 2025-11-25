@@ -1,27 +1,32 @@
-import { use } from "react"
-import { getCommunityBySlug, getProductsByCommunity, getUserPurchases } from "@/lib/mock-data"
+import { notFound } from "next/navigation"
 import ProductsPageContent from "@/app/(community)/[creator]/[feature]/(loggedUser)/products/components/products-page-content"
+import { productsCommunityApi } from "@/lib/api/products-community.api"
 
 type Props = {
-  params: Promise<{ feature: string }>
+  params: { creator: string; feature: string }
 }
 
-export default function ProductsPage({ params }: Props) {
-  const { feature } = use(params)
-  const community = getCommunityBySlug(feature)
-  const allProducts = getProductsByCommunity(community?.id || "")
-  const userPurchases = getUserPurchases("2") // Mock user ID
+export default async function ProductsPage({ params }: Props) {
+  const { creator, feature } = params
+  
+  try {
+    const data = await productsCommunityApi.getProductsPageData(feature)
+    
+    if (!data.community) {
+      notFound()
+    }
 
-  if (!community) {
-    return <div>Community not found</div>
+    return (
+      <ProductsPageContent 
+        creatorSlug={creator} 
+        slug={feature}
+        community={data.community}
+        allProducts={data.products}
+        userPurchases={data.userPurchases}
+      />
+    )
+  } catch (error) {
+    console.error('Error loading products page:', error)
+    notFound()
   }
-
-  return (
-    <ProductsPageContent 
-      slug={feature}
-      community={community}
-      allProducts={allProducts}
-      userPurchases={userPurchases}
-    />
-  )
 }

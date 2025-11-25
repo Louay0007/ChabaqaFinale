@@ -34,7 +34,7 @@ import {
 import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { getProfile, authenticatedGet } from "@/lib/auth"
+import { getProfile } from "@/lib/auth"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { LoginForm } from "@/components/login-form"
@@ -369,7 +369,11 @@ export default function ProfilePage({ overrideUser, isOwnProfile = true }: Profi
 
         // Fetch products with pagination
         const listUrl = `${apiBase}/products/by-user/${encodeURIComponent(user._id || user.id)}?page=${productsPage}&limit=12&type=all`
-        const listRes = await authenticatedGet(listUrl)
+        const listRes = await fetch(listUrl, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        })
         
         if (listRes.ok) {
           const data = await listRes.json()
@@ -558,7 +562,7 @@ export default function ProfilePage({ overrideUser, isOwnProfile = true }: Profi
             <p className="text-muted-foreground">Votre session a expiré ou vous n'êtes pas connecté.</p>
             <div className="flex justify-center">
               <Button asChild>
-                <a href="/signin?redirect=/profile">Se connecter</a>
+                <a href="/signin">Se connecter</a>
               </Button>
             </div>
           </div>

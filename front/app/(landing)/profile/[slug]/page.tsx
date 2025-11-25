@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth"
-import { authenticatedGet } from "@/lib/auth"
+import { useAuthContext } from "@/app/providers/auth-provider"
 import ProfilePage from "../page"
 
 interface SlugUser {
@@ -21,7 +20,7 @@ interface SlugUser {
 export default function ProfileSlugPage() {
   const params = useParams()
   const router = useRouter()
-  const { user: currentUser, isLoading: authLoading } = useAuth()
+  const { user: currentUser, loading: authLoading } = useAuthContext()
   const [slugUser, setSlugUser] = useState<SlugUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

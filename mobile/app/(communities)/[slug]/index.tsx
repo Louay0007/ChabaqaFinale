@@ -34,14 +34,14 @@ export default function CommunityDetailScreen() {
       setLoading(true);
       setError(null);
       console.log('🔍 Fetching community details for slug:', slug);
-      
+
       // Try to fetch from backend API
       const response = await getCommunityBySlug(slug as string);
-      
+
       if (response.success && response.data) {
         console.log('✅ Community fetched from backend:', response.data.name);
         console.log('📦 Raw backend data:', response.data);
-        
+
         // Map category images
         const getCategoryImage = (category: string) => {
           const categoryImages: { [key: string]: any } = {
@@ -58,9 +58,9 @@ export default function CommunityDetailScreen() {
         // Extract creator info (backend returns populated createur object)
         const creatorData = response.data.createur;
         const creatorName = creatorData?.name || creatorData?.email?.split('@')[0] || 'Unknown Creator';
-        const creatorAvatar = creatorData?.profile_picture || creatorData?.avatar || creatorData?.photo || 
+        const creatorAvatar = creatorData?.profile_picture || creatorData?.avatar || creatorData?.photo ||
           `https://placehold.co/64x64?text=${encodeURIComponent(creatorName.charAt(0).toUpperCase())}&style=identicon`;
-        
+
         // Extract member count (could be array length or direct count)
         let memberCount = 0;
         if (typeof response.data.members === 'number') {
@@ -70,14 +70,14 @@ export default function CommunityDetailScreen() {
         } else if (response.data.membersCount) {
           memberCount = response.data.membersCount;
         }
-        
+
         // Extract rating
         const rating = response.data.rating || response.data.averageRating || 0;
-        
+
         // Extract price info
         const price = response.data.price || response.data.fees_of_join || 0;
         const priceType = response.data.priceType || (price > 0 ? 'paid' : 'free');
-        
+
         // Transform backend data to match frontend format
         const transformedCommunity = {
           id: response.data._id?.toString() || response.data.id,
@@ -93,7 +93,38 @@ export default function CommunityDetailScreen() {
           price: price,
           priceType: priceType,
           currency: response.data.currency || 'TND',
-          image: getCategoryImage(response.data.category || 'General'),
+          // Fix image handling - use real backend image with URL transformation
+          image: (() => {
+            // Helper to transform localhost URLs to mobile-accessible URLs
+            const fixImageUrl = (url: string | null | undefined): string | null => {
+              if (!url) return null;
+              const apiBase = 'http://172.20.10.6:3000'; // Mobile API URL
+              if (url.startsWith('http')) {
+                return url.replace('http://localhost:3000', apiBase)
+                  .replace('http://127.0.0.1:3000', apiBase);
+              }
+              return `${apiBase}${url.startsWith('/') ? '' : '/'}${url}`;
+            };
+
+            // Get raw image URL from backend
+            const rawImageUrl = response.data.photo_de_couverture || response.data.image || response.data.logo;
+
+            // Check if it's a placeholder URL
+            const isPlaceholder = (url: string) => {
+              return url?.includes('placeholder.com') || url?.includes('placehold.co') || url?.includes('via.placeholder');
+            };
+
+            // If we have a real image URL (not placeholder), use it
+            if (rawImageUrl && !isPlaceholder(rawImageUrl)) {
+              const fixedUrl = fixImageUrl(rawImageUrl);
+              console.log('🖼️ Using backend image:', { raw: rawImageUrl, fixed: fixedUrl });
+              return { uri: fixedUrl };
+            }
+
+            // Otherwise, fallback to category image
+            console.log('🖼️ Using category fallback for:', response.data.category);
+            return getCategoryImage(response.data.category || 'General');
+          })(),
           imageUrl: response.data.image || response.data.photo_de_couverture || response.data.logo,
           tags: response.data.tags || [],
           featured: response.data.featured || false,
@@ -101,13 +132,13 @@ export default function CommunityDetailScreen() {
           type: response.data.type || 'community',
           benefits: response.data.settings?.benefits || response.data.settings?.features || [
             'Accès complet',
-            'Support prioritaire', 
+            'Support prioritaire',
             'Ressources exclusives'
           ],
           settings: response.data.settings,
           isPrivate: response.data.isPrivate || false,
         };
-        
+
         setCommunity(transformedCommunity);
         console.log('📊 Transformed community:', transformedCommunity);
         console.log('👥 Creator info:', { name: creatorName, avatar: creatorAvatar });
@@ -116,7 +147,7 @@ export default function CommunityDetailScreen() {
     } catch (err: any) {
       console.error('❌ Error fetching community:', err);
       setError(err.message || 'Failed to load community');
-      
+
       // Fallback to mock data
       console.log('⚠️ Falling back to mock data');
       const foundCommunity = ExploreData.communities.find(c => c.slug === slug);
@@ -132,9 +163,9 @@ export default function CommunityDetailScreen() {
     try {
       const response = await getMyJoinedCommunities();
       if (response.success && response.data) {
-        const joined = response.data.some((c: any) => 
-          c.slug === slug || 
-          c.id === community?.id || 
+        const joined = response.data.some((c: any) =>
+          c.slug === slug ||
+          c.id === community?.id ||
           c._id === community?.id
         );
         setIsJoined(joined);
@@ -165,9 +196,9 @@ export default function CommunityDetailScreen() {
               try {
                 setJoining(true);
                 console.log('🤝 Joining community:', community.id);
-                
+
                 const response = await joinCommunity(community.id);
-                
+
                 if (response.success) {
                   setIsJoined(true);
                   Alert.alert(
@@ -208,11 +239,11 @@ export default function CommunityDetailScreen() {
               try {
                 setJoining(true);
                 console.log('💳 Processing payment for community:', community.id);
-                
+
                 // TODO: Integrate with payment system
                 // For now, just join the community
                 const response = await joinCommunity(community.id);
-                
+
                 if (response.success) {
                   setIsJoined(true);
                   Alert.alert(
@@ -287,7 +318,7 @@ export default function CommunityDetailScreen() {
           <Text style={communityStyles.emptyStateText}>
             Community not found
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={communityStyles.joinButton}
             onPress={() => router.replace('/(communities)')}
           >
@@ -303,14 +334,14 @@ export default function CommunityDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Hero Image */}
         <View style={{ position: 'relative' }}>
-          <Image 
+          <Image
             source={community.image}
             style={communityStyles.detailImage}
             onError={(error) => {
               console.log('Hero image loading error:', error.nativeEvent.error);
             }}
           />
-          
+
           {/* Back Button */}
           <TouchableOpacity
             style={{
@@ -330,10 +361,10 @@ export default function CommunityDetailScreen() {
         <View style={communityStyles.detailContent}>
           {/* Title and Creator */}
           <Text style={communityStyles.detailTitle}>{community.name}</Text>
-          
+
           <View style={communityStyles.detailCreator}>
-            <Image 
-              source={{ uri: community.creatorAvatar }} 
+            <Image
+              source={{ uri: community.creatorAvatar }}
               style={communityStyles.creatorAvatar}
             />
             <View style={communityStyles.creatorInfo}>
@@ -408,7 +439,7 @@ export default function CommunityDetailScreen() {
           )}
 
           {/* Join Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               communityStyles.joinButton,
               isJoined && { backgroundColor: '#10b981' },

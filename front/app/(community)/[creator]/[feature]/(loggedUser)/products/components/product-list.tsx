@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Codesandbox, Search, Filter, RefreshCw } from "lucide-react"
 import ProductCard from "./product-card"
-import { Product, Purchase } from "@/lib/models"
+import { ProductWithDetails, ProductPurchase } from "@/lib/api/products-community.api"
 
 interface ProductListProps {
-  filteredProducts: Product[]
-  userPurchases: Purchase[]
+  creatorSlug: string
+  filteredProducts: ProductWithDetails[]
+  userPurchases: ProductPurchase[]
   selectedProduct: string | null
   setSelectedProduct: (value: string | null) => void
   slug: string
@@ -15,6 +16,7 @@ interface ProductListProps {
 }
 
 export default function ProductList({
+  creatorSlug,
   filteredProducts,
   userPurchases,
   selectedProduct,
@@ -93,11 +95,11 @@ export default function ProductList({
         {/* Quick Stats */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>
-            {userPurchases.length} owned
+            {(userPurchases || []).length} owned
           </span>
           <span>•</span>
           <span>
-            {filteredProducts.filter(p => p.price === 0).length} free
+            {filteredProducts.filter(p => (p.price || 0) === 0).length} free
           </span>
         </div>
       </div>
@@ -114,8 +116,9 @@ export default function ProductList({
             }`}
           >
             <ProductCard
+              creatorSlug={creatorSlug}
               product={product}
-              isPurchased={userPurchases.some((p) => p.productId === product.id)}
+              isPurchased={(userPurchases || []).some((p) => p.productId === product.id)}
               isSelected={selectedProduct === product.id}
               onSelect={() => setSelectedProduct(product.id)}
               slug={slug}

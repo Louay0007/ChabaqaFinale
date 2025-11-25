@@ -15,7 +15,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private tokenBlacklistService: TokenBlacklistService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        (request: any) => {
+          return request?.cookies?.accessToken;
+        },
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       ignoreExpiration: false,
       secretOrKey: process.env.JWT_SECRET || 'your-secret-key',
     });
@@ -30,10 +35,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Token révoqué - veuillez vous reconnecter');
     }
 
-    // ÉTAPE 2: Vérifier si c'est un admin (basé sur le rôle dans le token)
+    // ÉTAPE 2: Vérifier le fingerprint (anti-theft) - optionnel pour access tokens
+    // Note: fingerprint validation is primarily done in refresh flow for better UX
+
+    // ÉTAPE 3: Vérifier si c'est un admin (basé sur le rôle dans le token)
     if (payload.role === 'admin') {
       const admin = await this.adminModel.findById(payload.sub);
-      
+
       if (!admin) {
         throw new UnauthorizedException('Administrateur non trouvé');
       }
@@ -48,7 +56,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     } else {
       // Sinon, c'est un utilisateur normal
       const user = await this.userModel.findById(payload.sub);
-      
+
       if (!user) {
         throw new UnauthorizedException('Utilisateur non trouvé');
       }
@@ -62,4 +70,4 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       };
     }
   }
-} 
+}

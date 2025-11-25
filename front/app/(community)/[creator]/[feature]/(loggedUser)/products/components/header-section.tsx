@@ -1,14 +1,16 @@
 import { ShoppingBag } from "lucide-react"
-import { Product, Purchase } from "@/lib/models"
+import { ProductWithDetails, ProductPurchase } from "@/lib/api/products-community.api"
 
 interface HeaderSectionProps {
-  allProducts: Product[]
-  userPurchases: Purchase[]
+  allProducts: ProductWithDetails[]
+  userPurchases: ProductPurchase[]
 }
 
 export default function HeaderSection({ allProducts, userPurchases }: HeaderSectionProps) {
-  const freeProducts = allProducts.filter(p => p.price === 0).length
-  const premiumProducts = allProducts.filter(p => p.price > 0).length
+  // Filter only published products
+  const publishedProducts = allProducts?.filter(p => p.isPublished) || []
+  const freeProducts = publishedProducts.filter(p => (p.price || 0) === 0).length
+  const premiumProducts = publishedProducts.filter(p => (p.price || 0) > 0).length
 
   return (
     <div className="mb-6">
@@ -33,11 +35,11 @@ export default function HeaderSection({ allProducts, userPurchases }: HeaderSect
         {/* Stats horizontal */}
         <div className="flex space-x-6 mt-4 md:mt-0">
           <div className="text-center">
-            <div className="text-xl font-bold">{allProducts.length}</div>
+            <div className="text-xl font-bold">{publishedProducts.length}</div>
             <div className="text-primary-100 text-xs">Total Products</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold">{userPurchases.length}</div>
+            <div className="text-xl font-bold">{userPurchases?.length || 0}</div>
             <div className="text-primary-100 text-xs">Purchased</div>
           </div>
           <div className="text-center">

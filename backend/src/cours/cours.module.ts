@@ -11,6 +11,7 @@ import { TrackingModule } from '../common/modules/tracking.module';
 import { PolicyModule } from '../common/modules/policy.module';
 import { FeeModule } from '../common/modules/fee.module';
 import { PromoModule } from '../common/modules/promo.module';
+import { AchievementModule } from '../achievement/achievement.module';
 
 @Module({
   imports: [
@@ -26,7 +27,8 @@ import { PromoModule } from '../common/modules/promo.module';
     TrackingModule,
     PolicyModule,
     FeeModule,
-    PromoModule
+    PromoModule,
+    AchievementModule
   ],
   controllers: [CoursController],
   providers: [CoursService],

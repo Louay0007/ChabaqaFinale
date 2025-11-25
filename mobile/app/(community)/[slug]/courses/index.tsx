@@ -16,19 +16,19 @@ export default function CoursesScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
-  
+
   // Real data state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [community, setCommunity] = useState<any>(null);
   const [allCourses, setAllCourses] = useState<any[]>([]);
   const [userEnrollments, setUserEnrollments] = useState<any[]>([]);
-  
+
   // Fetch data on component mount
   useEffect(() => {
     fetchCoursesData();
   }, [slug]);
-  
+
   const fetchCoursesData = async () => {
     try {
       setLoading(true);
@@ -40,50 +40,55 @@ export default function CoursesScreen() {
       if (!communityResponse.success || !communityResponse.data) {
         throw new Error('Community not found');
       }
-      
+
       const communityData = {
         id: communityResponse.data._id || communityResponse.data.id,
         name: communityResponse.data.name,
         slug: communityResponse.data.slug,
       };
       setCommunity(communityData);
-      
+
       // Fetch courses for this community
       const coursesResponse = await getCoursesByCommunitySlug(slug as string, {
         page: 1,
         limit: 50,
         published: true
       });
-      
+
       // Transform backend courses to match frontend interface
-      const transformedCourses = (coursesResponse.courses || []).map((course: any) => ({
-        id: course._id,
-        title: course.titre,
-        description: course.description,
-        shortDescription: course.description,
-        thumbnail: course.thumbnailUrl || course.thumbnail || 'https://via.placeholder.com/400x300',
-        communityId: communityData.id,
-        creatorId: course.creatorId._id || course.creatorId,
-        creator: course.creatorId,
-        price: course.prix || 0,
-        currency: course.devise || 'TND',
-        isPaid: course.isPaid,
-        isPublished: course.isPublished,
-        category: course.category,
-        level: course.niveau,
-        duration: course.duree,
-        enrollmentCount: course.enrollmentCount || 0,
-        rating: course.averageRating || 0,
-        sections: course.sections || [],
-        learningObjectives: course.learningObjectives || [],
-        prerequisites: course.prerequisites || [],
-        tags: course.tags || [],
-        createdAt: new Date(course.createdAt),
-        updatedAt: new Date(course.updatedAt),
-      }));
-      
+      const transformedCourses = (coursesResponse.courses || []).map((course: any) => {
+        return {
+          id: course._id || course.id,
+          title: course.titre,
+          description: course.description,
+          shortDescription: course.description,
+          thumbnail: course.thumbnail || course.thumbnailUrl || 'https://via.placeholder.com/400x300',
+          communityId: communityData.id,
+          creatorId: course.creatorId?._id || course.creatorId,
+          creator: course.creator || (typeof course.creatorId === 'object' ? course.creatorId : null),
+          price: course.prix || 0,
+          currency: course.devise || 'TND',
+          isPaid: course.isPaid || course.prix > 0,
+          isPublished: course.isPublished,
+          category: course.category,
+          level: course.niveau,
+          duration: course.duree,
+          enrollmentCount: course.enrollmentCount || 0,
+          rating: course.averageRating || 0,
+          sections: (course.sections || []).map((section: any) => ({
+            ...section,
+            chapters: section.chapters || section.chapitres || []
+          })),
+          learningObjectives: course.learningObjectives || [],
+          prerequisites: course.prerequisites || [],
+          tags: course.tags || [],
+          createdAt: new Date(course.createdAt),
+          updatedAt: new Date(course.updatedAt),
+        };
+      });
+
       setAllCourses(transformedCourses);
-      
+
       // Fetch user's enrolled courses
       try {
         const enrolledCourses = await getUserEnrolledCourses();
@@ -102,17 +107,17 @@ export default function CoursesScreen() {
         console.warn('⚠️ Could not fetch user enrollments:', enrollmentError);
         setUserEnrollments([]);
       }
-      
+
       console.log('✅ Courses loaded:', transformedCourses.length);
     } catch (err: any) {
       console.error('❌ Error fetching courses:', err);
       setError(err.message || 'Failed to load courses');
-      
+
       // Fallback to mock data
       console.log('⚠️ Falling back to mock data');
       const mockCourses = getMockCourses('1');
       const mockEnrollments = getMockEnrollments('2');
-      
+
       setAllCourses(mockCourses);
       setUserEnrollments(mockEnrollments);
     } finally {
@@ -150,9 +155,9 @@ export default function CoursesScreen() {
 
     const totalChapters = course.sections.reduce((acc: number, s: any) => acc + (s.chapters?.length || 0), 0);
     const completed = enrollment.progress.filter((p: any) => p.isCompleted).length;
-    return { 
-      completed, 
-      total: totalChapters, 
+    return {
+      completed,
+      total: totalChapters,
       percentage: totalChapters > 0 ? (completed / totalChapters) * 100 : 0
     };
   };
@@ -181,23 +186,23 @@ export default function CoursesScreen() {
 
   return (
     <View style={styles.container}>
-      <CoursesHeader 
-        allCourses={allCourses} 
-        userEnrollments={userEnrollments} 
+      <CoursesHeader
+        allCourses={allCourses}
+        userEnrollments={userEnrollments}
       />
-      
-      <SearchBar 
-        searchQuery={searchQuery} 
-        onSearchChange={setSearchQuery} 
+
+      <SearchBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
-      
-      <CoursesTabs 
-        activeTab={activeTab} 
+
+      <CoursesTabs
+        activeTab={activeTab}
         onTabChange={setActiveTab}
         allCourses={allCourses}
         userEnrollments={userEnrollments}
       />
-      
+
       <CoursesList
         filteredCourses={filteredCourses}
         userEnrollments={userEnrollments}
@@ -206,7 +211,7 @@ export default function CoursesScreen() {
         slug={slug as string}
         getEnrollmentProgress={getEnrollmentProgress}
       />
-      
+
       {/* Bottom Navigation */}
       <BottomNavigation slug={slug as string} currentTab="courses" />
     </View>

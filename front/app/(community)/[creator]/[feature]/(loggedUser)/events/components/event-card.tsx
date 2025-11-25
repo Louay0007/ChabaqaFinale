@@ -33,8 +33,10 @@ export default function EventCard({
   setSelectedEvent,
   handleRegister
 }: EventCardProps) {
-  const selectedTicketData = event.tickets.find((t) => t.id === selectedTicket);
-  const minPrice = Math.min(...event.tickets.map((t) => t.price));
+  const selectedTicketData = event.tickets?.find((t) => t.id === selectedTicket);
+  const minPrice = event.tickets && event.tickets.length > 0 
+    ? Math.min(...event.tickets.map((t) => t.price || 0))
+    : event.price || 0;
 
   return (
     <Card key={event.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
@@ -68,7 +70,7 @@ export default function EventCard({
           <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
             <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-2 shrink-0" />
             <span className="truncate">
-              {format(event.startDate, "MMM dd, yyyy")}
+              {format(new Date(event.startDate), "MMM dd, yyyy")}
             </span>
           </div>
           <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
@@ -82,15 +84,15 @@ export default function EventCard({
         </div>
 
         {/* Speakers - Mobile Optimized */}
-        {event.speakers.length > 0 && (
+        {event.speakers && event.speakers.length > 0 && (
           <div className="flex items-center gap-2">
             <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
             <div className="flex -space-x-1 sm:-space-x-2">
-              {event.speakers.slice(0, 3).map((speaker) => (
+              {event.speakers.slice(0, 3).map((speaker: any) => (
                 <Avatar key={speaker.id} className="border-2 border-white h-6 w-6 sm:h-8 sm:w-8">
                   <AvatarImage src={speaker.photo || "/placeholder.svg"} />
                   <AvatarFallback className="text-xs">
-                    {speaker.name.split(" ").map((n) => n[0]).join("")}
+                    {(speaker.name || 'Speaker').split(" ").map((n: string) => n[0]).join("")}
                   </AvatarFallback>
                 </Avatar>
               ))}
@@ -110,7 +112,7 @@ export default function EventCard({
               From ${minPrice}
             </div>
             <div className="text-xs text-muted-foreground">
-              {event.tickets.length} ticket type{event.tickets.length !== 1 ? 's' : ''}
+              {event.tickets?.length || 0} ticket type{(event.tickets?.length || 0) !== 1 ? 's' : ''}
             </div>
           </div>
 
@@ -137,7 +139,7 @@ export default function EventCard({
                   <div>
                     <Label className="text-sm font-medium mb-3 block">Select Ticket Type</Label>
                     <div className="space-y-2">
-                      {event.tickets.map((ticket) => (
+                      {(event.tickets || []).map((ticket) => (
                         <Button
                           key={ticket.id}
                           variant={selectedTicket === ticket.id ? "default" : "outline"}

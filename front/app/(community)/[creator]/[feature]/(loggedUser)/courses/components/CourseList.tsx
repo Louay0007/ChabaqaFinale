@@ -35,7 +35,7 @@ export default function CourseList({
       {filteredCourses.map((course) => {
         const isEnrolled = userEnrollments.some((e) => e.courseId === course.id)
         const progress = getEnrollmentProgress(course.id)
-        const totalChapters = course.sections.reduce((acc: any, s: any) => acc + s.chapters.length, 0)
+        const totalChapters = course.sections?.reduce((acc: any, s: any) => acc + (s.chapters?.length || 0), 0) || 0
         const pricing = getCoursePricing(course)
 
 return (
@@ -108,7 +108,7 @@ return (
         <div className="flex flex-wrap gap-3 text-xs sm:text-sm text-muted-foreground mb-4">
           <div className="flex items-center">
             <BookOpen className="h-4 w-4 mr-1" />
-            {course.sections.length} sections
+            {course.sections?.length || 0} sections
           </div>
           <div className="flex items-center">
             <Clock className="h-4 w-4 mr-1" />
@@ -116,7 +116,7 @@ return (
           </div>
           <div className="flex items-center">
             <Users className="h-4 w-4 mr-1" />
-            {course.enrollments.length} students
+            {course.enrollments?.length || course.enrollmentCount || 0} students
           </div>
           {course.level && (
             <Badge variant="outline" className="text-xs">
@@ -141,22 +141,24 @@ return (
         {/* Footer */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           {/* Author */}
-          <div className="flex items-center space-x-2">
-            <Avatar className="h-8 w-8">
-              <AvatarImage
-                src={course.creator.avatar || "/placeholder.svg"}
-              />
-              <AvatarFallback>
-                {course.creator.name
-                  .split(" ")
-                  .map((n: string) => n[0])
-                  .join("")}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-none">
-              {course.creator.name}
-            </span>
-          </div>
+          {course.creator && (
+            <div className="flex items-center space-x-2">
+              <Avatar className="h-8 w-8">
+                <AvatarImage
+                  src={course.creator.avatar || "/placeholder.svg"}
+                />
+                <AvatarFallback>
+                  {course.creator.name
+                    ?.split(" ")
+                    .map((n: string) => n[0])
+                    .join("") || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-none">
+                {course.creator.name || 'Unknown'}
+              </span>
+            </div>
+          )}
 
           {/* Actions */}
           {isEnrolled ? (

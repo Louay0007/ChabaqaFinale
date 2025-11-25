@@ -35,6 +35,7 @@ export interface UserDocument extends Document {
   bio: string;
   lien_instagram: string;
   profile_picture: string;
+  twoFactorEnabled: boolean;
   googleTokens?: {
     access_token: string;
     refresh_token: string;
@@ -248,6 +249,22 @@ export class User {
     required: false,
   })
   profile_picture: string;
+
+  /**
+   * Indique si l'authentification à deux facteurs est activée
+   */
+  @Prop({ default: false })
+  twoFactorEnabled: boolean;
+
+  /**
+   * Timestamp de la dernière activité de l'utilisateur
+   * Utilisé pour déterminer le statut en ligne/hors ligne
+   */
+  @Prop({
+    type: Date,
+    default: () => new Date()
+  })
+  lastActive: Date;
 }
 
 /**
@@ -263,39 +280,39 @@ UserSchema.index({ createdCommunities: 1 });
 UserSchema.index({ joinedCommunities: 1 });
 
 // Méthode toJSON personnalisée pour exclure le mot de passe
-UserSchema.methods.toJSON = function(): any {
+UserSchema.methods.toJSON = function (): any {
   const userObject = this.toObject();
   delete userObject.password;
   return userObject;
 };
 
 // Méthode pour ajouter une communauté créée
-UserSchema.methods.addCreatedCommunity = function(communityId: Types.ObjectId) {
+UserSchema.methods.addCreatedCommunity = function (communityId: Types.ObjectId) {
   if (!this.createdCommunities.includes(communityId)) {
     this.createdCommunities.push(communityId);
   }
 };
 
 // Méthode pour ajouter une communauté rejointe
-UserSchema.methods.addJoinedCommunity = function(communityId: Types.ObjectId) {
+UserSchema.methods.addJoinedCommunity = function (communityId: Types.ObjectId) {
   if (!this.joinedCommunities.includes(communityId)) {
     this.joinedCommunities.push(communityId);
   }
 };
 
 // Méthode pour quitter une communauté
-UserSchema.methods.leaveCommunity = function(communityId: Types.ObjectId) {
+UserSchema.methods.leaveCommunity = function (communityId: Types.ObjectId) {
   this.joinedCommunities = this.joinedCommunities.filter(community => !community.equals(communityId));
   this.adminCommunities = this.adminCommunities.filter(community => !community.equals(communityId));
   this.moderatorCommunities = this.moderatorCommunities.filter(community => !community.equals(communityId));
 };
 
 // Méthode pour vérifier si l'utilisateur est créateur d'une communauté
-UserSchema.methods.isCreatorOf = function(communityId: Types.ObjectId): boolean {
+UserSchema.methods.isCreatorOf = function (communityId: Types.ObjectId): boolean {
   return this.createdCommunities.some(community => community.equals(communityId));
 };
 
 // Méthode pour vérifier si l'utilisateur est membre d'une communauté
-UserSchema.methods.isMemberOf = function(communityId: Types.ObjectId): boolean {
+UserSchema.methods.isMemberOf = function (communityId: Types.ObjectId): boolean {
   return this.joinedCommunities.some(community => community.equals(communityId));
 };

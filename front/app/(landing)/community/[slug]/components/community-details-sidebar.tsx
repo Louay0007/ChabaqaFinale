@@ -62,7 +62,7 @@ export function CommunityDetailsSidebar({ community }: CommunityDetailsSidebarPr
     
     if (!token) {
       toast.error("Please sign in to join this community")
-      router.push(`/signin?redirect=/community/${community.slug}`)
+      router.push(`/signin`)
       return
     }
 

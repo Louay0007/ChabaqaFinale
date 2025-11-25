@@ -5,6 +5,7 @@ import { CommunitiesService } from './communities.service';
 import { Community, CommunitySchema } from '../schema/community.schema';
 import { User, UserSchema } from '../schema/user.schema';
 import { Post, PostSchema } from '../schema/post.schema';
+import { CommunityPageContentModule } from '../community-page-content/community-page-content.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { Post, PostSchema } from '../schema/post.schema';
       { name: User.name, schema: UserSchema },
       { name: Post.name, schema: PostSchema },
     ]),
+    CommunityPageContentModule,
   ],
   controllers: [CommunitiesController],
   providers: [CommunitiesService],

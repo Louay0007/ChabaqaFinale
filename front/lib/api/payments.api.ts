@@ -51,11 +51,36 @@ export const paymentsApi = {
 
   // Get payouts
   getPayouts: async (params?: PaginationParams): Promise<PaginatedResponse<any>> => {
-    return apiClient.get<PaginatedResponse<any>>('/payments/payouts', params);
+    return apiClient.get<PaginatedResponse<any>>('/payouts', params);
   },
 
   // Request payout
   requestPayout: async (data: RequestPayoutData): Promise<ApiSuccessResponse<any>> => {
-    return apiClient.post<ApiSuccessResponse<any>>('/payments/payouts/request', data);
+    return apiClient.post<ApiSuccessResponse<any>>('/payouts', data);
+  },
+
+  // Get payout by ID
+  getPayout: async (id: string): Promise<ApiSuccessResponse<any>> => {
+    return apiClient.get<ApiSuccessResponse<any>>(`/payouts/${id}`);
+  },
+
+  // Get payout stats
+  getPayoutStats: async (): Promise<ApiSuccessResponse<any>> => {
+    return apiClient.get<ApiSuccessResponse<any>>('/payouts/stats');
+  },
+
+  // Get available balance
+  getAvailableBalance: async (): Promise<ApiSuccessResponse<{ availableBalance: number }>> => {
+    return apiClient.get<ApiSuccessResponse<{ availableBalance: number }>>('/payouts/available-balance');
+  },
+
+  // Process payout (admin)
+  processPayout: async (id: string): Promise<ApiSuccessResponse<any>> => {
+    return apiClient.post<ApiSuccessResponse<any>>(`/payouts/${id}/process`);
+  },
+
+  // Cancel payout
+  cancelPayout: async (id: string, reason?: string): Promise<ApiSuccessResponse<any>> => {
+    return apiClient.post<ApiSuccessResponse<any>>(`/payouts/${id}/cancel`, { reason });
   },
 };

@@ -6,12 +6,13 @@ import ChallengesTabs from "@/app/(community)/[creator]/[feature]/(loggedUser)/c
 import ChallengeSelectionModal from "@/app/(community)/[creator]/[feature]/(loggedUser)/challenges/components/challenge-selection-modal"
 
 interface ChallengesPageContentProps {
+  creatorSlug: string
   slug: string
   community: any
   allChallenges: any[]
 }
 
-export default function ChallengesPageContent({ slug, community, allChallenges }: ChallengesPageContentProps) {
+export default function ChallengesPageContent({ creatorSlug, slug, community, allChallenges }: ChallengesPageContentProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("browse")
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null)
@@ -25,6 +26,7 @@ export default function ChallengesPageContent({ slug, community, allChallenges }
       <div className="container mx-auto px-4 py-8">
         <HeaderSection allChallenges={allChallenges} />
         <ChallengesTabs
+          creatorSlug={creatorSlug}
           slug={slug}
           allChallenges={allChallenges}
           searchQuery={searchQuery}

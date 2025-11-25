@@ -10,48 +10,48 @@ import { WAFMiddleware } from './common/middleware/waf.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
-  // Serve static files from public directory
+
+
   app.use(express.static('public'));
-  
-  // ⚠️ DEVELOPMENT ONLY: Increased body size limit for file uploads (50MB)
-  // TODO: Reduce to 10MB for production or use direct file uploads instead of base64
-  // See DEVELOPMENT_CHANGES.md for details
-  app.use(express.json({ limit: '50mb' }));  // PROD: '10mb'
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));  // PROD: '10mb'
-  
-  // Stripe webhook needs raw body
+
+
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+
   app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
-  
-  // Configuration des cookies
+
+
   app.use(cookieParser());
-  
-  // Configuration globale de validation
+
+
   app.useGlobalPipes(new ValidationPipe({
-    whitelist: true, // Supprime les propriétés non définies dans le DTO
-    forbidNonWhitelisted: true, // Lance une erreur si des propriétés non autorisées sont présentes
-    transform: true, // Transforme automatiquement les types
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
     transformOptions: {
       enableImplicitConversion: true,
     },
   }));
 
-  // Filtre d'exception global
+
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Configuration du préfixe global pour l'API
+
   app.setGlobalPrefix('api');
 
-  // Configuration CORS - Permissive pour développement mobile
+
   const isProduction = process.env.NODE_ENV === 'production';
-  
-  console.log(`🌐 CORS Mode: ${isProduction ? 'PRODUCTION (restrictif)' : 'DEVELOPMENT (permissif)'}`);
+
+  if (!isProduction) {
+    console.log(`🌐 CORS Mode: ${isProduction ? 'PRODUCTION (restrictif)' : 'DEVELOPMENT (permissif)'}`);
+  }
 
   app.enableCors({
-    // En développement, accepter TOUTES les origines pour le mobile
+
     origin: true,
     credentials: true,
-    methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
@@ -68,17 +68,21 @@ async function bootstrap() {
     optionsSuccessStatus: 204,
     maxAge: 86400, // 24 hours
   });
-  
-  console.log('✅ CORS enabled - Accepting all origins in development mode');
 
-  // Middleware pour logger toutes les requêtes entrantes (debug)
-  app.use((req, res, next) => {
-    const timestamp = new Date().toISOString();
-    console.log(`📥 [${timestamp}] ${req.method} ${req.url} - Origin: ${req.get('origin') || 'No origin'}`);
-    next();
-  });
+  if (!isProduction) {
+    console.log('✅ CORS enabled - Accepting all origins in development mode');
+  }
 
-  // Configuration Swagger
+  // Request logging middleware (development only)
+  if (!isProduction) {
+    app.use((req, res, next) => {
+      const timestamp = new Date().toISOString();
+      console.log(`📥 [${timestamp}] ${req.method} ${req.url} - Origin: ${req.get('origin') || 'No origin'}`);
+      next();
+    });
+  }
+
+
   const config = new DocumentBuilder()
     .setTitle('Shabaka API')
     .setDescription(`
@@ -359,58 +363,64 @@ async function bootstrap() {
 
   // Start the application
   const port = process.env.PORT || 3000;
-  
-  // Get local network IP address
-  const os = require('os');
-  const networkInterfaces = os.networkInterfaces();
-  let localIP = 'localhost';
-  
-  // Find the local network IP
-  for (const interfaceName in networkInterfaces) {
-    const networkInterface = networkInterfaces[interfaceName];
-    for (const network of networkInterface) {
-      // Skip internal (i.e. 127.0.0.1) and non-IPv4 addresses
-      if (network.family === 'IPv4' && !network.internal) {
-        localIP = network.address;
-        break;
-      }
-    }
-    if (localIP !== 'localhost') break;
-  }
-  
+
   // Bind to 0.0.0.0 to allow connections from both localhost and network
   await app.listen(port, '0.0.0.0');
-  
-  console.log('\n╔════════════════════════════════════════════════════════════════╗');
-  console.log('║          🚀 SHABAKA BACKEND SERVER STARTED                    ║');
-  console.log('╚════════════════════════════════════════════════════════════════╝\n');
-  
-  console.log(`📍 Port: ${port}`);
-  console.log(`🌐 Binding: 0.0.0.0 (all network interfaces)`);
-  console.log(`🌐 Detected IP: ${localIP}\n`);
-  
-  console.log('📋 AVAILABLE ENDPOINTS:\n');
-  console.log(`   💻 Web Browser (localhost):`);
-  console.log(`      → http://localhost:${port}/api/docs`);
-  console.log(`      → http://localhost:${port}/api/auth/register\n`);
-  
-  console.log(`   📱 Mobile App (network IP):`);
-  console.log(`      → http://${localIP}:${port}/api/docs`);
-  console.log(`      → http://${localIP}:${port}/api/auth/register\n`);
-  
-  console.log(`   🤖 Android Emulator:`);
-  console.log(`      → http://10.0.2.2:${port}/api/docs`);
-  console.log(`      → http://10.0.2.2:${port}/api/auth/register\n`);
-  
-  console.log('🔧 MOBILE APP CONFIGURATION:\n');
-  console.log(`   Update mobile/.env with ONE of these:`);
-  console.log(`   ✓ EXPO_PUBLIC_API_URL=http://${localIP}:${port}`);
-  console.log(`   ✓ EXPO_PUBLIC_API_URL=http://10.0.2.2:${port} (Android emulator)`);
-  console.log(`   ✓ EXPO_PUBLIC_API_URL=http://localhost:${port} (iOS simulator)\n`);
-  
-  console.log('✅ CORS: Enabled (accepting all origins in development)');
-  console.log('✅ Request Logging: Enabled');
-  console.log('✅ MongoDB: Connected');
-  console.log('\n🎯 Backend ready to accept mobile connections!\n');
+
+  if (isProduction) {
+    // Minimal production logging
+    console.log(`🚀 Chabaqa API Server started on port ${port}`);
+    console.log(`📚 API Docs: http://localhost:${port}/api/docs`);
+    console.log(`🌐 Environment: production\n`);
+  } else {
+    // Detailed development logging
+    // Get local network IP address
+    const os = require('os');
+    const networkInterfaces = os.networkInterfaces();
+    let localIP = 'localhost';
+
+    for (const interfaceName in networkInterfaces) {
+      const networkInterface = networkInterfaces[interfaceName];
+      for (const network of networkInterface) {
+        if (network.family === 'IPv4' && !network.internal) {
+          localIP = network.address;
+          break;
+        }
+      }
+      if (localIP !== 'localhost') break;
+    }
+
+    console.log('\n╔════════════════════════════════════════════════════════════════╗');
+    console.log('║          🚀 CHABAQA BACKEND SERVER STARTED                    ║');
+    console.log('╚════════════════════════════════════════════════════════════════╝\n');
+
+    console.log(`📍 Port: ${port}`);
+    console.log(`🌐 Binding: 0.0.0.0 (all network interfaces)`);
+    console.log(`🌐 Detected IP: ${localIP}\n`);
+
+    console.log('📋 AVAILABLE ENDPOINTS:\n');
+    console.log(`   💻 Web Browser (localhost):`);
+    console.log(`      → http://localhost:${port}/api/docs`);
+    console.log(`      → http://localhost:${port}/api/auth/register\n`);
+
+    console.log(`   📱 Mobile App (network IP):`);
+    console.log(`      → http://${localIP}:${port}/api/docs`);
+    console.log(`      → http://${localIP}:${port}/api/auth/register\n`);
+
+    console.log(`   🤖 Android Emulator:`);
+    console.log(`      → http://10.0.2.2:${port}/api/docs`);
+    console.log(`      → http://10.0.2.2:${port}/api/auth/register\n`);
+
+    console.log('🔧 MOBILE APP CONFIGURATION:\n');
+    console.log(`   Update mobile/.env with ONE of these:`);
+    console.log(`   ✓ EXPO_PUBLIC_API_URL=http://${localIP}:${port}`);
+    console.log(`   ✓ EXPO_PUBLIC_API_URL=http://10.0.2.2:${port} (Android emulator)`);
+    console.log(`   ✓ EXPO_PUBLIC_API_URL=http://localhost:${port} (iOS simulator)\n`);
+
+    console.log('✅ CORS: Enabled (accepting all origins in development)');
+    console.log('✅ Request Logging: Enabled');
+    console.log('✅ MongoDB: Connected');
+    console.log('\n🎯 Backend ready to accept mobile connections!\n');
+  }
 }
 bootstrap();

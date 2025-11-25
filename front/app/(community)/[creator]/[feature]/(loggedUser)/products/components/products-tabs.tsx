@@ -6,23 +6,25 @@ import { Button } from "@/components/ui/button"
 import { Search, Filter } from "lucide-react"
 import ProductList from "@/app/(community)/[creator]/[feature]/(loggedUser)/products/components/product-list"
 import ProductDetailsSidebar from "@/app/(community)/[creator]/[feature]/(loggedUser)/products/components/product-details-sidebar"
-import { Product, Purchase } from "@/lib/models"
+import { ProductWithDetails, ProductPurchase } from "@/lib/api/products-community.api"
 
 
 interface ProductsTabsProps {
+  creatorSlug: string
   activeTab: string
   setActiveTab: (value: string) => void
   searchQuery: string
   setSearchQuery: (value: string) => void
-  allProducts: Product[]
-  filteredProducts: Product[]
-  userPurchases: Purchase[]
+  allProducts: ProductWithDetails[]
+  filteredProducts: ProductWithDetails[]
+  userPurchases: ProductPurchase[]
   selectedProduct: string | null
   setSelectedProduct: (value: string | null) => void
   slug: string
 }
 
 export default function ProductsTabs({
+  creatorSlug,
   activeTab,
   setActiveTab,
   searchQuery,
@@ -46,44 +48,44 @@ export default function ProductsTabs({
                 value="all" 
                 className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
               >
-                All <span className="hidden sm:inline">({allProducts.length})</span>
+                All <span className="hidden sm:inline">({(allProducts || []).filter(p => p.isPublished).length})</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="purchased"
                 className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
               >
                 <span className="sm:hidden">Library</span>
-                <span className="hidden sm:inline">My Library ({userPurchases.length})</span>
+                <span className="hidden sm:inline">My Library ({(userPurchases || []).length})</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="templates"
                 className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
               >
-                Templates <span className="hidden sm:inline">({allProducts.filter(p => p.category === "Templates").length})</span>
+                Templates <span className="hidden sm:inline">({(allProducts || []).filter(p => p.isPublished && p.category === "Templates").length})</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="courses"
                 className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
               >
-                Courses <span className="hidden sm:inline">({allProducts.filter(p => p.category === "Courses").length})</span>
+                Courses <span className="hidden sm:inline">({(allProducts || []).filter(p => p.isPublished && p.category === "Courses").length})</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="assets"
                 className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
               >
-                Assets <span className="hidden sm:inline">({allProducts.filter(p => p.category === "Assets").length})</span>
+                Assets <span className="hidden sm:inline">({(allProducts || []).filter(p => p.isPublished && p.category === "Assets").length})</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="free"
                 className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
               >
-                Free <span className="hidden sm:inline">({allProducts.filter(p => p.price === 0).length})</span>
+                Free <span className="hidden sm:inline">({(allProducts || []).filter(p => p.isPublished && (p.price || 0) === 0).length})</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="paid"
                 className="whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
               >
-                Premium <span className="hidden sm:inline">({allProducts.filter(p => p.price > 0).length})</span>
+                Premium <span className="hidden sm:inline">({(allProducts || []).filter(p => p.isPublished && (p.price || 0) > 0).length})</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -119,6 +121,7 @@ export default function ProductsTabs({
           {/* Product List Section */}
           <div className="space-y-4 sm:space-y-6 min-w-0">
             <ProductList
+              creatorSlug={creatorSlug}
               filteredProducts={filteredProducts}
               userPurchases={userPurchases}
               selectedProduct={selectedProduct}

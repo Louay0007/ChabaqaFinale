@@ -15,12 +15,12 @@ interface AuthenticatedUser {
 @ApiTags('Cours')
 @Controller('cours')
 export class CoursController {
-	constructor(private readonly coursService: CoursService) {}
+	constructor(private readonly coursService: CoursService) { }
 
 	// ============ LISTE DES COURS ============
 
 	@Get()
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Récupérer la liste des cours',
 		description: 'Récupère tous les cours avec pagination et filtres'
 	})
@@ -29,8 +29,8 @@ export class CoursController {
 	@ApiQuery({ name: 'category', required: false, type: String, description: 'Filtrer par catégorie' })
 	@ApiQuery({ name: 'niveau', required: false, type: String, description: 'Filtrer par niveau' })
 	@ApiQuery({ name: 'search', required: false, type: String, description: 'Rechercher dans le titre et la description' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Liste des cours récupérée avec succès',
 		schema: {
 			example: {
@@ -79,11 +79,11 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Post('create-cours')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Créer un cours complet',
 		description: 'Créer un nouveau cours avec sections et chapitres optionnels. Seuls les créateurs peuvent créer des cours.'
 	})
-	@ApiBody({ 
+	@ApiBody({
 		type: CreateCoursDto,
 		description: 'Données du cours à créer',
 		examples: {
@@ -141,8 +141,8 @@ export class CoursController {
 			}
 		}
 	})
-	@ApiResponse({ 
-		status: 201, 
+	@ApiResponse({
+		status: 201,
 		description: 'Cours créé avec succès',
 		content: {
 			'application/json': {
@@ -164,8 +164,8 @@ export class CoursController {
 			}
 		}
 	})
-	@ApiResponse({ 
-		status: 400, 
+	@ApiResponse({
+		status: 400,
 		description: 'Données invalides ou erreur de validation',
 		content: {
 			'application/json': {
@@ -177,8 +177,8 @@ export class CoursController {
 			}
 		}
 	})
-	@ApiResponse({ 
-		status: 401, 
+	@ApiResponse({
+		status: 401,
 		description: 'Non autorisé - Token JWT manquant ou invalide',
 		content: {
 			'application/json': {
@@ -190,8 +190,8 @@ export class CoursController {
 			}
 		}
 	})
-	@ApiResponse({ 
-		status: 404, 
+	@ApiResponse({
+		status: 404,
 		description: 'Communauté non trouvée',
 		content: {
 			'application/json': {
@@ -247,13 +247,28 @@ export class CoursController {
 		@Req() req,
 	) {
 		const userId = req.user?._id;
-		return await this.coursService.obtenirCoursParCommunaute(
+		const result = await this.coursService.obtenirCoursParCommunaute(
 			slug,
 			Number(page) || 1,
 			Number(limit) || 10,
 			published !== 'false',
 			userId,
 		);
+
+		// Wrap response in the format expected by mobile
+		return {
+			success: true,
+			message: 'Courses retrieved successfully',
+			data: {
+				courses: result.cours,
+				pagination: {
+					page: result.page,
+					limit: result.limit,
+					total: result.total,
+					totalPages: result.totalPages
+				}
+			}
+		};
 	}
 
 	@UseGuards(JwtAuthGuard)
@@ -301,7 +316,7 @@ export class CoursController {
 
 	// Get courses for a specific user (for profile viewing)
 	@Get('by-user/:userId')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Get courses for a specific user',
 		description: 'Retrieve courses associated with a user (enrolled + created)'
 	})
@@ -347,8 +362,8 @@ export class CoursController {
 		@Query('type') type: 'enrolled' | 'created' | 'all' = 'all'
 	) {
 		return await this.coursService.obtenirCoursParUtilisateur(
-			userId, 
-			Number(page) || 1, 
+			userId,
+			Number(page) || 1,
 			Number(limit) || 10,
 			type
 		);
@@ -358,8 +373,17 @@ export class CoursController {
 	@Get(':id')
 	@ApiOperation({ summary: 'Obtenir un cours par ID' })
 	async getCoursById(@Param('id') id: string, @Req() req) {
+		console.log('🔍 [CONTROLLER] getCoursById called with ID:', id);
 		const userId = req.user?._id;
-		return await this.coursService.obtenirCours(id, userId);
+		console.log('🔍 [CONTROLLER] User ID:', userId);
+		try {
+			const result = await this.coursService.obtenirCours(id, userId);
+			console.log('✅ [CONTROLLER] Course found:', result.titre);
+			return result;
+		} catch (error) {
+			console.error('❌ [CONTROLLER] Error getting course:', error.message);
+			throw error;
+		}
 	}
 
 	// ============ GESTION DE COURS ============
@@ -491,12 +515,12 @@ export class CoursController {
 
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
-  @Post(':id/enroll')
+	@Post(':id/enroll')
 	@ApiOperation({ summary: 'S\'inscrire à un cours' })
-  @ApiQuery({ name: 'promoCode', required: false, type: String })
-  async enrollToCours(@Param('id') id: string, @Query('promoCode') promoCode: string | undefined, @Req() req) {
+	@ApiQuery({ name: 'promoCode', required: false, type: String })
+	async enrollToCours(@Param('id') id: string, @Query('promoCode') promoCode: string | undefined, @Req() req) {
 		const user = req.user as AuthenticatedUser;
-    return await this.coursService.inscrireAuCours(id, user._id, promoCode);
+		return await this.coursService.inscrireAuCours(id, user._id, promoCode);
 	}
 
 	// ============ VÉRIFICATION D'ACCÈS ============
@@ -531,7 +555,7 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Post(':id/track/view')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Enregistrer une vue d\'un cours',
 		description: 'Enregistre qu\'un utilisateur a visualisé un cours. Incrémente le compteur de vues.'
 	})
@@ -547,7 +571,7 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Post(':id/track/start')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Démarrer un cours',
 		description: 'Marque le début de la consommation d\'un cours par un utilisateur. Enregistre l\'heure de début.'
 	})
@@ -563,7 +587,7 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Post(':id/track/complete')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Marquer un cours comme terminé',
 		description: 'Marque la fin de la consommation d\'un cours par un utilisateur. Enregistre l\'heure de fin et calcule la progression.'
 	})
@@ -579,16 +603,16 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Put(':id/track/watch-time')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Mettre à jour le temps de visionnage d\'un cours',
 		description: 'Ajoute du temps de visionnage au cours. Utilisé pour tracker la progression en temps réel.'
 	})
 	@ApiParam({ name: 'id', description: 'ID du cours', type: 'string' })
-	@ApiBody({ 
-		schema: { 
-			type: 'object', 
-			properties: { 
-				additionalTime: { type: 'number', description: 'Temps additionnel en secondes' } 
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
+				additionalTime: { type: 'number', description: 'Temps additionnel en secondes' }
 			},
 			required: ['additionalTime']
 		}
@@ -604,7 +628,7 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Post(':id/track/like')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Enregistrer un like sur un cours',
 		description: 'Enregistre qu\'un utilisateur a liké un cours. Incrémente le compteur de likes.'
 	})
@@ -620,7 +644,7 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Post(':id/track/share')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Enregistrer un partage d\'un cours',
 		description: 'Enregistre qu\'un utilisateur a partagé un cours. Incrémente le compteur de partages.'
 	})
@@ -636,7 +660,7 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Post(':id/track/download')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Enregistrer un téléchargement d\'un cours',
 		description: 'Enregistre qu\'un utilisateur a téléchargé un cours. Incrémente le compteur de téléchargements.'
 	})
@@ -652,16 +676,16 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Post(':id/track/bookmark')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Ajouter un bookmark d\'un cours',
 		description: 'Ajoute un cours aux favoris de l\'utilisateur avec un identifiant de bookmark personnalisé.'
 	})
 	@ApiParam({ name: 'id', description: 'ID du cours', type: 'string' })
-	@ApiBody({ 
-		schema: { 
-			type: 'object', 
-			properties: { 
-				bookmarkId: { type: 'string', description: 'Identifiant unique du bookmark' } 
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
+				bookmarkId: { type: 'string', description: 'Identifiant unique du bookmark' }
 			},
 			required: ['bookmarkId']
 		}
@@ -677,7 +701,7 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Delete(':id/track/bookmark/:bookmarkId')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Retirer un bookmark d\'un cours',
 		description: 'Supprime un bookmark spécifique d\'un cours des favoris de l\'utilisateur.'
 	})
@@ -694,15 +718,15 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Post(':id/track/rating')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Ajouter une note/évaluation d\'un cours',
 		description: 'Permet à un utilisateur de noter et éventuellement commenter un cours.'
 	})
 	@ApiParam({ name: 'id', description: 'ID du cours', type: 'string' })
-	@ApiBody({ 
-		schema: { 
-			type: 'object', 
-			properties: { 
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
 				rating: { type: 'number', minimum: 1, maximum: 5, description: 'Note de 1 à 5' },
 				review: { type: 'string', description: 'Commentaire optionnel' }
 			},
@@ -721,13 +745,13 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Get(':id/track/progress')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Obtenir la progression d\'un utilisateur pour un cours',
 		description: 'Récupère les données de progression détaillées d\'un utilisateur pour un cours spécifique.'
 	})
 	@ApiParam({ name: 'id', description: 'ID du cours', type: 'string' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Progression récupérée avec succès',
 		schema: {
 			type: 'object',
@@ -758,13 +782,13 @@ export class CoursController {
 	}
 
 	@Get(':id/track/stats')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Obtenir les statistiques d\'un cours',
 		description: 'Récupère les statistiques publiques d\'un cours (vues, likes, partages, etc.).'
 	})
 	@ApiParam({ name: 'id', description: 'ID du cours', type: 'string' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Statistiques récupérées avec succès',
 		schema: {
 			type: 'object',
@@ -790,14 +814,14 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Get('user/progress')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Obtenir les progressions d\'un utilisateur pour tous ses cours',
 		description: 'Récupère la liste paginée des progressions de l\'utilisateur connecté pour tous ses cours.'
 	})
 	@ApiQuery({ name: 'page', required: false, type: Number, description: 'Numéro de page (défaut: 1)' })
 	@ApiQuery({ name: 'limit', required: false, type: Number, description: 'Nombre d\'éléments par page (défaut: 10)' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Progressions récupérées avec succès',
 		schema: {
 			type: 'object',
@@ -824,13 +848,13 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Get('user/actions/recent')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Obtenir les actions récentes d\'un utilisateur sur les cours',
 		description: 'Récupère l\'historique des actions récentes de l\'utilisateur connecté sur les cours.'
 	})
 	@ApiQuery({ name: 'limit', required: false, type: Number, description: 'Nombre d\'actions à récupérer (défaut: 20)' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Actions récentes récupérées avec succès',
 		schema: {
 			type: 'object',
@@ -862,7 +886,7 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Patch(':id/sequential-progression')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Activer/désactiver la progression séquentielle d\'un cours',
 		description: 'Permet au créateur du cours d\'activer ou désactiver la progression séquentielle. Quand activée, les utilisateurs doivent compléter le chapitre précédent pour accéder au suivant.'
 	})
@@ -878,9 +902,9 @@ export class CoursController {
 	) {
 		const user = req.user as AuthenticatedUser;
 		return await this.coursService.updateSequentialProgression(
-			id, 
-			dto.enabled, 
-			dto.unlockMessage, 
+			id,
+			dto.enabled,
+			dto.unlockMessage,
 			user._id
 		);
 	}
@@ -888,7 +912,7 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Get(':id/chapters/:chapterId/access')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Vérifier l\'accès à un chapitre avec progression séquentielle',
 		description: 'Vérifie si l\'utilisateur peut accéder à un chapitre spécifique en tenant compte de la progression séquentielle.'
 	})
@@ -909,7 +933,7 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Get(':id/unlocked-chapters')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Obtenir les chapitres déverrouillés pour l\'utilisateur',
 		description: 'Récupère la liste des chapitres déverrouillés pour l\'utilisateur connecté, avec leur statut de completion.'
 	})
@@ -928,17 +952,17 @@ export class CoursController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth('JWT-auth')
 	@Post(':id/chapters/:chapterId/unlock')
-	@ApiOperation({ 
+	@ApiOperation({
 		summary: 'Déverrouiller manuellement un chapitre',
 		description: 'Permet au créateur du cours de déverrouiller manuellement un chapitre pour un utilisateur spécifique.'
 	})
 	@ApiParam({ name: 'id', description: 'ID du cours', type: 'string' })
 	@ApiParam({ name: 'chapterId', description: 'ID du chapitre', type: 'string' })
-	@ApiBody({ 
-		schema: { 
-			type: 'object', 
-			properties: { 
-				userId: { type: 'string', description: 'ID de l\'utilisateur cible' } 
+	@ApiBody({
+		schema: {
+			type: 'object',
+			properties: {
+				userId: { type: 'string', description: 'ID de l\'utilisateur cible' }
 			},
 			required: ['userId']
 		}

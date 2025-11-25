@@ -26,6 +26,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { communitiesApi, type CreateCommunityData } from "@/lib/api/communities.api"
+import { ImageUpload } from "@/app/(dashboard)/components/image-upload"
+import { storageApi } from "@/lib/api"
 
 export default function CommunityPage() {
   const router = useRouter()
@@ -34,6 +37,8 @@ export default function CommunityPage() {
     name: "",
     bio: "",
     country: "",
+    logo: "",
+    coverImage: "",
     status: "public",
     joinFee: "free",
     feeAmount: "0",
@@ -50,6 +55,8 @@ export default function CommunityPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
 
   const updateFormData = (field: string, value: any) => {
     if (field.includes(".")) {
@@ -66,46 +73,83 @@ export default function CommunityPage() {
     }
   }
 
-  // Fonction pour soumettre la communauté au backend
+  // Handle logo upload
+  const handleLogoUpload = async (file: File) => {
+    setUploadingLogo(true)
+    try {
+      const response = await storageApi.upload(file)
+      if (response && response.url) {
+        updateFormData("logo", response.url)
+      }
+    } catch (err) {
+      console.error("Error uploading logo:", err)
+      setError("Failed to upload logo")
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
+  // Handle cover image upload
+  const handleCoverUpload = async (file: File) => {
+    setUploadingCover(true)
+    try {
+      const response = await storageApi.upload(file)
+      if (response && response.url) {
+        updateFormData("coverImage", response.url)
+      }
+    } catch (err) {
+      console.error("Error uploading cover:", err)
+      setError("Failed to upload cover image")
+    } finally {
+      setUploadingCover(false)
+    }
+  }
+
+  // Submit community to backend using typed API client
   const submitCommunity = async () => {
     setIsSubmitting(true)
     setError("")
-    
+
     try {
-      // Ajustement du montant en fonction du type d'adhésion
-      const dataToSubmit = {
-        ...formData,
-        feeAmount: formData.joinFee === "paid" ? formData.feeAmount : "0"
+      // Generate slug from name
+      const slug = formData.name
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+
+      // Map form data to API format matching backend DTO exactly
+      const communityData: CreateCommunityData = {
+        // Required fields
+        name: formData.name,
+        country: formData.country,
+        status: formData.status as 'public' | 'private',
+        joinFee: formData.joinFee as 'free' | 'paid',
+        feeAmount: formData.feeAmount,
+        currency: formData.currency as 'USD' | 'TND' | 'EUR',
+        socialLinks: formData.socialLinks,
+
+        // Optional fields using backend DTO field names
+        bio: formData.bio || undefined, // Backend expects 'bio', not 'description'
+        logo: formData.logo || undefined,
+        coverImage: formData.coverImage || undefined,
+        category: 'General',
+        tags: [],
       }
-      
-      const response = await fetch("http://localhost:3001/community-aff-crea-join/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        // Inclure les cookies dans la requête
-        credentials: "include",
-        body: JSON.stringify(dataToSubmit)
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.message || "Erreur lors de la création de la communauté")
-      }
-      
+
+      // Call API using typed client
+      const response = await communitiesApi.create(communityData)
+
       setSuccess(true)
-      // Rediriger vers la page de la communauté ou afficher un message de succès
-      console.log("Communauté créée avec succès:", data)
-      
-      // Attendre 2 secondes avant de rediriger pour que l'utilisateur puisse voir le message de succès
+      console.log("Community created successfully:", response.data)
+
+      // Redirect to community selector after short delay
       setTimeout(() => {
-        router.push(`/communities/${data.communityId || data.id || ''}`)
-      }, 2000)
-      
+        router.push('/creator/select-community')
+      }, 1500)
+
     } catch (err: any) {
-      setError(err.message || "Une erreur s'est produite lors de la création de la communauté")
-      console.error("Erreur lors de la création de la communauté:", err)
+      setError(err.message || "Failed to create community. Please try again.")
+      console.error("Error creating community:", err)
     } finally {
       setIsSubmitting(false)
     }
@@ -151,16 +195,30 @@ export default function CommunityPage() {
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Name your community</h2>
               <p className="text-gray-600 mb-6">You can always change this later.</p>
 
-              {/* Photo upload button */}
+              {/* Community Logo */}
               <div className="mb-6">
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    className="w-20 h-20 rounded-2xl border-0 relative overflow-hidden hover:scale-105 transition-transform duration-200 bg-gradient-to-br from-[#47c7ea] to-purple-600"
-                  >
-                    <Camera className="w-8 h-8 text-white" />
-                  </Button>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Community Logo</label>
+                <div className="max-w-xs">
+                  <ImageUpload
+                    currentImage={formData.logo}
+                    onImageChange={(url) => updateFormData("logo", url)}
+                    aspectRatio="square"
+                    maxSize={2}
+                    showPreview={true}
+                  />
                 </div>
+              </div>
+
+              {/* Community Cover Image */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cover Image (optional)</label>
+                <ImageUpload
+                  currentImage={formData.coverImage}
+                  onImageChange={(url) => updateFormData("coverImage", url)}
+                  aspectRatio="wide"
+                  maxSize={5}
+                  showPreview={true}
+                />
               </div>
 
               <Input
@@ -308,7 +366,7 @@ export default function CommunityPage() {
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
-                              
+
                               <div className="mt-2">
                                 <Input
                                   type="number"
@@ -498,11 +556,11 @@ export default function CommunityPage() {
           <div className="p-8">
             {/* Logo dans le formulaire */}
             <div className="mb-8">
-              <Image 
-                src="/logo_chabaqa.png" 
-                alt="Chabaqa Logo" 
-                width={200} 
-                height={80} 
+              <Image
+                src="/logo_chabaqa.png"
+                alt="Chabaqa Logo"
+                width={200}
+                height={80}
                 className="drop-shadow-md"
                 priority
               />
@@ -514,21 +572,19 @@ export default function CommunityPage() {
                 {[1, 2, 3].map((step) => (
                   <div key={step} className="flex items-center">
                     <div
-                      className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-300 ${
-                        step === currentStep
-                          ? "text-white shadow-lg community-step-active"
-                          : step < currentStep
-                            ? "text-white community-step-active"
-                            : "bg-gray-200 text-gray-500"
-                      }`}
+                      className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-300 ${step === currentStep
+                        ? "text-white shadow-lg community-step-active"
+                        : step < currentStep
+                          ? "text-white community-step-active"
+                          : "bg-gray-200 text-gray-500"
+                        }`}
                     >
                       {step < currentStep ? <Check className="w-4 h-4" /> : step}
                     </div>
                     {step < 3 && (
                       <div
-                        className={`w-12 h-1 mx-2 rounded-full transition-all duration-300 ${
-                          step < currentStep ? "community-step-connector-active" : "bg-gray-200"
-                        }`}
+                        className={`w-12 h-1 mx-2 rounded-full transition-all duration-300 ${step < currentStep ? "community-step-connector-active" : "bg-gray-200"
+                          }`}
                       />
                     )}
                   </div>
@@ -544,13 +600,13 @@ export default function CommunityPage() {
                   <p className="text-red-700 text-sm">{error}</p>
                 </div>
               )}
-              
+
               {success && (
                 <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
                   <p className="text-green-700 text-sm">Votre communauté a été créée avec succès!</p>
                 </div>
               )}
-              
+
               {renderStepContent()}
             </div>
 
@@ -573,11 +629,10 @@ export default function CommunityPage() {
                 <Button
                   onClick={currentStep === 3 ? submitCommunity : nextStep}
                   disabled={!canContinue() || isSubmitting}
-                  className={`px-6 py-2 rounded-lg font-semibold text-white transition-all duration-300 ${
-                    canContinue() && !isSubmitting
-                      ? "shadow-lg hover:shadow-xl hover:scale-105 community-button-active" 
-                      : "opacity-50 cursor-not-allowed community-button-inactive"
-                  }`}
+                  className={`px-6 py-2 rounded-lg font-semibold text-white transition-all duration-300 ${canContinue() && !isSubmitting
+                    ? "shadow-lg hover:shadow-xl hover:scale-105 community-button-active"
+                    : "opacity-50 cursor-not-allowed community-button-inactive"
+                    }`}
                 >
                   {isSubmitting ? (
                     <div className="flex items-center">
@@ -600,9 +655,8 @@ export default function CommunityPage() {
               {communities.map((community, index) => (
                 <Card
                   key={index}
-                  className={`${community.color} border-0 text-white cursor-pointer hover:scale-105 transition-transform duration-200 ${
-                    index === 1 ? "row-span-2 col-span-1" : "aspect-square"
-                  }`}
+                  className={`${community.color} border-0 text-white cursor-pointer hover:scale-105 transition-transform duration-200 ${index === 1 ? "row-span-2 col-span-1" : "aspect-square"
+                    }`}
                 >
                   <CardContent className="p-4 h-full flex flex-col justify-between relative overflow-hidden">
                     {/* Decorative elements */}

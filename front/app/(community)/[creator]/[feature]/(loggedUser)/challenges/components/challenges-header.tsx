@@ -1,17 +1,16 @@
 import { Zap } from "lucide-react"
-import { getUserChallengeParticipation } from "@/lib/mock-data"
 
 interface HeaderSectionProps {
   allChallenges: any[]
 }
 
 export default function HeaderSection({ allChallenges }: HeaderSectionProps) {
-  const currentUserId = "2" // Mock current user ID
-
   const getChallengeStatus = (challenge: any) => {
     const now = new Date()
-    if (challenge.startDate > now) return "upcoming"
-    if (challenge.endDate < now) return "completed"
+    const startDate = new Date(challenge.startDate)
+    const endDate = new Date(challenge.endDate)
+    if (startDate > now) return "upcoming"
+    if (endDate < now) return "completed"
     return "active"
   }
 
@@ -47,13 +46,13 @@ export default function HeaderSection({ allChallenges }: HeaderSectionProps) {
           </div>
           <div className="text-center">
             <div className="text-xl font-bold">
-              {allChallenges.reduce((acc, c) => acc + c.participants.length, 0)}
+              {allChallenges.reduce((acc, c) => acc + (c.participants?.length || c.participantCount || 0), 0)}
             </div>
             <div className="text-challenges-100 text-xs">Participants</div>
           </div>
           <div className="text-center">
             <div className="text-xl font-bold">
-              {allChallenges.filter((c) => getUserChallengeParticipation(currentUserId, c.id)).length}
+              {allChallenges.filter((c) => c.isParticipating).length}
             </div>
             <div className="text-challenges-100 text-xs">Joined</div>
           </div>

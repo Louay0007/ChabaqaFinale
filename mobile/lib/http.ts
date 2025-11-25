@@ -6,48 +6,13 @@ import PlatformUtils from './platform-utils';
  * Works on Web, iOS, Android without any adapter issues
  */
 
-// Base URLs to try in order (platform-specific)
-const PRIMARY_BASE_URL = PlatformUtils.getApiUrl();
-
-// Build platform-specific fallback list
-const BASE_URLS: string[] = (() => {
-  const urls: string[] = [];
-  
-  // Platform-specific fallbacks (prioritize fast local connections)
-  if (PlatformUtils.isWeb) {
-    // Web: prioritize localhost (fastest), then env URL
-    urls.push('http://localhost:3000');
-    if (PRIMARY_BASE_URL !== 'http://localhost:3000') {
-      urls.push(PRIMARY_BASE_URL);
-    }
-    urls.push('http://127.0.0.1:3000');
-  } else if (PlatformUtils.isIOS) {
-    // iOS simulator can use localhost
-    urls.push('http://localhost:3000');
-    if (PRIMARY_BASE_URL !== 'http://localhost:3000') {
-      urls.push(PRIMARY_BASE_URL);
-    }
-    urls.push('http://127.0.0.1:3000');
-  } else if (PlatformUtils.isAndroid) {
-    // Android emulator special IPs
-    urls.push('http://10.0.2.2:3000');
-    urls.push('http://10.0.3.2:3000');
-    if (PRIMARY_BASE_URL !== 'http://10.0.2.2:3000') {
-      urls.push(PRIMARY_BASE_URL);
-    }
-    urls.push('http://localhost:3000');
-  } else {
-    // Other platforms: use primary first
-    urls.push(PRIMARY_BASE_URL);
-  }
-  
-  // Remove duplicates
-  return [...new Set(urls)];
-})();
+// Use only the configured API URL from environment variable
+const API_BASE_URL = PlatformUtils.getApiUrl();
 
 if (__DEV__) {
   console.log(`🌐 [HTTP] Platform: ${PlatformUtils.getPlatformName()}`);
-  console.log('🌐 [HTTP] Will try endpoints:', BASE_URLS);
+  console.log(`🌐 [HTTP] API Base URL: ${API_BASE_URL}`);
+  console.log(`🌐 [HTTP] Full API URL will be: ${API_BASE_URL}/api/...`);
 }
 
 // Response interface
@@ -101,108 +66,84 @@ async function fetchWithTimeout(
 }
 
 /**
- * Try sending request against multiple base URLs with fallback
+ * Send request to the configured API endpoint
  */
 export async function tryEndpoints<T = any>(
   path: string,
   config: RequestConfig = {}
 ): Promise<HttpResponse<T>> {
-  let lastError: any;
   const startTime = Date.now();
   const method = config.method || 'GET';
+  const url = joinUrl(API_BASE_URL, path);
 
-  console.log(`🚀 [HTTP] Trying to ${method} ${path}`);
-  console.log(`🚀 [HTTP] Will attempt ${BASE_URLS.length} endpoint(s)`);
+  console.log(`🚀 [HTTP] ${method} ${url}`);
 
-  for (let i = 0; i < BASE_URLS.length; i++) {
-    const base = BASE_URLS[i];
-    const url = joinUrl(base, path);
-    
-    try {
-      console.log(`🎯 [HTTP] Attempt ${i + 1}/${BASE_URLS.length}: ${url}`);
-      
-      // Prepare fetch options
-      const fetchOptions: RequestInit = {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...(config.headers || {}),
-        },
-      };
+  try {
+    // Prepare fetch options
+    const fetchOptions: RequestInit = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(config.headers || {}),
+      },
+    };
 
-      // Add body for POST/PUT/PATCH
-      if (config.data && ['POST', 'PUT', 'PATCH'].includes(method)) {
-        fetchOptions.body = JSON.stringify(config.data);
-      }
-
-      // Make request with timeout (shorter for faster failover)
-      const response = await fetchWithTimeout(
-        url,
-        fetchOptions,
-        config.timeout || 5000  // Reduced from 30s to 5s for faster failover
-      );
-
-      const elapsed = Date.now() - startTime;
-      console.log(`✅ [HTTP] SUCCESS with ${base} in ${elapsed}ms - Status: ${response.status}`);
-
-      // Parse response
-      let data: T;
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        data = await response.text() as any;
-      }
-
-      return {
-        data,
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-      };
-      
-    } catch (error: any) {
-      lastError = error;
-      const message = error?.message || 'Unknown error';
-      
-      console.log(`❌ [HTTP] ${url} failed:`);
-      console.log(`   Message: ${message}`);
-
-      // Only try next base on network/timeout errors
-      const isTimeout = /timeout/i.test(message) || error.name === 'AbortError';
-      const isNetwork = /fetch|network|connection/i.test(message);
-
-      if (!isTimeout && !isNetwork && error.status) {
-        // Got a server response (4xx/5xx). Stop here.
-        console.log(`⚠️ [HTTP] Got server response (${error.status}), stopping fallback`);
-        throw error;
-      }
-      
-      if (i < BASE_URLS.length - 1) {
-        console.log(`🔄 [HTTP] Trying next endpoint...`);
-      }
+    // Add body for POST/PUT/PATCH
+    if (config.data && ['POST', 'PUT', 'PATCH'].includes(method)) {
+      fetchOptions.body = JSON.stringify(config.data);
     }
-  }
 
-  // If we reach here, all attempts failed
-  console.log(`💥 [HTTP] All ${BASE_URLS.length} endpoints failed`);
-  throw lastError ?? new Error('All endpoints failed');
+    // Make request with timeout
+    const response = await fetchWithTimeout(
+      url,
+      fetchOptions,
+      config.timeout || 30000
+    );
+
+    const elapsed = Date.now() - startTime;
+    console.log(`✅ [HTTP] SUCCESS in ${elapsed}ms - Status: ${response.status}`);
+
+    // Parse response
+    let data: T;
+    const contentType = response.headers.get('content-type');
+
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      data = await response.text() as any;
+    }
+
+    return {
+      data,
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    };
+
+  } catch (error: any) {
+    const message = error?.message || 'Unknown error';
+    const elapsed = Date.now() - startTime;
+
+    console.log(`❌ [HTTP] ${url} failed after ${elapsed}ms:`);
+    console.log(`   Message: ${message}`);
+
+    throw error;
+  }
 }
 
 // Convenience methods
 export const http = {
-  get: <T = any>(path: string, config?: RequestConfig) => 
+  get: <T = any>(path: string, config?: RequestConfig) =>
     tryEndpoints<T>(path, { ...config, method: 'GET' }),
-    
-  post: <T = any>(path: string, data?: any, config?: RequestConfig) => 
+
+  post: <T = any>(path: string, data?: any, config?: RequestConfig) =>
     tryEndpoints<T>(path, { ...config, method: 'POST', data }),
-    
-  put: <T = any>(path: string, data?: any, config?: RequestConfig) => 
+
+  put: <T = any>(path: string, data?: any, config?: RequestConfig) =>
     tryEndpoints<T>(path, { ...config, method: 'PUT', data }),
-    
-  delete: <T = any>(path: string, config?: RequestConfig) => 
+
+  delete: <T = any>(path: string, config?: RequestConfig) =>
     tryEndpoints<T>(path, { ...config, method: 'DELETE' }),
 };
 

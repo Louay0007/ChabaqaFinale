@@ -1,13 +1,13 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Codesandbox, FileText, DollarSign, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Product, Purchase } from "@/lib/models"
+import { ProductWithDetails, ProductPurchase } from "@/lib/api/products-community.api"
 import { getFileTypeIcon } from "@/lib/utilsmedia"
 
 interface ProductDetailsSidebarProps {
   selectedProduct: string | null
-  allProducts: Product[]
-  userPurchases: Purchase[]
+  allProducts: ProductWithDetails[]
+  userPurchases: ProductPurchase[]
 }
 
 export default function ProductDetailsSidebar({

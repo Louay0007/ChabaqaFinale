@@ -10,8 +10,10 @@ import { AppService } from './app.service';
 import { User, UserSchema } from './schema/user.schema';
 import { VerificationCode, VerificationCodeSchema } from './schema/verification-code.schema';
 import { RevokedToken, RevokedTokenSchema } from './schema/revoked-token.schema';
+import { Payout, PayoutSchema } from './schema/payout.schema';
 import { UserService } from './user/user.service';
 import { UserController } from './user/user.controller';
+import { PayoutModule } from './payout/payout.module';
 import { AuthModule } from './auth/auth.module';
 import { EmailService } from './common/services/email.service';
 import { CommunityAffCreaJoinModule } from './community-aff-crea-join/community-aff-crea-join.module';
@@ -53,6 +55,11 @@ import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
 import { SecurityModule } from './common/modules/security.module';
 import { MonitoringModule } from './common/modules/monitoring.module';
 import { CacheModule } from './common/modules/cache.module';
+import { CommunityPageContentModule } from './community-page-content/community-page-content.module';
+import { ProgressionModule } from './progression/progression.module';
+import { AchievementModule } from './achievement/achievement.module';
+import { Achievement, AchievementSchema } from './schema/achievement.schema';
+import { UserAchievement, UserAchievementSchema } from './schema/user-achievement.schema';
 
 @Module({
   imports: [
@@ -98,6 +105,7 @@ import { CacheModule } from './common/modules/cache.module';
       { name: User.name, schema: UserSchema },
       { name: VerificationCode.name, schema: VerificationCodeSchema },
       { name: RevokedToken.name, schema: RevokedTokenSchema },
+      { name: Payout.name, schema: PayoutSchema },
       { name: Community.name, schema: CommunitySchema },
       { name: StorageUsage.name, schema: StorageUsageSchema },
       { name: Plan.name, schema: PlanSchema },
@@ -107,6 +115,8 @@ import { CacheModule } from './common/modules/cache.module';
       { name: 'Event', schema: EventSchema },
       { name: 'Product', schema: ProductSchema },
       { name: 'Session', schema: SessionSchema },
+      { name: Achievement.name, schema: AchievementSchema },
+      { name: UserAchievement.name, schema: UserAchievementSchema },
     ]),
     AuthModule,
     CommunityAffCreaJoinModule,
@@ -136,9 +146,13 @@ import { CacheModule } from './common/modules/cache.module';
     SecurityModule,
     MonitoringModule,
     CacheModule,
+    CommunityPageContentModule,
+    ProgressionModule,
+    AchievementModule,
+    PayoutModule,
   ],
   controllers: [AppController, UserController, TrackingController, PaymentController],
   providers: [AppService, UserService, EmailService, StripePaymentService],
   exports: [EmailService],
 })
-export class AppModule {}
+export class AppModule { }

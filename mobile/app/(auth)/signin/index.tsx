@@ -32,12 +32,13 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  const [userId, setUserId] = useState(''); // Store userId for 2FA
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRequestingCode, setIsRequestingCode] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [showTwoFactor, setShowTwoFactor] = useState(false);
-  
+
   // Récupérer le paramètre de redirection
   const params = useLocalSearchParams();
   const redirectTo = params.redirect as string;
@@ -65,13 +66,13 @@ export default function SignInScreen() {
   // Fonction pour gérer la redirection après connexion réussie
   const handleSuccessfulLogin = async () => {
     console.log('🎉 Connexion réussie! Refetch des données utilisateur...');
-    
+
     // Forcer le refetch des données utilisateur
     await refetch();
-    
+
     // Attendre un peu pour que les données soient mises à jour
     await new Promise(resolve => setTimeout(resolve, 300));
-    
+
     if (redirectTo === 'build-community') {
       console.log('📍 Redirection vers build-community');
       router.replace('/(build_community)');
@@ -98,16 +99,17 @@ export default function SignInScreen() {
 
     try {
       console.log('🚀 [SIGNIN] Tentative de connexion...');
-      const result = await loginAction({ 
-        email: email.trim(), 
-        password, 
-        remember_me: true 
+      const result = await loginAction({
+        email: email.trim(),
+        password,
+        remember_me: true
       });
 
-      if (result.success && result.requires2FA) {
-        console.log('📱 [SIGNIN] 2FA requis');
+      if (result.success && result.requires2FA && result.userId) {
+        console.log('📱 [SIGNIN] 2FA requis, userId:', result.userId);
+        setUserId(result.userId); // Store userId for 2FA verification
         setShowTwoFactor(true);
-        setSuccessMessage('✉️ Code de vérification envoyé par email');
+        setSuccessMessage(result.message || '✉️ Code de vérification envoyé par email');
         setPassword(''); // Clear password for security
       } else if (result.success && !result.requires2FA) {
         console.log('✅ [SIGNIN] Connexion directe réussie (pas de 2FA)');
@@ -133,30 +135,37 @@ export default function SignInScreen() {
       return;
     }
 
+    if (!userId) {
+      setError('Session expirée. Veuillez vous reconnecter.');
+      handleBackToCredentials();
+      return;
+    }
+
     setIsSubmitting(true);
     setError('');
     setSuccessMessage('');
 
     try {
       console.log('🔐 [SIGNIN] Vérification du code 2FA...');
-      const result = await verifyTwoFactorAction({ 
-        email: email.trim(), 
-        verificationCode: verificationCode.trim() 
+      const result = await verifyTwoFactorAction({
+        userId: userId,
+        code: verificationCode.trim(),
+        rememberMe: true
       });
 
       if (result.success) {
         console.log('✅ [SIGNIN] 2FA validé avec succès');
         setSuccessMessage('✅ Code vérifié! Connexion en cours...');
-        
+
         // Les tokens sont automatiquement stockés par verifyTwoFactorAction
         if (result.user) {
           // Mettre à jour le contexte d'auth
           login(result.user);
         }
-        
+
         // Refetch et redirection
         await refetch();
-        
+
         // Petit délai pour que l'utilisateur voie le message de succès
         setTimeout(() => {
           handleSuccessfulLogin();
@@ -178,6 +187,7 @@ export default function SignInScreen() {
     console.log('⬅️ [SIGNIN] Retour à la saisie des identifiants');
     setShowTwoFactor(false);
     setVerificationCode('');
+    setUserId(''); // Clear userId
     setError('');
     setSuccessMessage('');
     // Reset password for security
@@ -188,29 +198,29 @@ export default function SignInScreen() {
     try {
       setIsSubmitting(true);
       setError('');
-      
+
       console.log('🔐 [SIGNIN] Starting Google Sign-In');
-      
+
       const result = await authenticateWithGoogle();
-      
+
       if (result.success && result.user) {
         console.log('✅ [SIGNIN] Google Sign-In successful');
-        
+
         // Refetch user data to update auth state
         await refetch();
-        
+
         // Navigate based on redirect parameter or default to communities
         if (redirectTo) {
           router.replace(redirectTo as any);
         } else {
           router.replace('/(communities)');
         }
-        
+
       } else {
         console.log('❌ [SIGNIN] Google Sign-In failed:', result.error);
         setError(result.error || 'Google Sign-In failed');
       }
-      
+
     } catch (error: any) {
       console.error('💥 [SIGNIN] Google Sign-In error:', error);
       setError('An error occurred during Google Sign-In');
@@ -231,24 +241,24 @@ export default function SignInScreen() {
 
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <AdaptiveStatusBar />
       <AdaptiveBackground style={styles.background} resizeMode="cover">
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <Header 
+          <Header
             showTwoFactor={showTwoFactor}
             email={email}
             styles={styles}
           />
 
-          <BlurView 
-            intensity={colors.isDark ? 40 : 20} 
+          <BlurView
+            intensity={colors.isDark ? 40 : 20}
             style={[
               styles.card,
               {

@@ -73,7 +73,7 @@ export function Header() {
           <div className="hidden lg:flex lg:flex-1 lg:justify-end items-center gap-x-4">
             {isLoading ? null : !isAuthenticated ? (
               <>
-                <Link href="/signin?redirect=/profile" className="text-sm font-semibold leading-6 text-gray-900 dark:text-white hover:text-pink-600 dark:hover:text-pink-400 transition-colors">Sign in</Link>
+                <Link href="/signin" className="text-sm font-semibold leading-6 text-gray-900 dark:text-white hover:text-pink-600 dark:hover:text-pink-400 transition-colors">Sign in</Link>
                 <Link href="/build-community" className="rounded-md bg-pink-500 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-pink-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600">
                   Get Started
                 </Link>
@@ -135,7 +135,7 @@ export function Header() {
             <div className="pt-2 space-y-2">
               {isLoading ? null : !isAuthenticated ? (
                 <>
-                  <Link href="/signin?redirect=/profile">
+                  <Link href="/signin">
                     <Button variant="ghost" className="w-full justify-start">
                       Sign In
                     </Button>

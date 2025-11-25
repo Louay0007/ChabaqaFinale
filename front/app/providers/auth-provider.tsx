@@ -16,7 +16,8 @@ interface AuthContextValue {
   register: (payload: { name: string; email: string; password: string; numtel?: string; date_naissance?: string }) => Promise<void>
   login: (payload: { email: string; password: string }) => Promise<void>
   logout: () => Promise<void>
-  fetchMe: () => Promise<void>
+  fetchMe: () => Promise<User | null>
+  fetchMeWithRetry: () => Promise<User | null>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -33,11 +34,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(null)
       const user = await getProfile();
       setUser(user);
+      return user;
     } catch (e: any) {
       setUser(null)
       // Only set error if it's not an authentication error (401)
       if (e?.statusCode !== 401) {
         setError(e?.message || 'Failed to fetch user profile')
+      }
+      // Don't throw error for 401 - this is expected for unauthenticated users
+      return null;
+    }
+  }, [])
+
+  const fetchMeWithRetry = useCallback(async () => {
+    try {
+      setError(null)
+      const user = await getProfile();
+      setUser(user);
+      return user;
+    } catch (e: any) {
+      // If it's a 401 error, try once more
+      if (e?.statusCode === 401) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        try {
+          const user = await getProfile();
+          setUser(user);
+          return user;
+        } catch (retryError: any) {
+          setUser(null)
+          return null
+        }
+      } else {
+        setUser(null)
+        setError(e?.message || 'Failed to fetch user profile')
+        return null
       }
     }
   }, [])
@@ -73,13 +103,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       // Clear local state
       setUser(null);
-      
+
       // Clear token manager
       tokenManager.clearTokens();
-      
+
       // Clear secure storage
       secureStorage.clear();
-      
+
       // Redirect to home page
       if (typeof window !== 'undefined') {
         window.location.href = '/';
@@ -89,16 +119,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true
-    ;(async () => {
-      await fetchMe()
-      if (mounted) {
-        setLoading(false)
-      }
-    })()
+      ; (async () => {
+        await fetchMeWithRetry()
+        if (mounted) {
+          setLoading(false)
+        }
+      })()
     return () => {
       mounted = false
     }
-  }, [fetchMe])
+  }, [fetchMeWithRetry])
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
@@ -109,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     fetchMe,
+    fetchMeWithRetry,
   }), [user, loading, error, isAuthenticated, register, login, logout, fetchMe])
 
   return (

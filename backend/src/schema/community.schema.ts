@@ -257,7 +257,7 @@ export interface CommunityDocument extends Document {
   inviteCode: string;
   inviteLink: string;
   cours: Types.ObjectId[];
-  
+
   // ============ Champs supplémentaires pour compatibilité frontend ============
   longDescription?: string;
   coverImage?: string;
@@ -529,17 +529,17 @@ export class Community {
       // Prix de base
       price: { type: Number, default: 0, min: 0 },
       currency: { type: String, enum: ['USD', 'EUR', 'TND'], default: 'TND' },
-      
+
       // Type de prix
       priceType: { type: String, enum: ['free', 'one-time', 'monthly', 'yearly'], default: 'free' },
-      
+
       // Produit récurrent
       isRecurring: { type: Boolean, default: false },
       recurringInterval: { type: String, enum: ['month', 'year', 'week'] },
-      
+
       // Fonctionnalités incluses
       features: [{ type: String }],
-      
+
       // Limites
       limits: {
         maxMembers: { type: Number, default: 1000 },
@@ -547,7 +547,7 @@ export class Community {
         maxPosts: { type: Number, default: 1000 },
         storageLimit: { type: String, default: '10GB' }
       },
-      
+
       // Options de paiement
       paymentOptions: {
         allowInstallments: { type: Boolean, default: false },
@@ -556,7 +556,7 @@ export class Community {
         groupDiscount: { type: Number, min: 0, max: 100 },
         memberDiscount: { type: Number, min: 0, max: 100 }
       },
-      
+
       // Période d'essai
       freeTrialDays: { type: Number, min: 0, max: 30 },
       trialFeatures: [{ type: String }]
@@ -665,7 +665,7 @@ export class Community {
   cours: Types.ObjectId[];
 
   // ============ Champs supplémentaires pour compatibilité frontend ============
-  
+
   /**
    * Description longue de la communauté (pour compatibilité frontend)
    */
@@ -693,8 +693,8 @@ export class Community {
   /**
    * Note moyenne de la communauté (pour compatibilité frontend)
    */
-  @Prop({ 
-    type: Number, 
+  @Prop({
+    type: Number,
     default: 0,
     min: 0,
     max: 5
@@ -778,11 +778,11 @@ CommunitySchema.index({ rating: -1, membersCount: -1 });
 CommunitySchema.index({ isActive: 1, isPrivate: 1 });
 
 // Middleware pour mettre à jour le nombre de membres
-CommunitySchema.pre('save', function(next) {
+CommunitySchema.pre('save', function (next) {
   if (this.isModified('members')) {
     this.membersCount = this.members.length;
   }
-  
+
   // Génération automatique du slug à partir du nom si pas défini
   if (this.isModified('name') && !this.slug) {
     this.slug = this.name
@@ -791,12 +791,12 @@ CommunitySchema.pre('save', function(next) {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
   }
-  
+
   next();
 });
 
 // Méthode pour ajouter un membre
-CommunitySchema.methods.addMember = function(userId: Types.ObjectId) {
+CommunitySchema.methods.addMember = function (userId: Types.ObjectId) {
   if (!this.members.includes(userId)) {
     this.members.push(userId);
     this.membersCount = this.members.length;
@@ -804,28 +804,28 @@ CommunitySchema.methods.addMember = function(userId: Types.ObjectId) {
 };
 
 // Méthode pour supprimer un membre
-CommunitySchema.methods.removeMember = function(userId: Types.ObjectId) {
+CommunitySchema.methods.removeMember = function (userId: Types.ObjectId) {
   this.members = this.members.filter(member => !member.equals(userId));
   this.membersCount = this.members.length;
 };
 
 // Méthode pour vérifier si un utilisateur est membre
-CommunitySchema.methods.isMember = function(userId: Types.ObjectId): boolean {
+CommunitySchema.methods.isMember = function (userId: Types.ObjectId): boolean {
   return this.members.some(member => member.equals(userId));
 };
 
 // Méthode pour vérifier si un utilisateur est administrateur
-CommunitySchema.methods.isAdmin = function(userId: Types.ObjectId): boolean {
+CommunitySchema.methods.isAdmin = function (userId: Types.ObjectId): boolean {
   return this.admins.some(admin => admin.equals(userId)) || this.createur.equals(userId);
 };
 
 // Méthode pour vérifier si un utilisateur est modérateur
-CommunitySchema.methods.isModerator = function(userId: Types.ObjectId): boolean {
+CommunitySchema.methods.isModerator = function (userId: Types.ObjectId): boolean {
   return this.moderateurs.some(moderator => moderator.equals(userId)) || this.isAdmin(userId);
 };
 
 // Méthode pour générer un code d'invitation unique
-CommunitySchema.methods.generateInviteCode = function(): string {
+CommunitySchema.methods.generateInviteCode = function (): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
   for (let i = 0; i < 12; i++) {
@@ -835,7 +835,7 @@ CommunitySchema.methods.generateInviteCode = function(): string {
 };
 
 // Méthode pour générer le lien d'invitation
-CommunitySchema.methods.generateInviteLink = function(baseUrl: string): string {
+CommunitySchema.methods.generateInviteLink = function (baseUrl: string): string {
   if (!this.inviteCode) {
     this.inviteCode = this.generateInviteCode();
   }
@@ -845,54 +845,54 @@ CommunitySchema.methods.generateInviteLink = function(baseUrl: string): string {
 
 
 // Méthode pour mettre à jour les statistiques
-CommunitySchema.methods.updateStats = function(stats: Partial<CommunityStats>): void {
+CommunitySchema.methods.updateStats = function (stats: Partial<CommunityStats>): void {
   this.stats = { ...this.stats, ...stats };
 };
 
 // Méthode pour ajouter un tag
-CommunitySchema.methods.addTag = function(tag: string): void {
+CommunitySchema.methods.addTag = function (tag: string): void {
   if (!this.tags.includes(tag)) {
     this.tags.push(tag);
   }
 };
 
 // Méthode pour supprimer un tag
-CommunitySchema.methods.removeTag = function(tag: string): void {
+CommunitySchema.methods.removeTag = function (tag: string): void {
   this.tags = this.tags.filter(t => t !== tag);
 };
 
 // Méthode pour générer un slug unique
-CommunitySchema.methods.generateSlug = function(baseName: string): string {
+CommunitySchema.methods.generateSlug = function (baseName: string): string {
   let slug = baseName
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
-  
+
   // Vous pouvez ajouter une logique pour vérifier l'unicité du slug
   // et ajouter un suffixe numérique si nécessaire
-  
+
   return slug;
 };
 
 // Méthode pour ajouter un cours à la communauté
-CommunitySchema.methods.ajouterCours = function(coursId: Types.ObjectId): void {
+CommunitySchema.methods.ajouterCours = function (coursId: Types.ObjectId): void {
   if (!this.cours.includes(coursId)) {
     this.cours.push(coursId);
   }
 };
 
 // Méthode pour supprimer un cours de la communauté
-CommunitySchema.methods.supprimerCours = function(coursId: Types.ObjectId): void {
+CommunitySchema.methods.supprimerCours = function (coursId: Types.ObjectId): void {
   this.cours = this.cours.filter(cours => !cours.equals(coursId));
 };
 
 // Méthode pour vérifier si un cours appartient à la communauté
-CommunitySchema.methods.possedeCours = function(coursId: Types.ObjectId): boolean {
+CommunitySchema.methods.possedeCours = function (coursId: Types.ObjectId): boolean {
   return this.cours.some(cours => cours.equals(coursId));
 };
 
 // Méthode pour obtenir le nombre de cours
-CommunitySchema.methods.obtenirNombreCours = function(): number {
+CommunitySchema.methods.obtenirNombreCours = function (): number {
   return this.cours.length;
 };

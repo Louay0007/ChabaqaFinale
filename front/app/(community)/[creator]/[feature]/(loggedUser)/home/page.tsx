@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -24,131 +24,182 @@ import {
   Trophy,
   Users,
   TrendingUp,
+  Loader2,
+  AlertCircle,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import Image from "next/image"
-import { getCommunityBySlug, mockUsers, getActiveChallengesByCommunity, getCoursesByCommunity } from "@/lib/mock-data"
+import { communityHomeApi, type CommunityHomeData } from "@/lib/api/community-home.api"
+import { postsApi } from "@/lib/api/posts.api"
+import type { Post, Challenge, Course, User } from "@/lib/api/types"
 
-const mockPosts = [
-  {
-    id: "1",
-    content:
-      "Just completed Day 18 of the 30-Day Coding Challenge! 🎉 Built a weather app with React and integrated with OpenWeatherMap API. The async/await concepts are finally clicking! Here's what I learned today...",
-    author: {
-      id: "2",
-      name: "Mike Chen",
-      avatar: "/placeholder.svg?height=40&width=40",
-      role: "member" as const,
-    },
-    createdAt: new Date("2024-02-20T14:30:00"),
-    likes: 24,
-    comments: 8,
-    shares: 3,
-    images: ["/placeholder.svg?height=300&width=400"],
-    tags: ["challenge", "react", "api"],
-    isLiked: false,
-    isBookmarked: true,
-  },
-  {
-    id: "2",
-    content:
-      "Quick tip for anyone struggling with CSS Flexbox: Use 'justify-content' for horizontal alignment and 'align-items' for vertical alignment. This simple mental model changed everything for me! 💡",
-    author: {
-      id: "3",
-      name: "Emily Rodriguez",
-      avatar: "/placeholder.svg?height=40&width=40",
-      role: "member" as const,
-    },
-    createdAt: new Date("2024-02-20T10:15:00"),
-    likes: 42,
-    comments: 12,
-    shares: 8,
-    images: [],
-    tags: ["css", "flexbox", "tip"],
-    isLiked: true,
-    isBookmarked: false,
-  },
-  {
-    id: "3",
-    content:
-      "Excited to announce that I just landed my first developer job! 🚀 The portfolio projects from this community really made the difference. Special thanks to Sarah for the amazing courses and everyone for the support!",
-    author: {
-      id: "4",
-      name: "David Kim",
-      avatar: "/placeholder.svg?height=40&width=40",
-      role: "member" as const,
-    },
-    createdAt: new Date("2024-02-19T16:45:00"),
-    likes: 89,
-    comments: 23,
-    shares: 15,
-    images: [],
-    tags: ["success", "job", "portfolio"],
-    isLiked: true,
-    isBookmarked: true,
-  },
-]
+interface PostWithInteractions extends Post {
+  isLiked?: boolean;
+  isBookmarked?: boolean;
+  shares?: number;
+  images?: string[];
+  tags?: string[];
+}
 
-export default function CommunityDashboard({ params }: { params: Promise<{ feature: string }> }) {
+export default function CommunityDashboard({ params }: { params: Promise<{ creator?: string; feature: string }> }) {
+  const resolvedParams = React.use(params)
+  const { creator, feature } = resolvedParams
+  
+  // State management
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [data, setData] = useState<CommunityHomeData | null>(null)
   const [newPost, setNewPost] = useState("")
-  const [posts, setPosts] = useState(mockPosts)
-  const { feature } = React.use(params)
-  const community = getCommunityBySlug(feature)
-  const currentUser = mockUsers[1] // Member user
-  const activeChallenges = getActiveChallengesByCommunity(community?.id || "")
-  const courses = getCoursesByCommunity(community?.id || "")
+  const [isCreatingPost, setIsCreatingPost] = useState(false)
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set())
+  const [postsPage, setPostsPage] = useState(1)
 
-  if (!community) {
-    return <div className="p-4 text-center text-gray-600">Community not found</div>
-  }
+  // Fetch data on mount
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true)
+        setError(null)
+        const homeData = await communityHomeApi.getHomeData(feature, postsPage, 10)
+        setData(homeData)
+        
+        // Initialize liked/bookmarked posts from user data if available
+        // This would come from user preferences API in the future
+      } catch (err: any) {
+        console.error('Error fetching community home data:', err)
+        setError(err.message || 'Failed to load community data')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchData()
+  }, [feature, postsPage])
 
-  const handleLike = (postId: string) => {
-    setPosts(
-      posts.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              isLiked: !post.isLiked,
-              likes: post.isLiked ? post.likes - 1 : post.likes + 1,
-            }
-          : post,
-      ),
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary-500 mb-4" />
+          <p className="text-gray-600">Loading community...</p>
+        </div>
+      </div>
     )
   }
 
-  const handleBookmark = (postId: string) => {
-    setPosts(posts.map((post) => (post.id === postId ? { ...post, isBookmarked: !post.isBookmarked } : post)))
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to load community</h2>
+          <p className="text-gray-600 mb-4">{error || 'Community not found'}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    )
   }
 
-  const handleCreatePost = () => {
-    if (newPost.trim()) {
-      const post = {
-        id: Date.now().toString(),
-        content: newPost,
-        author: currentUser,
-        createdAt: new Date(),
-        likes: 0,
-        comments: 0,
-        shares: 0,
-        images: [],
-        tags: [],
-        isLiked: false,
-        isBookmarked: false,
+  const { community, posts, activeChallenges, courses, currentUser, stats } = data
+  
+  // Use /[creator_name]/[feature] route structure for all navigation
+  const basePath = `/${community.creator.name}/${feature}`
+
+  const handleLike = async (postId: string) => {
+    const isLiked = likedPosts.has(postId)
+    
+    // Optimistic update
+    setLikedPosts(prev => {
+      const newSet = new Set(prev)
+      if (isLiked) {
+        newSet.delete(postId)
+      } else {
+        newSet.add(postId)
       }
-      setPosts([post, ...posts])
-      setNewPost("")
+      return newSet
+    })
+
+    try {
+      await postsApi.like(postId)
+      // Refresh posts to get updated like count
+      const updatedData = await communityHomeApi.getHomeData(feature, postsPage, 10)
+      setData(updatedData)
+    } catch (error) {
+      console.error('Error liking post:', error)
+      // Revert optimistic update
+      setLikedPosts(prev => {
+        const newSet = new Set(prev)
+        if (isLiked) {
+          newSet.add(postId)
+        } else {
+          newSet.delete(postId)
+        }
+        return newSet
+      })
     }
   }
 
-  const formatTimeAgo = (date: Date) => {
+  const handleBookmark = (postId: string) => {
+    // For now, bookmark is local only (no API endpoint yet)
+    setBookmarkedPosts(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(postId)) {
+        newSet.delete(postId)
+      } else {
+        newSet.add(postId)
+      }
+      return newSet
+    })
+  }
+
+  const handleCreatePost = async () => {
+    if (!newPost.trim() || !currentUser || !community) return
+
+    setIsCreatingPost(true)
+    try {
+      await postsApi.create({
+        title: '',
+        content: newPost,
+        communityId: community.id,
+        isPublished: true,
+      })
+      
+      // Refresh posts
+      const updatedData = await communityHomeApi.getHomeData(feature, postsPage, 10)
+      setData(updatedData)
+      setNewPost("")
+    } catch (error: any) {
+      console.error('Error creating post:', error)
+      alert(error.message || 'Failed to create post')
+    } finally {
+      setIsCreatingPost(false)
+    }
+  }
+
+  const formatTimeAgo = (dateString: string | Date) => {
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString
     const now = new Date()
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+    const diffInMs = now.getTime() - date.getTime()
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
+    const diffInDays = Math.floor(diffInHours / 24)
 
     if (diffInHours < 1) return "Just now"
     if (diffInHours < 24) return `${diffInHours}h ago`
-    return `${Math.floor(diffInHours / 24)}d ago`
+    if (diffInDays < 7) return `${diffInDays}d ago`
+    return date.toLocaleDateString()
   }
+
+  // Transform posts to include interaction state
+  const postsWithInteractions: PostWithInteractions[] = posts.map(post => ({
+    ...post,
+    isLiked: likedPosts.has(post.id),
+    isBookmarked: bookmarkedPosts.has(post.id),
+    shares: 0, // TODO: Get from API if available
+    images: [], // TODO: Get from API if available
+    tags: [], // TODO: Extract from content or get from API
+  }))
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -159,12 +210,13 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
             <CardContent className="p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
                 <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
-                  <AvatarImage src={currentUser.avatar || "/placeholder.svg?height=48&width=48"} />
+                  <AvatarImage src={currentUser?.avatar || "/placeholder.svg?height=48&width=48"} />
                   <AvatarFallback>
-                    {currentUser.name
+                    {(currentUser?.username || currentUser?.firstName || 'U')
                       .split(" ")
                       .map((n) => n[0])
-                      .join("")}
+                      .join("")
+                      .toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 space-y-3">
@@ -215,11 +267,20 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
                     </div>
                     <Button
                       onClick={handleCreatePost}
-                      disabled={!newPost.trim()}
-                      className="bg-primary-500 hover:bg-primary-600 text-white text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-full transition-colors"
+                      disabled={!newPost.trim() || isCreatingPost || !currentUser}
+                      className="bg-primary-500 hover:bg-primary-600 text-white text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-full transition-colors disabled:opacity-50"
                     >
+                      {isCreatingPost ? (
+                        <>
+                          <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 animate-spin" />
+                          <span className="hidden sm:inline">Posting...</span>
+                        </>
+                      ) : (
+                        <>
                       <Send className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                       <span className="hidden sm:inline">Post</span>
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -232,7 +293,21 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
             <div className="lg:col-span-3 space-y-6">
               {/* Posts Feed */}
               <div className="space-y-6">
-                {posts.map((post) => (
+                {postsWithInteractions.length === 0 ? (
+                  <Card className="border-0 shadow-sm bg-white">
+                    <CardContent className="p-8 text-center">
+                      <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No posts yet</h3>
+                      <p className="text-gray-600 mb-4">Be the first to share something with the community!</p>
+                      {currentUser && (
+                        <Button onClick={() => document.querySelector('textarea')?.focus()}>
+                          Create First Post
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  postsWithInteractions.map((post) => (
                   <Card key={post.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
                     <CardContent className="p-4 sm:p-6">
                       {/* Post Header */}
@@ -241,14 +316,17 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
                           <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
                             <AvatarImage src={post.author.avatar || "/placeholder.svg?height=48&width=48"} />
                             <AvatarFallback>
-                              {post.author.name
+                              {(post.author.username || post.author.firstName || 'U')
                                 .split(" ")
                                 .map((n) => n[0])
-                                .join("")}
+                                .join("")
+                                .toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <h4 className="font-semibold text-sm sm:text-base">{post.author.name}</h4>
+                            <h4 className="font-semibold text-sm sm:text-base">
+                              {post.author.username || post.author.firstName || 'Anonymous'}
+                            </h4>
                             <p className="text-xs sm:text-sm text-muted-foreground">
                               {formatTimeAgo(post.createdAt)} • {post.author.role}
                             </p>
@@ -270,10 +348,15 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
 
                       {/* Post Content */}
                       <div className="mb-3 sm:mb-4">
-                        <p className="text-gray-800 leading-relaxed text-sm sm:text-base">{post.content}</p>
+                        {post.title && (
+                          <h3 className="font-semibold text-base sm:text-lg mb-2">{post.title}</h3>
+                        )}
+                        <p className="text-gray-800 leading-relaxed text-sm sm:text-base whitespace-pre-wrap">
+                          {post.content}
+                        </p>
 
                         {/* Tags */}
-                        {post.tags.length > 0 && (
+                        {post.tags && post.tags.length > 0 && (
                           <div className="flex flex-wrap gap-2 mt-2 sm:mt-3">
                             {post.tags.map((tag) => (
                               <Badge key={tag} variant="secondary" className="text-xs">
@@ -285,7 +368,7 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
                       </div>
 
                       {/* Post Images */}
-                      {post.images.length > 0 && (
+                      {post.images && post.images.length > 0 && (
                         <div className="mb-3 sm:mb-4">
                           <div className="grid grid-cols-1 gap-2">
                             {post.images.map((image, index) => (
@@ -313,11 +396,11 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
                             className={`${post.isLiked ? "text-red-500" : "text-muted-foreground"} hover:text-red-500 text-xs sm:text-sm`}
                           >
                             <Heart className={`h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 ${post.isLiked ? "fill-current" : ""}`} />
-                            {post.likes}
+                            {post.likesCount}
                           </Button>
                           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-blue-500 text-xs sm:text-sm">
                             <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                            {post.comments}
+                            {post.commentsCount}
                           </Button>
                           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-green-500 text-xs sm:text-sm">
                             <Share className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -335,7 +418,8 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
@@ -353,25 +437,19 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
                   <CardContent className="p-4 sm:p-6">
                     <div className="space-y-3">
                       <h4 className="font-semibold text-sm sm:text-base">{activeChallenges[0].title}</h4>
-                      <div className="flex items-center justify-between text-xs sm:text-sm">
-                        <span className="text-muted-foreground">Your Progress</span>
-                        <span className="font-medium">Day 18/30</span>
+                      <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{activeChallenges[0].description}</p>
+                      <div className="flex items-center justify-between text-xs sm:text-sm mb-2">
+                        <span className="text-muted-foreground">Participants</span>
+                        <span className="font-medium">{activeChallenges[0].participantCount}</span>
                       </div>
-                      <div className="w-full bg-white/50 rounded-full h-1.5 sm:h-2">
-                        <div className="bg-challenges-500 h-1.5 sm:h-2 rounded-full" style={{ width: "60%" }} />
-                      </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs sm:text-sm gap-2">
-                        <div className="flex items-center text-muted-foreground">
-                          <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                          {activeChallenges[0].participants.length} participants
-                        </div>
-                        <div className="flex items-center text-muted-foreground">
-                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                          12 days left
-                        </div>
+                      <div className="flex items-center justify-between text-xs sm:text-sm mb-3">
+                        <span className="text-muted-foreground">Days Left</span>
+                        <span className="font-medium">
+                          {Math.ceil((new Date(activeChallenges[0].endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}
+                        </span>
                       </div>
                       <Button size="sm" className="w-full bg-challenges-500 hover:bg-challenges-600 text-xs sm:text-sm" asChild>
-                        <Link href={`/community/${feature}/challenge`}>Continue Challenge</Link>
+                        <Link href={`${basePath}/challenges`}>Continue Challenge</Link>
                       </Button>
                     </div>
                   </CardContent>
@@ -385,25 +463,25 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
                 </CardHeader>
                 <CardContent className="space-y-2 sm:space-y-3 p-4 sm:p-6">
                   <Button variant="outline" className="w-full justify-start bg-transparent text-xs sm:text-sm" asChild>
-                    <Link href={`/${feature}/courses`}>
+                    <Link href={`${basePath}/courses`}>
                       <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-2 sm:mr-3" />
                       Browse Courses
                     </Link>
                   </Button>
                   <Button variant="outline" className="w-full justify-start bg-transparent text-xs sm:text-sm" asChild>
-                    <Link href={`/${feature}/sessions`}>
+                    <Link href={`${basePath}/sessions`}>
                       <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-2 sm:mr-3" />
                       Book 1-on-1 Session
                     </Link>
                   </Button>
                   <Button variant="outline" className="w-full justify-start bg-transparent text-xs sm:text-sm" asChild>
-                    <Link href={`/${feature}/progress`}>
+                    <Link href={`${basePath}/progress`}>
                       <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-2 sm:mr-3" />
                       View Progress
                     </Link>
                   </Button>
                   <Button variant="outline" className="w-full justify-start bg-transparent text-xs sm:text-sm" asChild>
-                    <Link href={`/community/${feature}/achievements`}>
+                    <Link href={`${basePath}/achievements`}>
                       <Trophy className="h-3 w-3 sm:h-4 sm:w-4 mr-2 sm:mr-3" />
                       Achievements
                     </Link>
@@ -434,7 +512,7 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
                     </div>
                   ))}
                   <Button variant="ghost" size="sm" className="w-full text-xs sm:text-sm" asChild>
-                    <Link href={`/community/${feature}/courses`}>View All Courses</Link>
+                    <Link href={`${basePath}/courses`}>View All Courses</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -451,16 +529,18 @@ export default function CommunityDashboard({ params }: { params: Promise<{ featu
                   </div>
                   <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Active Today</span>
-                    <span className="font-semibold">247</span>
+                    <span className="font-semibold">{stats.activeToday.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Posts This Week</span>
-                    <span className="font-semibold">89</span>
+                    <span className="font-semibold">{stats.postsThisWeek.toLocaleString()}</span>
                   </div>
+                  {stats.userRank && (
                   <div className="flex items-center justify-between text-xs sm:text-sm">
                     <span className="text-muted-foreground">Your Rank</span>
-                    <span className="font-semibold text-primary-600">#47</span>
+                      <span className="font-semibold text-primary-600">#{stats.userRank}</span>
                   </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

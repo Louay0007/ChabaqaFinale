@@ -187,7 +187,7 @@ export default function SignUpForm({ onSuccess }: SignUpFormProps = {}) {
               setNumtel(e.target.value)
               if (fieldErrors.numtel) setFieldErrors({ ...fieldErrors, numtel: '' })
             }}
-            placeholder="+1 (555) 000-0000"
+            placeholder="+216 XX XXX XXX"
             disabled={isLoading}
             className={`w-full px-4 py-4 rounded-2xl border-2 transition-all duration-300 text-gray-900 placeholder-gray-500 bg-white/70 backdrop-blur-sm disabled:opacity-50 ${
               fieldErrors.numtel

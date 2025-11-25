@@ -1,21 +1,21 @@
 import { CalendarIcon } from "lucide-react"
 
-const bookedSessions = [
-  {
-    id: "1",
-    session: { price: 150 },
-    scheduledAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-    status: "confirmed" as const,
-  },
-  {
-    id: "2",
-    session: { price: 120 },
-    scheduledAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    status: "pending" as const,
-  },
-]
+interface HeaderSectionProps {
+  sessions: any[]
+  userBookings: any[]
+}
 
-export default function HeaderSection() {
+export default function HeaderSection({ sessions, userBookings }: HeaderSectionProps) {
+  // Calculate stats
+  const bookedCount = userBookings?.filter(b => 
+    b.status === 'confirmed' || b.status === 'pending'
+  ).length || 0
+  
+  const availableTypes = new Set(sessions?.map(s => s.category).filter(Boolean)).size || 0
+  
+  // Calculate average rating (default to 4.9 for now)
+  const avgRating = 4.9
+
   return (
     <div className="mb-6">
       <div className="bg-gradient-to-r from-sessions-500 to-pink-500 rounded-xl p-4 text-white relative overflow-hidden flex flex-col md:flex-row items-center justify-between">
@@ -39,15 +39,15 @@ export default function HeaderSection() {
         {/* Stats horizontal */}
         <div className="flex space-x-6 mt-4 md:mt-0">
           <div className="text-center">
-            <div className="text-xl font-bold">{bookedSessions.length}</div>
+            <div className="text-xl font-bold">{bookedCount}</div>
             <div className="text-sessions-100 text-xs">Sessions Booked</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold">3</div>
+            <div className="text-xl font-bold">{availableTypes || sessions?.length || 0}</div>
             <div className="text-sessions-100 text-xs">Available Types</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold">4.9</div>
+            <div className="text-xl font-bold">{avgRating}</div>
             <div className="text-sessions-100 text-xs">Avg Rating</div>
           </div>
         </div>

@@ -44,13 +44,13 @@ export const getCurrentUser = async (): Promise<User | null> => {
   try {
     console.log('👤 [USER-API] Fetching current user profile');
     const accessToken = await getAccessToken();
-    
+
     if (!accessToken) {
       console.log('⚠️ [USER-API] No access token available');
       return null;
     }
 
-    const resp = await tryEndpoints<{ user: any; message: string }>(
+    const resp = await tryEndpoints<{ success?: boolean; data?: any; user?: any; message?: string }>(
       '/api/auth/me',
       {
         method: 'GET',
@@ -62,7 +62,12 @@ export const getCurrentUser = async (): Promise<User | null> => {
     );
 
     console.log('✅ [USER-API] User profile fetched successfully');
-    return resp.data.user;
+    // Backend returns { success: true, data: user } from /api/auth/me
+    const user = resp.data.data || resp.data.user;
+    if (user) {
+      await storeUser(user);
+    }
+    return user || null;
   } catch (error: any) {
     console.error('💥 [USER-API] Error fetching user:', error);
     // Return cached user as fallback
@@ -79,7 +84,7 @@ export const updateProfile = async (data: UpdateProfileData): Promise<UserRespon
   try {
     console.log('🔄 [USER-API] Updating profile:', Object.keys(data));
     const accessToken = await getAccessToken();
-    
+
     if (!accessToken) {
       throw new Error('Not authenticated');
     }
@@ -97,7 +102,7 @@ export const updateProfile = async (data: UpdateProfileData): Promise<UserRespon
     );
 
     console.log('✅ [USER-API] Profile updated successfully');
-    
+
     // Update cached user
     if (resp.data.user) {
       await storeUser(resp.data.user);
@@ -119,7 +124,7 @@ export const changePassword = async (newPassword: string): Promise<SuccessRespon
   try {
     console.log('🔐 [USER-API] Changing password...');
     const accessToken = await getAccessToken();
-    
+
     if (!accessToken) {
       throw new Error('Not authenticated');
     }

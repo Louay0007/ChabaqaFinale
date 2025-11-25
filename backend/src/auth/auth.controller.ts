@@ -6,28 +6,57 @@ import { AuthService } from './auth.service';
 import { LoginDto } from '../dto-user/login.dto';
 import { LoginResponseDto } from '../dto-user/login-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { CookieUtil } from '../common/utils/cookie.util';
 import { RegisterDto } from '../dto-user/register.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'User Login',
-    description: 'Authenticate user and return JWT tokens.',
+    description: 'Authenticate user credentials. 2FA is optional based on user settings.',
   })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ status: 200, description: 'Login successful', type: LoginResponseDto })
-  @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<LoginResponseDto> {
-    const result = await this.authService.login(loginDto);
-    if (result.access_token && result.refresh_token) {
-      CookieUtil.setTokenCookies(res, result.access_token, result.refresh_token, result.rememberMe || false);
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful or 2FA required.',
+    schema: {
+      type: 'object',
+      properties: {
+        requires2FA: { type: 'boolean', example: true },
+        userId: { type: 'string', example: '64a1b2c3d4e5f6789abcdef0' },
+        user: { type: 'object' }
+      }
     }
+  })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(loginDto);
+
+    if (!result.requires2FA && result.accessToken && result.refreshToken) {
+      // Set HttpOnly cookies
+      this.setCookies(res, result.accessToken, result.refreshToken, loginDto.remember_me);
+    }
+
+    return result;
+  }
+
+  @Post('verify-2fa')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify 2FA Code',
+    description: 'Verify the 2FA code and complete the login process.',
+  })
+  @ApiBody({ schema: { type: 'object', properties: { userId: { type: 'string' }, code: { type: 'string' }, rememberMe: { type: 'boolean' } } } })
+  async verifyTwoFactorCode(@Body() body: { userId: string; code: string; rememberMe?: boolean }, @Req() req, @Res({ passthrough: true }) res: Response): Promise<LoginResponseDto> {
+    const result = await this.authService.verifyTwoFactorCode(body.userId, body.code, body.rememberMe || false, req);
+
+    // Set HttpOnly cookies
+    this.setCookies(res, result.access_token, result.refresh_token, body.rememberMe);
+
     return result;
   }
 
@@ -35,21 +64,24 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Refresh Access Token',
-    description: 'Refresh expired access token using refresh token.',
+    description: 'Refresh expired access token using refresh token from cookie or body.',
   })
   @ApiBody({ type: require('./dto/refresh-token.dto').RefreshTokenDto })
   @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
   async refreshToken(@Body() body: { refreshToken?: string }, @Req() req, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = body.refreshToken || req.cookies[CookieUtil.COOKIE_NAMES.REFRESH_TOKEN];
+    // Try to get refresh token from cookie first, then body
+    const refreshToken = req.cookies?.refreshToken || body.refreshToken;
+
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token manquant');
     }
-    
-    const result = await this.authService.refreshToken(refreshToken);
-    if (result.access_token) {
-      CookieUtil.setAccessTokenCookie(res, result.access_token, false);
-    }
+
+    const result = await this.authService.refreshToken(refreshToken, req);
+
+    // Update cookies with new tokens
+    this.setCookies(res, result.access_token, result.refresh_token);
+
     return result;
   }
 
@@ -63,13 +95,32 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getProfile(@Req() req) {
-    // The user object is attached to the request by the JwtAuthGuard
-    const user = await this.authService.getUserById(req.user._id);
-    return {
-      success: true,
-      data: user,
-      message: 'Token valide',
-    };
+    try {
+      // The user object is attached to the request by the JwtAuthGuard
+      if (!req.user || !req.user._id) {
+        throw new UnauthorizedException('Token non valide ou expiré');
+      }
+
+      const user = await this.authService.getUserById(req.user._id);
+
+      if (!user) {
+        throw new UnauthorizedException('Utilisateur non trouvé');
+      }
+
+      return {
+        success: true,
+        data: user,
+        message: 'Token valide',
+      };
+    } catch (error) {
+      // Re-throw UnauthorizedException as-is
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      // For any other error, return a generic unauthorized message
+      throw new UnauthorizedException('Erreur lors de la récupération du profil');
+    }
   }
 
   @UseGuards(JwtAuthGuard)
@@ -85,22 +136,24 @@ export class AuthController {
   async logout(@Req() req, @Res({ passthrough: true }) res: Response) {
     try {
       const userId = req.user._id;
-      const accessToken = req.headers.authorization?.replace('Bearer ', '');
-      const refreshToken = req.cookies[CookieUtil.COOKIE_NAMES.REFRESH_TOKEN];
-      
+      const accessToken = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.accessToken;
+
+      // Extract refresh token from cookie or request body
+      const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+
       // Revoke both tokens
       await this.authService.logout(accessToken, refreshToken);
-      
-      // Clear cookies from response
-      CookieUtil.clearTokenCookies(res);
-      
+
+      // Clear cookies
+      this.clearCookies(res);
+
       return {
         success: true,
         message: 'Déconnexion réussie.',
       };
     } catch (error) {
-      // Still clear cookies even if revocation fails
-      CookieUtil.clearTokenCookies(res);
+      // Even if revocation fails, clear cookies
+      this.clearCookies(res);
       return {
         success: true,
         message: 'Déconnexion réussie.',
@@ -119,11 +172,50 @@ export class AuthController {
   async revokeAllTokens(@Req() req, @Res({ passthrough: true }) res: Response) {
     const userId = req.user._id;
     await this.authService.revokeAllTokens(userId);
-    CookieUtil.clearTokenCookies(res);
+
+    // Clear cookies for current device
+    this.clearCookies(res);
+
     return {
       success: true,
       message: 'Tous les tokens de l\'utilisateur ont été révoqués.',
     };
+  }
+
+  private setCookies(res: Response, accessToken: string, refreshToken: string, rememberMe: boolean = false) {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    // Access Token Cookie (15 min)
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax', // Allow navigation from external sites
+      maxAge: 15 * 60 * 1000, // 15 minutes
+      path: '/',
+    });
+
+    // Refresh Token Cookie (30 days or 90 days)
+    const refreshMaxAge = rememberMe ? 90 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: refreshMaxAge,
+      path: '/',
+    });
+  }
+
+  private clearCookies(res: Response) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+      path: '/',
+    };
+
+    res.clearCookie('accessToken', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
   }
 
   @Post('forgot-password')
@@ -152,11 +244,8 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   @ApiOperation({ summary: 'Google OAuth 2.0 callback' })
-  async googleAuthCallback(@Req() req, @Res({ passthrough: true }) res: Response) {
+  async googleAuthCallback(@Req() req) {
     const result = await (this.authService as any).loginWithGoogle(req.user);
-    if (result.access_token && result.refresh_token) {
-      CookieUtil.setTokenCookies(res, result.access_token, result.refresh_token, true);
-    }
     return result;
   }
 
@@ -183,5 +272,17 @@ export class AuthController {
   async registerCreator(@Body() registerDto: RegisterDto) {
     return this.authService.registerCreator(registerDto);
   }
+
+  @Post('resend-2fa')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Resend 2FA Code',
+    description: 'Resend a new 2FA verification code to the user\'s email.',
+  })
+  @ApiBody({ schema: { type: 'object', properties: { userId: { type: 'string' } } } })
+  @ApiResponse({ status: 200, description: '2FA code resent successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async resend2FACode(@Body() body: { userId: string }) {
+    return this.authService.resend2FACode(body.userId);
+  }
 }
- 

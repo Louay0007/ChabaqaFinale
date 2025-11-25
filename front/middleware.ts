@@ -47,7 +47,7 @@ export async function middleware(req: NextRequest) {
 
   // Get access token from cookies
   const accessToken = req.cookies.get('accessToken')?.value
-  
+
   let user = null
   let isValidToken = false
 
@@ -71,17 +71,21 @@ export async function middleware(req: NextRequest) {
   const isCreatorPath = CREATOR_PATHS.some((rx) => rx.test(pathname))
   const isAuthRedirectPath = AUTH_REDIRECT_PATHS.some((rx) => rx.test(pathname))
 
-  // Redirect authenticated users away from auth pages
+  // Redirect authenticated users away from auth pages based on role
   if (isValidToken && isAuthRedirectPath) {
-    const redirectTo = req.nextUrl.searchParams.get('redirect') || '/dashboard'
-    return NextResponse.redirect(new URL(redirectTo, req.url))
+    let redirectTo = '/explore' // default for users
+    if (user?.role === 'creator' || user?.role === 'admin') {
+      redirectTo = '/creator/select-community'
+    }
+    // Clear any auth-related search params to prevent loops
+    const url = new URL(redirectTo, req.url)
+    url.search = ''
+    return NextResponse.redirect(url)
   }
 
   // Handle protected routes
   if (isProtected && !isValidToken) {
-    const redirect = encodeURIComponent(`${pathname}${search || ''}`)
-    const url = new URL(`/signin?redirect=${redirect}`, req.url)
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(new URL('/signin', req.url))
   }
 
   // Handle admin-only routes
@@ -100,7 +104,7 @@ export async function middleware(req: NextRequest) {
     requestHeaders.set('x-user-id', user.sub as string)
     requestHeaders.set('x-user-email', user.email as string)
     requestHeaders.set('x-user-role', user.role as string)
-    
+
     return NextResponse.next({
       request: {
         headers: requestHeaders,

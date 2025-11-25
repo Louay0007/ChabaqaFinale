@@ -35,7 +35,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/a
 
 class ApiClient {
   private baseURL: string;
-  private refreshPromise: Promise<Response | null> | null = null;
+  private refreshPromise: Promise<boolean> | null = null;
   private isRefreshing: boolean = false;
 
   constructor() {
@@ -48,6 +48,21 @@ class ApiClient {
         message: 'An error occurred',
         statusCode: response.status,
       }));
+
+      // For 401 errors on /auth/me, don't redirect - allow graceful handling
+      // Only redirect for other 401 errors on protected resources
+      if (response.status === 401 && typeof window !== 'undefined') {
+        // Check if this is a protected route that requires login
+        const protectedRoutes = ['/creator', '/dashboard', '/settings', '/profile', '/admin'];
+        const currentPath = window.location.pathname;
+        const isProtectedRoute = protectedRoutes.some(route => currentPath.startsWith(route));
+
+        // Only redirect if on a protected route
+        if (isProtectedRoute) {
+          window.location.href = '/signin';
+        }
+      }
+
       throw error;
     }
     return response.json();
@@ -70,65 +85,104 @@ class ApiClient {
     if (!isFormData) {
       headers['Content-Type'] = 'application/json';
     }
+    // Add Authorization header if we have an access token
+    // Only add on client side to avoid SSR issues
+    if (typeof window !== 'undefined') {
+      try {
+        const { tokenStorage } = require('@/lib/token-storage');
+        const accessToken = tokenStorage.getAccessToken();
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+      } catch (error) {
+        // Silently fail - user might not be authenticated
+      }
+    }
+
     return headers;
   }
 
   // Generic HTTP methods
   async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
     const url = this.buildUrl(endpoint, params);
-    const doRequest = async () => fetch(url, { method: 'GET', headers: this.getHeaders(), credentials: 'include' });
+    const doRequest = async () => fetch(url, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
     let response = await doRequest();
     if (response.status === 401) {
-      await this.tryRefreshToken();
-      response = await doRequest();
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        response = await doRequest();
+      }
     }
     return this.handleResponse<T>(response);
   }
 
   async post<T>(endpoint: string, data?: any): Promise<T> {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
-      method: 'POST', headers: this.getHeaders(), credentials: 'include', body: data ? JSON.stringify(data) : undefined,
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: data ? JSON.stringify(data) : undefined,
     });
     let response = await doRequest();
     if (response.status === 401) {
-      await this.tryRefreshToken();
-      response = await doRequest();
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        response = await doRequest();
+      }
     }
     return this.handleResponse<T>(response);
   }
 
   async patch<T>(endpoint: string, data?: any): Promise<T> {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
-      method: 'PATCH', headers: this.getHeaders(), credentials: 'include', body: data ? JSON.stringify(data) : undefined,
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: data ? JSON.stringify(data) : undefined,
     });
     let response = await doRequest();
     if (response.status === 401) {
-      await this.tryRefreshToken();
-      response = await doRequest();
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        response = await doRequest();
+      }
     }
     return this.handleResponse<T>(response);
   }
 
   async put<T>(endpoint: string, data?: any): Promise<T> {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
-      method: 'PUT', headers: this.getHeaders(), credentials: 'include', body: data ? JSON.stringify(data) : undefined,
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: data ? JSON.stringify(data) : undefined,
     });
     let response = await doRequest();
     if (response.status === 401) {
-      await this.tryRefreshToken();
-      response = await doRequest();
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        response = await doRequest();
+      }
     }
     return this.handleResponse<T>(response);
   }
 
   async delete<T>(endpoint: string): Promise<T> {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
-      method: 'DELETE', headers: this.getHeaders(), credentials: 'include',
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include',
     });
     let response = await doRequest();
     if (response.status === 401) {
-      await this.tryRefreshToken();
-      response = await doRequest();
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        response = await doRequest();
+      }
     }
     return this.handleResponse<T>(response);
   }
@@ -139,12 +193,17 @@ class ApiClient {
     formData.append('file', file);
 
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
-      method: 'POST', headers: this.getHeaders(true), credentials: 'include', body: formData,
+      method: 'POST',
+      headers: this.getHeaders(true),
+      credentials: 'include',
+      body: formData,
     });
     let response = await doRequest();
     if (response.status === 401) {
-      await this.tryRefreshToken();
-      response = await doRequest();
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        response = await doRequest();
+      }
     }
     return this.handleResponse<T>(response);
   }
@@ -166,49 +225,54 @@ class ApiClient {
   }
 
   // Token refresh logic (single-flight with better error handling)
-  private async tryRefreshToken(): Promise<Response | null> {
+  private async tryRefreshToken(): Promise<boolean> {
     if (this.isRefreshing) {
       // Wait for ongoing refresh to complete
       while (this.isRefreshing) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      return null; // Return null to retry the original request
+      return false;
     }
 
-    if (this.refreshPromise) return this.refreshPromise;
-    
+    if (this.refreshPromise) {
+      await this.refreshPromise;
+      return false;
+    }
+
     this.isRefreshing = true;
     this.refreshPromise = (async () => {
       try {
+        if (typeof window === 'undefined') {
+          return false;
+        }
+
+        // Attempt refresh using cookies
         const res = await fetch(`${this.baseURL}/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+          credentials: 'include', // Send cookies
+          body: JSON.stringify({}), // Empty body, backend should read cookie
         });
-        
+
         if (!res.ok) {
-          // If refresh fails, redirect to login
-          if (typeof window !== 'undefined') {
-            window.location.href = '/signin';
-          }
-          return null;
+          return false;
         }
-        
-        return res;
+
+        // We don't need to manually set tokens in storage anymore
+        // The backend Set-Cookie header will handle it for the browser
+
+        return true;
       } catch (error) {
         console.error('Token refresh failed:', error);
-        // Redirect to login on network error
-        if (typeof window !== 'undefined') {
-          window.location.href = '/signin';
-        }
-        return null;
+        return false;
       } finally {
         this.isRefreshing = false;
         this.refreshPromise = null;
       }
     })();
-    
-    return this.refreshPromise;
+
+    const result = await this.refreshPromise;
+    return result;
   }
 }
 

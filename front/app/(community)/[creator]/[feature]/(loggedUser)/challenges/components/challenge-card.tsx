@@ -7,20 +7,19 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Calendar, Clock, Users, DollarSign, Trophy, Flame, Star, Lock, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { getUserChallengeParticipation } from "@/lib/mock-data"
 import { formatDate } from "@/lib/utils"
 
 interface ChallengeCardProps {
+  creatorSlug: string
   slug: string
   challenge: any
   setSelectedChallenge: (id: string | null) => void
 }
 
-export default function ChallengeCard({ slug, challenge, setSelectedChallenge }: ChallengeCardProps) {
-  const currentUserId = "2" // Mock current user ID
+export default function ChallengeCard({ creatorSlug, slug, challenge, setSelectedChallenge }: ChallengeCardProps) {
   const status = getChallengeStatus(challenge)
-  const isParticipating = getUserChallengeParticipation(currentUserId, challenge.id)
-  const daysRemaining = getDaysRemaining(challenge.endDate)
+  const isParticipating = challenge.isParticipating || false
+  const daysRemaining = getDaysRemaining(new Date(challenge.endDate))
 
   const handleJoinChallenge = (challengeId: string) => {
     setSelectedChallenge(challengeId)
@@ -76,7 +75,7 @@ export default function ChallengeCard({ slug, challenge, setSelectedChallenge }:
           <div className="flex items-center text-muted-foreground">
             <Calendar className="h-4 w-4 mr-2" />
             <div>
-              <div className="font-medium text-foreground">{formatDate(challenge.startDate)}</div>
+              <div className="font-medium text-foreground">{formatDate(new Date(challenge.startDate))}</div>
               <div>Start Date</div>
             </div>
           </div>
@@ -95,7 +94,7 @@ export default function ChallengeCard({ slug, challenge, setSelectedChallenge }:
           <div className="flex items-center text-muted-foreground">
             <Users className="h-4 w-4 mr-2" />
             <div>
-              <div className="font-medium text-foreground">{challenge.participants.length}</div>
+              <div className="font-medium text-foreground">{challenge.participants?.length || challenge.participantCount || 0}</div>
               <div>Participants</div>
             </div>
           </div>
@@ -121,14 +120,14 @@ export default function ChallengeCard({ slug, challenge, setSelectedChallenge }:
           </div>
         )}
 
-        {isParticipating && (
+        {isParticipating && challenge.progress !== undefined && (
           <div className="bg-green-50 rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Flame className="h-4 w-4 text-orange-500" />
                 <span className="text-sm font-medium">Your Progress</span>
               </div>
-              <span className="text-sm font-bold text-green-600">{isParticipating.progress}%</span>
+              <span className="text-sm font-bold text-green-600">{challenge.progress}%</span>
             </div>
           </div>
         )}
@@ -141,7 +140,7 @@ export default function ChallengeCard({ slug, challenge, setSelectedChallenge }:
           <div className="flex items-center space-x-2">
             {isParticipating ? (
               <Button size="sm" asChild>
-                <Link href={`/${slug}/challenges/${challenge.id}`}>
+                <Link href={`/${creatorSlug}/${slug}/challenges/${challenge.id}`}>
                   Continue <ArrowRight className="h-4 w-4 ml-1" />
                 </Link>
               </Button>
@@ -156,7 +155,7 @@ export default function ChallengeCard({ slug, challenge, setSelectedChallenge }:
               </Button>
             ) : (
               <Button size="sm" variant="outline" asChild>
-                <Link href={`/${slug}/challenge/${challenge.id}`}>
+                <Link href={`/${creatorSlug}/${slug}/challenges/${challenge.id}`}>
                   View Details <ArrowRight className="h-4 w-4 ml-1" />
                 </Link>
               </Button>
@@ -170,14 +169,17 @@ export default function ChallengeCard({ slug, challenge, setSelectedChallenge }:
 
 function getChallengeStatus(challenge: any) {
   const now = new Date()
-  if (challenge.startDate > now) return "upcoming"
-  if (challenge.endDate < now) return "completed"
+  const startDate = new Date(challenge.startDate)
+  const endDate = new Date(challenge.endDate)
+  if (startDate > now) return "upcoming"
+  if (endDate < now) return "completed"
   return "active"
 }
 
-function getDaysRemaining(endDate: Date) {
+function getDaysRemaining(endDate: Date | string) {
   const now = new Date()
-  const diffTime = endDate.getTime() - now.getTime()
+  const end = typeof endDate === 'string' ? new Date(endDate) : endDate
+  const diffTime = end.getTime() - now.getTime()
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   return Math.max(0, diffDays)
 }

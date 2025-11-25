@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Event } from "@/lib/models";
 import EventCard from "@/app/(community)/[creator]/[feature]/(loggedUser)/events/components/event-card";
 import { TabsContent } from "@/components/ui/tabs";
-
+import { Card, CardContent } from "@/components/ui/card";
+import { Sparkles } from "lucide-react";
 
 interface AvailableEventsTabProps {
   availableEvents: Event[];
@@ -16,6 +17,11 @@ export default function AvailableEventsTab({ availableEvents }: AvailableEventsT
   const [quantity, setQuantity] = useState<number>(1);
   const [notes, setNotes] = useState("");
 
+  // Filter only published and upcoming events
+  const upcomingEvents = availableEvents?.filter(e => 
+    e.isPublished && new Date(e.startDate) >= new Date()
+  ) || []
+
   const handleRegister = () => {
     console.log("Registering:", { 
       event: selectedEvent?.id, 
@@ -25,10 +31,26 @@ export default function AvailableEventsTab({ availableEvents }: AvailableEventsT
     });
   };
 
+  if (upcomingEvents.length === 0) {
+    return (
+      <TabsContent value="available" className="space-y-6">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="text-center py-12">
+            <Sparkles className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Events Available</h3>
+            <p className="text-muted-foreground">
+              Check back later for new upcoming events
+            </p>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    )
+  }
+
   return (
     <TabsContent value="available" className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {availableEvents.map((event) => (
+        {upcomingEvents.map((event) => (
           <EventCard
             key={event.id}
             event={event}

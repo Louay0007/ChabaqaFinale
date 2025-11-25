@@ -3,18 +3,18 @@ import { getProfileServer } from "@/lib/auth.server"
 import Image from "next/image"
 import SignInForm from "../components/signin-form"
 
-export default async function SignInPage({ 
-  searchParams 
-}: { 
-  searchParams: Promise<{ redirect?: string }> 
-}) {
+export default async function SignInPage() {
   const user = await getProfileServer()
-  // Await the dynamic API (Next.js 15+) to access the params safely
-  const { redirect: redirectParam } = await searchParams
-  const redirectUrl = redirectParam || "/profile"
 
   if (user) {
-    redirect(redirectUrl)
+    // Role-based redirection
+    const role = user.role?.toLowerCase()
+
+    if (role === 'creator') {
+      redirect('/creator/dashboard')
+    } else {
+      redirect('/explore')
+    }
   }
 
   return (

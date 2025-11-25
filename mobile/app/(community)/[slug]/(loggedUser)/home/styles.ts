@@ -75,6 +75,21 @@ export const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.postBorder,
   },
+  userInfoSection: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  userName: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.semibold,
+    color: colors.gray800,
+    marginBottom: 2,
+  },
+  userRole: {
+    fontSize: fontSize.xs,
+    color: colors.gray500,
+    textTransform: 'capitalize',
+  },
   inputWrapper: {
     flex: 1,
   },

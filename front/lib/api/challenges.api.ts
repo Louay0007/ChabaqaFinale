@@ -63,9 +63,14 @@ export const challengesApi = {
     return apiClient.delete<ApiSuccessResponse<void>>(`/challenges/${id}`);
   },
 
-  // Get challenges by community
-  getByCommunity: async (communityId: string): Promise<ApiSuccessResponse<Challenge[]>> => {
-    return apiClient.get<ApiSuccessResponse<Challenge[]>>(`/challenges/community/${communityId}`);
+  // Get challenges by community (using slug)
+  getByCommunity: async (slug: string): Promise<any> => {
+    return apiClient.get(`/challenges/community/${slug}`);
+  },
+  
+  // Get user participations
+  getMyParticipations: async (params?: { communitySlug?: string; status?: string }): Promise<any> => {
+    return apiClient.get('/challenges/my-participations', params);
   },
 
   // Join challenge

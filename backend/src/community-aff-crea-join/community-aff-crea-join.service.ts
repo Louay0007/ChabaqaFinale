@@ -23,7 +23,7 @@ export class CommunityAffCreaJoinService {
     private readonly promoService: PromoService,
     private readonly feeService: FeeService,
     private readonly notificationService: NotificationService,
-  ) {}
+  ) { }
 
   /**
    * Créer une nouvelle communauté
@@ -44,11 +44,11 @@ export class CommunityAffCreaJoinService {
         ...createCommunityDto,
         logo: uploadedFiles.logo || createCommunityDto.logo
       };
-      
+
       // Vérifier si l'utilisateur existe
       const user = await this.userModel.findById(userId);
       console.log('🔍 Debug - Utilisateur trouvé:', user ? 'Oui' : 'Non');
-      
+
       if (!user) {
         throw new NotFoundException('Utilisateur non trouvé');
       }
@@ -69,9 +69,9 @@ export class CommunityAffCreaJoinService {
       // Validation des liens sociaux - au moins un lien requis
       const socialLinks = communityDataAvecLogo.socialLinks || {};
       console.log('🔍 [SERVICE] Social links:', JSON.stringify(socialLinks, null, 2));
-      
+
       const hasAtLeastOneLink = Object.values(socialLinks).some(link => link && link.trim() !== '');
-      
+
       if (!hasAtLeastOneLink) {
         throw new BadRequestException('Au moins un lien social est requis pour créer une communauté');
       }
@@ -95,19 +95,19 @@ export class CommunityAffCreaJoinService {
 
       // Parser le montant en nombre
       const feeAmount = parseFloat(communityDataAvecLogo.feeAmount) || 0;
-      
+
       // Mapper les données de CommunityFormData vers le schéma Community - 100% compatible frontend
       const communityData = {
         name: communityDataAvecLogo.name,
         slug: uniqueSlug,
         short_description: communityDataAvecLogo.bio || `Communauté ${communityDataAvecLogo.name}`,
         country: communityDataAvecLogo.country,
-        
+
         // Mappage des paramètres d'accès
         isPrivate: communityDataAvecLogo.status === 'private',
         fees_of_join: communityDataAvecLogo.joinFee === 'paid' ? feeAmount : 0,
         currency: communityDataAvecLogo.currency,
-        
+
         // Liens sociaux dans les settings - tous les champs frontend
         settings: {
           socialLinks: {
@@ -148,13 +148,13 @@ export class CommunityAffCreaJoinService {
           metaTitle: `${communityDataAvecLogo.name} - Communauté`,
           metaDescription: communityDataAvecLogo.bio || `Rejoignez ${communityDataAvecLogo.name} pour apprendre et partager.`,
         },
-        
+
         // Relations utilisateur
         createur: new Types.ObjectId(userId),
         members: [new Types.ObjectId(userId)],
         admins: [new Types.ObjectId(userId)],
         membersCount: 1,
-        
+
         // Valeurs par défaut pour les champs requis du schéma
         logo: communityDataAvecLogo.logo || socialLinks.website || socialLinks.instagram || socialLinks.facebook || 'https://via.placeholder.com/150',
         photo_de_couverture: communityDataAvecLogo.coverImage || 'https://via.placeholder.com/800x400',
@@ -164,14 +164,14 @@ export class CommunityAffCreaJoinService {
         image: communityDataAvecLogo.image || 'https://via.placeholder.com/600x400',
         tags: communityDataAvecLogo.tags || [communityDataAvecLogo.country],
         featured: false,
-        
+
         // Valeurs par défaut système
         long_description: [],
         rank: 0,
         isActive: true,
         isVerified: false,
         cours: [],
-        
+
         // ============ Champs supplémentaires pour compatibilité frontend ============
         longDescription: communityDataAvecLogo.longDescription || communityDataAvecLogo.bio || `Bienvenue dans ${communityDataAvecLogo.name}, une communauté dédiée à l'apprentissage et au partage.`,
         coverImage: communityDataAvecLogo.coverImage || 'https://via.placeholder.com/800x400',
@@ -182,10 +182,10 @@ export class CommunityAffCreaJoinService {
       };
 
       const community = new this.communityModel(communityData);
-      
+
       // Générer automatiquement un inviteCode unique pour éviter les conflits
       community.inviteCode = community.generateInviteCode();
-      
+
       const savedCommunity = await community.save();
 
       // Log de confirmation si le logo a été intégré
@@ -215,7 +215,7 @@ export class CommunityAffCreaJoinService {
         .populate('members', 'name email')
         .populate('admins', 'name email')
         .exec();
-        
+
 
       if (!populatedCommunity) {
         throw new InternalServerErrorException('Erreur lors de la récupération de la communauté créée');
@@ -231,7 +231,7 @@ export class CommunityAffCreaJoinService {
       if (error instanceof ConflictException || error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      
+
       console.error('Erreur lors de la création de la communauté:', error);
       throw new InternalServerErrorException('Erreur lors de la création de la communauté');
     }
@@ -376,7 +376,7 @@ export class CommunityAffCreaJoinService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      
+
       console.error('Erreur lors de la récupération des communautés créées:', error);
       throw new InternalServerErrorException('Erreur lors de la récupération des communautés');
     }
@@ -407,7 +407,7 @@ export class CommunityAffCreaJoinService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      
+
       console.error('Erreur lors de la récupération des communautés rejointes:', error);
       throw new InternalServerErrorException('Erreur lors de la récupération des communautés');
     }
@@ -455,7 +455,7 @@ export class CommunityAffCreaJoinService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      
+
       console.error('Erreur lors de la récupération de la communauté:', error);
       throw new InternalServerErrorException('Erreur lors de la récupération de la communauté');
     }
@@ -759,7 +759,7 @@ export class CommunityAffCreaJoinService {
       if (error instanceof NotFoundException || error instanceof ConflictException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('Erreur lors de la jonction à la communauté:', error);
       throw new InternalServerErrorException('Erreur lors de la jonction à la communauté');
     }
@@ -847,7 +847,7 @@ export class CommunityAffCreaJoinService {
       if (error instanceof NotFoundException || error instanceof ConflictException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('Erreur lors de la jonction par invitation:', error);
       throw new InternalServerErrorException('Erreur lors de la jonction par invitation');
     }
@@ -860,7 +860,7 @@ export class CommunityAffCreaJoinService {
    * @param baseUrl - URL de base pour construire le lien complet
    * @returns Le lien d'invitation généré
    */
-  async generateInviteLink(generateData: GenerateInviteDto, userId: string, baseUrl: string): Promise<{inviteCode: string, inviteLink: string}> {
+  async generateInviteLink(generateData: GenerateInviteDto, userId: string, baseUrl: string): Promise<{ inviteCode: string, inviteLink: string }> {
     try {
       // Vérifier si l'utilisateur existe
       const user = await this.userModel.findById(userId);
@@ -877,7 +877,7 @@ export class CommunityAffCreaJoinService {
       // Vérifier si l'utilisateur est créateur ou administrateur
       const isCreator = community.createur.equals(new Types.ObjectId(userId));
       const isAdmin = community.admins.includes(new Types.ObjectId(userId));
-      
+
       if (!isCreator && !isAdmin) {
         throw new ForbiddenException('Seuls les créateurs et administrateurs peuvent générer des liens d\'invitation');
       }
@@ -905,7 +905,7 @@ export class CommunityAffCreaJoinService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
-      
+
       console.error('Erreur lors de la génération du lien d\'invitation:', error);
       throw new InternalServerErrorException('Erreur lors de la génération du lien d\'invitation');
     }
@@ -917,7 +917,7 @@ export class CommunityAffCreaJoinService {
    * @param userId - ID de l'utilisateur qui souhaite quitter
    * @returns Message de confirmation
    */
-  async leaveCommunity(communityId: string, userId: string): Promise<{message: string}> {
+  async leaveCommunity(communityId: string, userId: string): Promise<{ message: string }> {
     try {
       // Vérifier si l'utilisateur existe
       const user = await this.userModel.findById(userId);
@@ -951,11 +951,11 @@ export class CommunityAffCreaJoinService {
       // Retirer la communauté de la liste des communautés rejointes de l'utilisateur
       await this.userModel.findByIdAndUpdate(
         userId,
-        { 
-          $pull: { 
+        {
+          $pull: {
             joinedCommunities: community._id,
             adminCommunities: community._id
-          } 
+          }
         },
         { new: true }
       );
@@ -971,10 +971,99 @@ export class CommunityAffCreaJoinService {
       if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
         throw error;
       }
-      
+
       console.error('Erreur lors de la sortie de la communauté:', error);
       throw new InternalServerErrorException('Erreur lors de la sortie de la communauté');
     }
   }
-  
+
+  /**
+   * Get active/online members of a community by slug
+   * @param slug - Community slug
+   * @param limit - Maximum number of members to return
+   * @returns Members with their online status
+   */
+  async getActiveMembers(slug: string, limit: number = 20): Promise<{
+    members: Array<{
+      id: string;
+      name: string;
+      email: string;
+      avatar: string;
+      bio: string;
+      isOnline: boolean;
+      lastActive: Date;
+    }>;
+    total: number;
+    online: number;
+  }> {
+    try {
+      console.log('👥 [ACTIVE-MEMBERS-SERVICE] Fetching active members for slug:', slug);
+
+      // Find community by slug
+      const community = await this.communityModel
+        .findOne({ slug })
+        .populate({
+          path: 'members',
+          select: 'name email profile_picture photo_profil bio lastActive',
+          options: { limit }
+        })
+        .exec();
+
+      if (!community) {
+        throw new NotFoundException('Community not found');
+      }
+
+      console.log('📦 [ACTIVE-MEMBERS-SERVICE] Community found:', community.name);
+      console.log('📊 [ACTIVE-MEMBERS-SERVICE] Total members:', community.members.length);
+
+      // Calculate online status - users are online if active within last 5 minutes
+      const onlineThreshold = new Date(Date.now() - 5 * 60 * 1000);
+
+      const members = (community.members as any[]).map((member: any) => {
+        const lastActiveDate = member.lastActive ? new Date(member.lastActive) : new Date(0);
+        const isOnline = lastActiveDate > onlineThreshold;
+
+        return {
+          id: member._id.toString(),
+          name: member.name || 'Unknown User',
+          email: member.email,
+          avatar: member.profile_picture || member.photo_profil ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'U')}&background=8e78fb&color=fff`,
+          bio: member.bio || '',
+          isOnline,
+          lastActive: lastActiveDate,
+        };
+      });
+
+      // Sort by online status first, then by lastActive
+      members.sort((a, b) => {
+        if (a.isOnline && !b.isOnline) return -1;
+        if (!a.isOnline && b.isOnline) return 1;
+        return b.lastActive.getTime() - a.lastActive.getTime();
+      });
+
+      const onlineCount = members.filter(m => m.isOnline).length;
+
+      console.log('✅ [ACTIVE-MEMBERS-SERVICE] Members processed:', {
+        total: members.length,
+        online: onlineCount,
+        offline: members.length - onlineCount
+      });
+
+      return {
+        members,
+        total: members.length,
+        online: onlineCount
+      };
+
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+
+      console.error('❌ [ACTIVE-MEMBERS-SERVICE] Error:', error);
+      throw new InternalServerErrorException('Error fetching active members');
+    }
+  }
 }
