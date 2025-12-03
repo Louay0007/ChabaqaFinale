@@ -1,10 +1,10 @@
 import { ThemedView } from '@/_components/ThemedView';
 import { getChallengesByCommunity as getMockChallenges } from '@/lib/challenge-utils';
 import {
-    Challenge as MockChallenge,
-    getCommunityBySlug as getMockCommunity,
-    getCurrentUser,
-    getUserChallengeParticipation
+  Challenge as MockChallenge,
+  getCommunityBySlug as getMockCommunity,
+  getCurrentUser,
+  getUserChallengeParticipation
 } from '@/lib/mock-data';
 import { getChallengesByCommunity, getUserParticipations, Challenge as ApiChallenge } from '@/lib/challenge-api';
 import { getCommunityBySlug } from '@/lib/communities-api';
@@ -23,22 +23,22 @@ export default function ChallengesScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('browse');
-  
+
   // Real data state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [community, setCommunity] = useState<any>(null);
   const [allChallenges, setAllChallenges] = useState<any[]>([]);
   const [userParticipations, setUserParticipations] = useState<any[]>([]);
-  
+
   const currentUser = getCurrentUser();
   const currentUserId = currentUser?.id || '';
-  
+
   // Fetch data on component mount
   useEffect(() => {
     fetchChallengesData();
   }, [slug]);
-  
+
   const fetchChallengesData = async () => {
     try {
       setLoading(true);
@@ -50,77 +50,95 @@ export default function ChallengesScreen() {
       if (!communityResponse.success || !communityResponse.data) {
         throw new Error('Community not found');
       }
-      
+
       const communityData = {
         id: communityResponse.data._id || communityResponse.data.id,
         name: communityResponse.data.name,
         slug: communityResponse.data.slug,
       };
       setCommunity(communityData);
-      
+
       // Fetch challenges for this community
+      console.log('🏆 [CHALLENGES] Fetching challenges for slug:', slug);
       const challengesResponse = await getChallengesByCommunity(slug as string, {
         page: 1,
         limit: 50,
         isActive: true
       });
-      
+
+      console.log('📦 [CHALLENGES] Response:', {
+        total: challengesResponse.total,
+        count: challengesResponse.challenges?.length,
+        page: challengesResponse.page,
+        limit: challengesResponse.limit
+      });
+
       // Transform backend challenges to match frontend interface
-      const transformedChallenges = challengesResponse.challenges.map((challenge: ApiChallenge) => ({
-        id: challenge._id,
-        title: challenge.title,
-        description: challenge.description,
-        shortDescription: challenge.short_description || challenge.description,
-        thumbnail: challenge.thumbnail || challenge.cover_image || 'https://via.placeholder.com/400x300',
-        communityId: communityData.id,
-        creatorId: challenge.created_by._id,
-        creator: challenge.created_by,
-        startDate: new Date(challenge.start_date),
-        endDate: new Date(challenge.end_date),
-        isActive: challenge.is_active,
-        difficulty: challenge.difficulty,
-        category: challenge.category,
-        participants: [], // Will be populated from backend data
-        participantsCount: challenge.participants_count || 0,
-        maxParticipants: challenge.max_participants,
-        tasks: challenge.tasks || [],
-        prize: challenge.prize,
-        tags: challenge.tags || [],
-        createdAt: new Date(challenge.created_at),
-        updatedAt: new Date(challenge.updated_at),
-      }));
-      
+      console.log('🔄 [CHALLENGES] Transforming', challengesResponse.challenges.length, 'challenges');
+      const transformedChallenges = (challengesResponse.challenges || []).map((challenge: ApiChallenge) => {
+        console.log('   → Challenge:', challenge.title);
+        return {
+          id: challenge._id,
+          title: challenge.title,
+          description: challenge.description,
+          shortDescription: challenge.short_description || challenge.description,
+          thumbnail: challenge.thumbnail || challenge.cover_image || 'https://via.placeholder.com/400x300',
+          communityId: communityData.id,
+          creatorId: challenge.created_by?._id || challenge.created_by,
+          creator: challenge.created_by,
+          startDate: new Date(challenge.start_date),
+          endDate: new Date(challenge.end_date),
+          isActive: challenge.is_active,
+          difficulty: challenge.difficulty,
+          category: challenge.category,
+          participants: [], // Will be populated from backend data
+          participantsCount: challenge.participants_count || 0,
+          maxParticipants: challenge.max_participants,
+          tasks: challenge.tasks || [],
+          prize: challenge.prize,
+          tags: challenge.tags || [],
+          createdAt: new Date(challenge.created_at),
+          updatedAt: new Date(challenge.updated_at),
+        };
+      });
+
+      console.log('✅ [CHALLENGES] Transformed challenges:', transformedChallenges.length);
       setAllChallenges(transformedChallenges);
-      
+
       // Fetch user's challenge participations
+      console.log('📊 [CHALLENGES] Fetching user participations for community:', slug);
       try {
         const participationsResponse = await getUserParticipations(slug as string, 'all');
-        const transformedParticipations = participationsResponse.map((participation: any) => ({
-          challengeId: participation.challengeId || participation.challenge?.id,
-          userId: participation.userId,
-          joinedAt: participation.joinedAt,
+        console.log('📊 [CHALLENGES] User participations response:', participationsResponse?.length || 0);
+
+        const transformedParticipations = (participationsResponse || []).map((participation: any) => ({
+          challengeId: participation.challengeId || participation.challenge?._id || participation.challenge?.id,
+          userId: participation.userId || participation.user_id,
+          joinedAt: participation.joinedAt || participation.joined_at,
           progress: participation.progress || 0,
-          completedTasks: participation.completedTasks || 0,
-          totalTasks: participation.totalTasks || 0,
-          isActive: participation.isActive,
-          lastActivityAt: participation.lastActivityAt,
+          completedTasks: participation.completedTasks || participation.completed_tasks || 0,
+          totalTasks: participation.totalTasks || participation.total_tasks || 0,
+          isActive: participation.isActive !== undefined ? participation.isActive : true,
+          lastActivityAt: participation.lastActivityAt || participation.last_activity_at,
         }));
+
+        console.log('✅ [CHALLENGES] Transformed participations:', transformedParticipations.length);
         setUserParticipations(transformedParticipations);
-      } catch (participationError) {
-        console.warn('⚠️ Could not fetch user participations:', participationError);
+      } catch (participationError: any) {
+        console.warn('⚠️ Could not fetch user participations:', participationError.message);
         setUserParticipations([]);
       }
-      
+
       console.log('✅ Challenges loaded:', transformedChallenges.length);
     } catch (err: any) {
       console.error('❌ Error fetching challenges:', err);
       setError(err.message || 'Failed to load challenges');
-      
+
       // Fallback to mock data
       console.log('⚠️ Falling back to mock data');
       const mockCommunity = getMockCommunity(slug as string);
       const mockChallenges = getMockChallenges(mockCommunity?.id || '');
-      
+
       setCommunity(mockCommunity);
       setAllChallenges(mockChallenges);
       setUserParticipations([]);
@@ -255,7 +273,7 @@ export default function ChallengesScreen() {
         getChallengeStatus={getChallengeStatus}
         getUserParticipation={(challengeId: string) => userParticipations.some(p => p.challengeId === challengeId)}
       />
-      
+
       {/* Bottom Navigation */}
       <BottomNavigation slug={slug as string} currentTab="challenges" />
     </ThemedView>

@@ -16,7 +16,7 @@ export class UserService {
     @InjectModel('User') private userModel: Model<IUser>,
     @InjectModel('VerificationCode') private verificationCodeModel: Model<VerificationCodeDocument>,
     private emailService: EmailService,
-  ) {}
+  ) { }
 
   /**
    * Hash un mot de passe
@@ -39,7 +39,7 @@ export class UserService {
   async checkUserExists(email: string, name: string): Promise<{ emailExists: boolean; nameExists: boolean }> {
     const emailExists = await this.userModel.findOne({ email: email.toLowerCase() });
     const nameExists = await this.userModel.findOne({ name: name });
-    
+
     return {
       emailExists: !!emailExists,
       nameExists: !!nameExists
@@ -131,12 +131,12 @@ export class UserService {
     if (!updateUserDto.password) {
       throw new Error('Le mot de passe est requis');
     }
-    
+
     // Hash le nouveau mot de passe
     const hashedPassword = await this.hashPassword(updateUserDto.password);
     const updatedUser = await this.userModel.findByIdAndUpdate(
-      id, 
-      { password: hashedPassword }, 
+      id,
+      { password: hashedPassword },
       { new: true }
     );
     if (!updatedUser) {
@@ -157,7 +157,7 @@ export class UserService {
    */
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
     const { email } = forgotPasswordDto;
-    
+
     // Vérifier si l'utilisateur existe
     const user = await this.userModel.findOne({ email: email.toLowerCase() });
     if (!user) {

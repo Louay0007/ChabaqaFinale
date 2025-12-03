@@ -61,7 +61,7 @@ export default function EditProfilePage() {
     // when SWR provides user, prefill
     if (!isLoading) {
       if (!user) {
-        router.replace("/signin?redirect=/profile")
+        router.replace("/signin")
         return
       }
       const expected = slugFromUser(user)

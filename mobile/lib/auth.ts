@@ -126,7 +126,7 @@ export const refreshToken = async (): Promise<boolean> => {
       '/api/auth/refresh',
       {
         method: 'POST',
-        data: { refresh_token: storedRefreshToken },
+        data: { refreshToken: storedRefreshToken }, // Backend expects 'refreshToken' not 'refresh_token'
         timeout: 30000,
       }
     );
@@ -138,13 +138,20 @@ export const refreshToken = async (): Promise<boolean> => {
         await storeTokens(data.access_token, data.refresh_token || storedRefreshToken);
         return true;
       }
+    } else if (resp.status === 401) {
+      // Refresh token is invalid/expired - clear everything and force re-login
+      console.log('🚪 [AUTH] Refresh token invalide - déconnexion automatique');
+      await clearAllTokens();
+      return false;
     } else {
       console.log(`❌ [AUTH] Échec du rafraîchissement (${resp.status})`);
     }
-    
+
     return false;
   } catch (error) {
     console.error("💥 [AUTH] Exception lors du rafraîchissement:", error);
+    // If refresh fails, clear tokens to force re-login
+    await clearAllTokens();
     return false;
   }
 };
@@ -159,7 +166,7 @@ export const getProfile = async (): Promise<User | null> => {
     }
 
     console.log('🔍 [AUTH] Récupération du profil utilisateur...');
-    const resp = await tryEndpoints<{ user?: User }>(
+    const resp = await tryEndpoints<{ success?: boolean; data?: User; user?: User }>(
       '/api/auth/me',
       {
         method: 'GET',
@@ -172,11 +179,13 @@ export const getProfile = async (): Promise<User | null> => {
     );
 
     if (resp.status >= 200 && resp.status < 300) {
-      const data = resp.data;
-      console.log('✅ [AUTH] Profil récupéré:', data);
-      if (data.user) {
-        await storeUser(data.user);
-        return data.user;
+      const payload = resp.data;
+      console.log('✅ [AUTH] Profil récupéré:', payload);
+      // Handle both response formats: { data: user } or { user: user }
+      const user = payload.data || payload.user;
+      if (user) {
+        await storeUser(user);
+        return user;
       }
     } else if (resp.status === 401) {
       // Token expiré, essayer de le rafraîchir
@@ -224,7 +233,7 @@ export const login = async (email: string, password: string, rememberMe: boolean
 
     if (resp.status >= 200 && resp.status < 300 && result.requires2FA) {
       console.log('📱 [AUTH] 2FA requis');
-      return { 
+      return {
         requires2FA: true,
         email: email,
         message: result.message
@@ -236,21 +245,21 @@ export const login = async (email: string, password: string, rememberMe: boolean
       if (result.user) {
         await storeUser(result.user);
       }
-      
-      return { 
+
+      return {
         access_token: result.access_token,
         refresh_token: result.refresh_token,
         user: result.user
       };
     } else {
       console.log('❌ [AUTH] Échec de connexion:', result.message);
-      return { 
+      return {
         error: result.message || "Email ou mot de passe incorrect"
       };
     }
   } catch (error) {
     console.error('💥 [AUTH] Exception lors de la connexion:', error);
-    return { 
+    return {
       error: "Erreur de connexion. Vérifiez votre connexion internet."
     };
   }
@@ -279,8 +288,8 @@ export const verifyTwoFactor = async (email: string, verificationCode: string): 
       if (result.user) {
         await storeUser(result.user);
       }
-      
-      return { 
+
+      return {
         access_token: result.access_token,
         refresh_token: result.refresh_token,
         user: result.user,
@@ -288,13 +297,13 @@ export const verifyTwoFactor = async (email: string, verificationCode: string): 
       };
     } else {
       console.log('❌ [AUTH] Code invalide ou expiré');
-      return { 
+      return {
         error: result.message || "Code de vérification invalide ou expiré"
       };
     }
   } catch (error) {
     console.error('💥 [AUTH] Exception lors de la vérification 2FA:', error);
-    return { 
+    return {
       error: "Erreur de connexion. Veuillez réessayer."
     };
   }
@@ -307,7 +316,7 @@ export const logout = async (): Promise<boolean> => {
     const storedRefreshToken = await getRefreshToken();
 
     console.log('👋 [AUTH] Déconnexion en cours...');
-    
+
     if (accessToken || storedRefreshToken) {
       const resp = await tryEndpoints(
         '/api/auth/logout',
@@ -326,10 +335,10 @@ export const logout = async (): Promise<boolean> => {
       // Supprimer les tokens localement même si l'appel échoue
       await clearAllTokens();
       console.log('✅ [AUTH] Tokens supprimés localement');
-      
+
       return resp.status >= 200 && resp.status < 300;
     }
-    
+
     await clearAllTokens();
     return true;
   } catch (error) {
@@ -343,7 +352,7 @@ export const logout = async (): Promise<boolean> => {
 // Fonction pour faire des requêtes authentifiées avec refresh automatique
 export const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
   let accessToken = await getAccessToken();
-  
+
   if (!accessToken) {
     throw new Error('No access token available');
   }
@@ -405,15 +414,15 @@ export const isAuthenticated = async (): Promise<boolean> => {
   try {
     const accessToken = await getAccessToken();
     const storedRefreshToken = await getRefreshToken();
-    
+
     console.log('🔍 [AUTH] Vérification de l\'authentification...');
-    
+
     // Si on n'a aucun token, l'utilisateur n'est pas connecté
     if (!accessToken && !storedRefreshToken) {
       console.log('⚠️ [AUTH] Aucun token disponible');
       return false;
     }
-    
+
     // Si on a un access token, essayer de récupérer le profil
     if (accessToken) {
       console.log('🔑 [AUTH] Access token trouvé, vérification du profil...');
@@ -423,7 +432,7 @@ export const isAuthenticated = async (): Promise<boolean> => {
         return true;
       }
     }
-    
+
     // Si on n'a qu'un refresh token, essayer de le rafraîchir
     if (storedRefreshToken) {
       console.log('🔄 [AUTH] Tentative de rafraîchissement du token...');
@@ -436,7 +445,7 @@ export const isAuthenticated = async (): Promise<boolean> => {
         return isAuth;
       }
     }
-    
+
     console.log('❌ [AUTH] Authentification échouée');
     return false;
   } catch (error) {
@@ -476,7 +485,7 @@ export const revokeAllTokens = async (): Promise<boolean> => {
       await clearAllTokens();
       return true;
     }
-    
+
     console.log('❌ [AUTH] Échec de la révocation des tokens');
     return false;
   } catch (error) {

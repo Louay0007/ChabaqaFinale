@@ -196,25 +196,36 @@ export interface Event {
   slug: string;
   description: string;
   communityId?: string;
+  creatorId?: string;
   thumbnail?: string;
+  image?: string;
   startDate: string;
-  endDate: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
   location?: string;
-  isVirtual: boolean;
+  isVirtual?: boolean;
   maxAttendees?: number;
-  currentAttendees: number;
+  currentAttendees?: number;
+  attendeesCount?: number;
   price: number;
+  type?: string;
+  category?: string;
+  tags?: string[];
+  onlineUrl?: string;
   isPublished: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface EventTicket {
   id: string;
-  eventId: string;
+  eventId?: string;
   name: string;
   price: number;
-  quantity: number;
-  sold: number;
+  quantity?: number;
+  sold?: number;
+  type?: string;
   description?: string;
 }
 
@@ -336,10 +347,123 @@ export interface Notification {
 
 // Storage types
 export interface UploadedFile {
-  id: string;
+  filename: string;
+  originalName: string;
   url: string;
-  name: string;
   size: number;
+  mimetype: string;
   type: string;
+  uploadedAt: string;
+}
+
+// Progression types
+export type ProgressionContentType =
+  | 'course'
+  | 'challenge'
+  | 'session'
+  | 'event'
+  | 'product'
+  | 'post'
+  | 'resource'
+  | 'community'
+  | 'subscription';
+
+export interface ProgressionActionLinks {
+  view: string;
+  continue?: string;
+}
+
+export interface ProgressionCommunityRef {
+  id: string;
+  name?: string;
+  slug?: string;
+}
+
+export interface ProgressionItem {
+  contentId: string;
+  contentType: ProgressionContentType;
+  title: string;
+  description?: string;
+  thumbnail?: string;
+  status: 'not_started' | 'in_progress' | 'completed';
+  progressPercent?: number;
+  lastAccessedAt?: string;
+  completedAt?: string;
+  community?: ProgressionCommunityRef;
+  meta?: Record<string, unknown>;
+  actions?: ProgressionActionLinks;
+}
+
+export interface ProgressionSummaryByType {
+  total: number;
+  completed: number;
+}
+
+export interface ProgressionSummary {
+  totalItems: number;
+  completed: number;
+  inProgress: number;
+  notStarted: number;
+  byType: Record<string, ProgressionSummaryByType>;
+}
+
+export interface ProgressionPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ProgressionOverview {
+  summary: ProgressionSummary;
+  pagination: ProgressionPagination;
+  items: ProgressionItem[];
+}
+
+// Achievement types
+export interface AchievementCriteria {
+  type: 'count_completed' | 'count_created' | 'time_spent' | 'streak_days' | 'points_earned' | 'community_join_date';
+  contentType?: string;
+  count?: number;
+  timeMinutes?: number;
+  days?: number;
+  points?: number;
+  monthsSinceJoin?: number;
+}
+
+export interface AchievementResponse {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+  criteria: AchievementCriteria;
+  communityId?: string;
+  isActive: boolean;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  points: number;
+  tags: string[];
+  order: number;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserAchievementResponse {
+  id: string;
+  userId: string;
+  achievementId: string;
+  communityId: string;
+  earnedAt: string;
+  metadata: Record<string, any>;
+  isPublic: boolean;
+  sharedAt?: string;
+  achievement?: AchievementResponse;
+}
+
+export interface AchievementWithProgress extends AchievementResponse {
+  isUnlocked: boolean;
+  earnedAt?: string;
+  userAchievementId?: string;
+  progress?: number;
+  currentValue?: number;
+  targetValue?: number;
 }

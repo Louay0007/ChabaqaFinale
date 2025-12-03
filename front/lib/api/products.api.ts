@@ -58,9 +58,9 @@ export const productsApi = {
     return apiClient.delete<ApiSuccessResponse<void>>(`/products/${id}`);
   },
 
-  // Get products by community
-  getByCommunity: async (communityId: string): Promise<ApiSuccessResponse<Product[]>> => {
-    return apiClient.get<ApiSuccessResponse<Product[]>>(`/products/community/${communityId}`);
+  // Get products by community (using community ID)
+  getByCommunity: async (communityId: string): Promise<any> => {
+    return apiClient.get(`/products/community/${communityId}`, { page: 1, limit: 100 });
   },
 
   // Create variant

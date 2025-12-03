@@ -15,9 +15,14 @@ interface CalendarTabProps {
 export default function CalendarTab({ myTickets, availableEvents }: CalendarTabProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   
+  const tickets = myTickets || []
+  const events = availableEvents || []
+  
   // Calculate stats
-  const totalSpent = myTickets.reduce((acc, r) => acc + r.ticket.price * r.quantity, 0);
-  const upcomingEvents = myTickets.filter(ticket => new Date(ticket.event.startDate) > new Date());
+  const totalSpent = tickets.reduce((acc: number, r: any) => acc + ((r.ticket?.price || 0) * (r.quantity || 1)), 0);
+  const upcomingEvents = tickets.filter((ticket: any) => 
+    ticket.event?.startDate && new Date(ticket.event.startDate) > new Date()
+  );
   
   return (
     <TabsContent value="calendar" className="space-y-4 sm:space-y-6">
@@ -42,7 +47,9 @@ export default function CalendarTab({ myTickets, availableEvents }: CalendarTabP
                   onSelect={setSelectedDate}
                   className="rounded-md border w-fit"
                   modifiers={{ 
-                    booked: myTickets.map((reg) => new Date(reg.event.startDate)) 
+                    booked: tickets
+                      .filter((reg: any) => reg.event?.startDate)
+                      .map((reg: any) => new Date(reg.event.startDate))
                   }}
                   modifiersStyles={{ 
                     booked: { 
@@ -97,7 +104,7 @@ export default function CalendarTab({ myTickets, availableEvents }: CalendarTabP
                   <CalendarIcon className="h-4 w-4 text-primary" />
                 </div>
                 <div className="text-lg sm:text-xl font-bold text-primary">
-                  {availableEvents.length}
+                  {events.length}
                 </div>
                 <div className="text-xs text-muted-foreground">This Month</div>
               </CardContent>
@@ -108,7 +115,7 @@ export default function CalendarTab({ myTickets, availableEvents }: CalendarTabP
                   <Ticket className="h-4 w-4 text-primary" />
                 </div>
                 <div className="text-lg sm:text-xl font-bold text-primary">
-                  {myTickets.length}
+                  {tickets.length}
                 </div>
                 <div className="text-xs text-muted-foreground">My Tickets</div>
               </CardContent>
@@ -145,32 +152,36 @@ export default function CalendarTab({ myTickets, availableEvents }: CalendarTabP
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              {myTickets.length > 0 ? (
+              {tickets.length > 0 ? (
                 <div className="space-y-3">
-                  {myTickets.slice(0, 4).map((reg) => (
+                  {tickets.slice(0, 4).map((reg: any) => (
                     <div key={reg.id} className="p-3 bg-purple-50/80 border border-purple-100 rounded-lg hover:bg-purple-50 transition-colors">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">{reg.event.title}</div>
+                          <div className="font-medium text-sm truncate">{reg.event?.title || 'Event'}</div>
+                          {reg.event?.startDate && (
                           <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                             <CalendarIcon className="h-3 w-3" />
                             {format(new Date(reg.event.startDate), "MMM dd, h:mm a")}
                           </div>
+                          )}
                           <div className="text-xs text-purple-700 mt-1 flex items-center gap-1">
                             <Ticket className="h-3 w-3" />
-                            {reg.ticket.name} × {reg.quantity}
+                            {reg.ticket?.name || 'General'} × {reg.quantity || 1}
                           </div>
                         </div>
+                        {reg.event?.type && (
                         <Badge variant="outline" className="text-xs shrink-0">
                           {reg.event.type}
                         </Badge>
+                        )}
                       </div>
                     </div>
                   ))}
-                  {myTickets.length > 4 && (
+                  {tickets.length > 4 && (
                     <div className="text-center pt-2">
                       <Badge variant="secondary" className="text-xs">
-                        +{myTickets.length - 4} more events
+                        +{tickets.length - 4} more events
                       </Badge>
                     </div>
                   )}
@@ -201,14 +212,14 @@ export default function CalendarTab({ myTickets, availableEvents }: CalendarTabP
                   <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                   <span>Events This Month</span>
                 </div>
-                <span className="font-semibold text-primary">{availableEvents.length}</span>
+                <span className="font-semibold text-primary">{events.length}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <Ticket className="h-4 w-4 text-muted-foreground" />
                   <span>Total Tickets</span>
                 </div>
-                <span className="font-semibold text-primary">{myTickets.length}</span>
+                <span className="font-semibold text-primary">{tickets.length}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">

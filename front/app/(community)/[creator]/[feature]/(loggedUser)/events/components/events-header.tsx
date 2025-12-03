@@ -7,10 +7,16 @@ interface EventsHeaderProps {
 }
 
 export default function EventsHeader({ availableEvents, myTickets }: EventsHeaderProps) {
-  const totalTicketsSold = availableEvents.reduce(
-    (acc, ev) => acc + ev.tickets.reduce((t, tk) => t + tk.sold, 0),
+  // Filter only published and active events
+  const upcomingEvents = availableEvents?.filter(e => 
+    e.isPublished && new Date(e.startDate) >= new Date()
+  ) || []
+
+  // Calculate total tickets sold
+  const totalTicketsSold = availableEvents?.reduce(
+    (acc, ev) => acc + (ev.tickets?.reduce((t, tk) => t + (tk.sold || 0), 0) || 0),
     0
-  );
+  ) || 0
 
   return (
     <div className="mb-6">
@@ -35,11 +41,11 @@ export default function EventsHeader({ availableEvents, myTickets }: EventsHeade
         {/* Stats horizontal */}
         <div className="flex space-x-6 mt-4 md:mt-0">
           <div className="text-center">
-            <div className="text-xl font-bold">{availableEvents.length}</div>
+            <div className="text-xl font-bold">{upcomingEvents.length}</div>
             <div className="text-purple-100 text-xs">Upcoming Events</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold">{myTickets.length}</div>
+            <div className="text-xl font-bold">{myTickets?.length || 0}</div>
             <div className="text-purple-100 text-xs">My Tickets</div>
           </div>
           <div className="text-center">

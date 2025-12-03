@@ -18,7 +18,7 @@ interface CommunityCardProps {
     rating: number;
     price: number;
     priceType: string;
-    image: number; // Images locales uniquement
+    image: number | string; // Images locales ou URL distantes
     tags: string[];
     featured: boolean;
     verified: boolean;
@@ -47,7 +47,7 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
   // Get type-specific styling and CTA text (same as web version)
   const getTypeConfig = (type?: string) => {
     const itemType = type || "community";
-    
+
     const typeConfigs = {
       community: {
         badgeColor: "#8e78fb",
@@ -57,7 +57,7 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
         gradientColors: ["#8e78fb", "#8e78fb"],
       },
       course: {
-        badgeColor: "#3b82f6", 
+        badgeColor: "#3b82f6",
         backgroundColor: "#3b82f610",
         borderColor: "#3b82f650",
         ctaText: "Join",
@@ -65,7 +65,7 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
       },
       challenge: {
         badgeColor: "#f97316",
-        backgroundColor: "#f9731610", 
+        backgroundColor: "#f9731610",
         borderColor: "#f9731650",
         ctaText: "Join",
         gradientColors: ["#f97316", "#f97316"],
@@ -73,7 +73,7 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
       product: {
         badgeColor: "#6366f1",
         backgroundColor: "#6366f110",
-        borderColor: "#6366f150", 
+        borderColor: "#6366f150",
         ctaText: "Buy",
         gradientColors: ["#6366f1", "#6366f1"],
       },
@@ -81,7 +81,7 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
         badgeColor: "#F7567C",
         backgroundColor: "#F7567C10",
         borderColor: "#F7567C50",
-        ctaText: "Book", 
+        ctaText: "Book",
         gradientColors: ["#F7567C", "#F7567C"],
       },
       event: {
@@ -101,23 +101,44 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
   if (viewMode === "list") {
     return (
       <Card style={communityStyles.listCard}>
-        <TouchableOpacity 
-          onPress={handlePress} 
+        <TouchableOpacity
+          onPress={handlePress}
           style={communityStyles.cardTouchable}
           activeOpacity={0.95}
         >
           <View style={communityStyles.listContainer}>
             {/* Image Section */}
             <View style={communityStyles.listImageContainer}>
-              <Image 
-                source={community.image} 
+              <Image
+                source={
+                  typeof community.image === 'string'
+                    ? { uri: community.image }
+                    : community.image
+                }
                 style={communityStyles.listImage}
                 resizeMode="cover"
                 onError={(error) => {
-                  console.log('Image loading error:', error.nativeEvent.error);
+                  console.log('❌ [IMAGE ERROR] Failed to load image for:', community.name);
+                  console.log('   Image value:', community.image);
+                  console.log('   Image type:', typeof community.image);
+                  console.log('   Error:', error.nativeEvent.error);
                 }}
               />
-              
+              {/* DEBUG BADGE - Remove before production */}
+              <View style={{
+                position: 'absolute',
+                top: 5,
+                left: 5,
+                backgroundColor: typeof community.image === 'string' ? 'rgba(0, 255, 0, 0.7)' : 'rgba(255, 165, 0, 0.7)',
+                padding: 4,
+                borderRadius: 4,
+                zIndex: 10
+              }}>
+                <Text style={{ fontSize: 10, color: 'white', fontWeight: 'bold' }}>
+                  {typeof community.image === 'string' ? 'REMOTE' : 'LOCAL'}
+                </Text>
+              </View>
+
               {/* Overlay Gradient */}
               <View style={communityStyles.imageOverlay} />
 
@@ -190,10 +211,10 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
                     <Text style={communityStyles.communityCardStatText}>{community.rating}</Text>
                   </View>
                   <View style={[
-                    communityStyles.typeBadge, 
-                    { 
+                    communityStyles.typeBadge,
+                    {
                       borderColor: typeConfig.borderColor,
-                      backgroundColor: typeConfig.backgroundColor 
+                      backgroundColor: typeConfig.backgroundColor
                     }
                   ]}>
                     <Text style={[communityStyles.typeBadgeText, { color: typeConfig.badgeColor }]}>
@@ -203,7 +224,7 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
                 </View>
 
                 {/* CTA Button */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[communityStyles.communityCardCtaButton, { backgroundColor: '#8e78fb' }]}
                   onPress={handlePress}
                 >
@@ -220,22 +241,43 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
   // Grid View (simplified version matching web design)
   return (
     <Card style={communityStyles.communityCardGridCard}>
-      <TouchableOpacity 
-        onPress={handlePress} 
+      <TouchableOpacity
+        onPress={handlePress}
         style={communityStyles.cardTouchable}
         activeOpacity={0.95}
       >
         {/* Image Section */}
         <View style={communityStyles.gridImageContainer}>
-          <Image 
-            source={community.image} 
+          <Image
+            source={
+              typeof community.image === 'string'
+                ? { uri: community.image }
+                : community.image
+            }
             style={communityStyles.communityCardGridImage}
             resizeMode="cover"
             onError={(error) => {
-              console.log('Image loading error:', error.nativeEvent.error);
+              console.log('❌ [IMAGE ERROR] Failed to load image for:', community.name);
+              console.log('   Image value:', community.image);
+              console.log('   Image type:', typeof community.image);
+              console.log('   Error:', error.nativeEvent.error);
             }}
           />
-          
+          {/* DEBUG BADGE - Remove before production */}
+          <View style={{
+            position: 'absolute',
+            top: 5,
+            left: 5,
+            backgroundColor: typeof community.image === 'string' ? 'rgba(0, 255, 0, 0.7)' : 'rgba(255, 165, 0, 0.7)',
+            padding: 4,
+            borderRadius: 4,
+            zIndex: 10
+          }}>
+            <Text style={{ fontSize: 10, color: 'white', fontWeight: 'bold' }}>
+              {typeof community.image === 'string' ? 'REMOTE' : 'LOCAL'}
+            </Text>
+          </View>
+
           {/* Overlay */}
           <View style={communityStyles.gridImageOverlay} />
 
@@ -280,10 +322,10 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
               <Text style={communityStyles.communityCardStatText}>{community.rating}</Text>
             </View>
             <View style={[
-              communityStyles.typeBadge, 
-              { 
+              communityStyles.typeBadge,
+              {
                 borderColor: typeConfig.borderColor,
-                backgroundColor: typeConfig.backgroundColor 
+                backgroundColor: typeConfig.backgroundColor
               }
             ]}>
               <Text style={[communityStyles.typeBadgeText, { color: typeConfig.badgeColor }]}>
@@ -293,7 +335,7 @@ export default function CommunityCard({ community, viewMode = 'list' }: Communit
           </View>
 
           {/* CTA */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[communityStyles.communityCardGridCtaButton, { backgroundColor: '#8e78fb' }]}
             onPress={handlePress}
           >

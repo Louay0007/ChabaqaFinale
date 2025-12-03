@@ -44,18 +44,18 @@ export const viewport: Viewport = {
 
 interface CreatorLayoutProps {
   children: React.ReactNode
-  params: { feature: string }
+  params: { creator: string; feature: string }
 }
 
-export default async function CreatorLayout({
+export default function CreatorLayout({
   children,
   params
 }: CreatorLayoutProps) {
-  const { feature } = params
+  const { creator, feature } = params
 
   return (
     <>
-      <CommunityHeader currentCommunity={feature} />
+      <CommunityHeader currentCommunity={feature} creatorSlug={creator} />
       <main className="min-h-screen">{children}</main>
     </>
   )

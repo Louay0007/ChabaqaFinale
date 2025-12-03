@@ -16,11 +16,15 @@ import {
   ApiParam
 } from '@nestjs/swagger';
 import { CommunitiesService } from './communities.service';
+import { CommunityPageContentService } from '../community-page-content/community-page-content.service';
 
 @ApiTags('Communities Discovery')
 @Controller('communities')
 export class CommunitiesController {
-  constructor(private readonly communitiesService: CommunitiesService) {}
+  constructor(
+    private readonly communitiesService: CommunitiesService,
+    private readonly pageContentService: CommunityPageContentService
+  ) {}
 
   /**
    * Get communities list with filters and search
@@ -433,5 +437,68 @@ export class CommunitiesController {
       message: 'User communities retrieved successfully',
       data: result
     };
+  }
+
+  /**
+   * Get published page content for a community (public endpoint)
+   * Route: GET /communities/:slug/page-content
+   */
+  @Get(':slug/page-content')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get published community page content',
+    description: 'Get the published page content for a community landing page. Returns default content if nothing is published. No authentication required.'
+  })
+  @ApiParam({ name: 'slug', description: 'Community slug', example: 'system-admin' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Page content retrieved successfully',
+    schema: {
+      example: {
+        communityId: '507f1f77bcf86cd799439011',
+        communitySlug: 'system-admin',
+        communityName: 'System Admin',
+        hero: {
+          customTitle: '',
+          customSubtitle: '',
+          customBanner: '',
+          ctaButtonText: 'Join Community',
+          showMemberCount: true,
+          showRating: true,
+          showCreator: true
+        },
+        overview: {
+          title: 'Community Overview',
+          subtitle: 'Everything you need to succeed',
+          visible: true,
+          cards: []
+        },
+        benefits: {
+          titlePrefix: 'Transform Your Skills with',
+          visible: true,
+          benefits: []
+        },
+        testimonials: {
+          title: 'What Members Are Saying',
+          visible: true,
+          testimonials: []
+        },
+        cta: {
+          title: 'Ready to Get Started?',
+          subtitle: 'Take the first step',
+          buttonText: 'Join Community Now',
+          visible: true
+        },
+        isPublished: true,
+        version: 1
+      }
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Community not found'
+  })
+  async getPublishedPageContent(@Param('slug') slug: string) {
+    return await this.pageContentService.getPublishedContent(slug);
   }
 }

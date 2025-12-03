@@ -9,6 +9,7 @@ import CreatePostCard from './ComponentCard';
 interface MobileViewProps {
   slug: string;
   community: any;
+  activeMembers?: any[];
   newPost: string;
   setNewPost: (text: string) => void;
   onCreatePost: () => Promise<void>;
@@ -23,6 +24,7 @@ interface MobileViewProps {
 export default function MobileView({
   slug,
   community,
+  activeMembers,
   newPost,
   setNewPost,
   onCreatePost,
@@ -35,7 +37,7 @@ export default function MobileView({
 }: MobileViewProps) {
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContainer}
         refreshControl={
           onRefresh ? (
@@ -50,24 +52,25 @@ export default function MobileView({
       >
         <View style={styles.mobileContent}>
           {/* Active Members */}
-          <ActiveMembers />
-          
+          <ActiveMembers members={activeMembers} />
+
           {/* Create Post */}
           <CreatePostCard
             newPost={newPost}
             setNewPost={setNewPost}
             onCreatePost={onCreatePost}
+            creatingPost={creatingPost}
           />
 
           {/* Posts Feed */}
-          <Posts 
+          <Posts
             posts={posts}
             onLike={onLike}
             onBookmark={onBookmark}
           />
         </View>
       </ScrollView>
-      
+
       {/* Bottom Navigation */}
       <BottomNavigation slug={slug} currentTab="home" />
     </View>

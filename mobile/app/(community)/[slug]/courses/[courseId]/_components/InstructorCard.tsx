@@ -8,6 +8,10 @@ interface InstructorCardProps {
 }
 
 export const InstructorCard: React.FC<InstructorCardProps> = ({ course }) => {
+  const creator = course?.creator || {};
+  const creatorName = creator.name || (creator.nom ? `${creator.nom} ${creator.prenom || ''}`.trim() : 'Unknown Instructor');
+  const creatorAvatar = creator.avatar || creator.profile_picture || 'https://randomuser.me/api/portraits/lego/1.jpg';
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -17,12 +21,12 @@ export const InstructorCard: React.FC<InstructorCardProps> = ({ course }) => {
         <View style={styles.instructorContainer}>
           <Image
             source={{
-              uri: course.creator.avatar || 'https://randomuser.me/api/portraits/lego/1.jpg',
+              uri: creatorAvatar,
             }}
             style={styles.instructorAvatar}
           />
           <View style={styles.instructorInfo}>
-            <Text style={styles.instructorName}>{course.creator.name}</Text>
+            <Text style={styles.instructorName}>{creatorName}</Text>
             <Text style={styles.instructorRole}>Web Development Expert</Text>
             <View style={styles.instructorRating}>
               <Star size={12} color="#f59e0b" />

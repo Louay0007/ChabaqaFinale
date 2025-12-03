@@ -217,10 +217,17 @@ export async function getCourseById(courseId: string): Promise<Course> {
   try {
     console.log('📚 [COURSE-API] Fetching course details:', courseId);
 
+    const token = await getAccessToken();
+    const headers: any = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const resp = await tryEndpoints<any>(
       `/api/cours/${courseId}`,
       {
         method: 'GET',
+        headers,
         timeout: 30000,
       }
     );
@@ -538,7 +545,7 @@ export async function getCoursesByCommunity(
 export function formatCourseDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }
@@ -595,28 +602,43 @@ export async function getCoursesByCommunitySlug(
 ): Promise<any> {
   try {
     console.log('📚 [COURSE-API] Fetching courses for community:', communitySlug);
+    console.log('📚 [COURSE-API] Filters:', filters);
 
     const params = new URLSearchParams();
     if (filters.page) params.append('page', filters.page.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
     if (filters.published !== undefined) params.append('published', filters.published.toString());
 
+    const endpoint = `/api/cours/community/${communitySlug}?${params.toString()}`;
+    console.log('📚 [COURSE-API] Calling endpoint:', endpoint);
+
     const resp = await tryEndpoints<any>(
-      `/api/cours/community/${communitySlug}?${params.toString()}`,
+      endpoint,
       {
         method: 'GET',
         timeout: 30000,
       }
     );
 
+    console.log('📦 [COURSE-API] Response status:', resp.status);
+    console.log('📦 [COURSE-API] Response data:', JSON.stringify(resp.data, null, 2));
+
     if (resp.status >= 200 && resp.status < 300) {
-      console.log('✅ [COURSE-API] Community courses fetched:', resp.data.data?.courses?.length || 0);
-      return resp.data.data || resp.data;
+      const result = resp.data.data || resp.data;
+      console.log('✅ [COURSE-API] Processed result:', result);
+      console.log('✅ [COURSE-API] Courses count:', result.courses?.length || 0);
+
+      if (result.courses && result.courses.length > 0) {
+        console.log('📚 [COURSE-API] First course:', result.courses[0]);
+      }
+
+      return result;
     }
 
     throw new Error(resp.data.message || 'Failed to fetch community courses');
   } catch (error: any) {
     console.error('💥 [COURSE-API] Error fetching community courses:', error);
+    console.error('💥 [COURSE-API] Error details:', error.message);
     throw new Error(error.message || 'Failed to fetch community courses');
   }
 }

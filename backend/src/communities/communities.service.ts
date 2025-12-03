@@ -29,7 +29,7 @@ export class CommunitiesService {
     @InjectModel(Community.name) private communityModel: Model<CommunityDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Post.name) private postModel: Model<PostDocument>,
-  ) {}
+  ) { }
 
   /**
    * Get communities for a specific user (joined + created)
@@ -69,7 +69,7 @@ export class CommunitiesService {
         } else if (communityData.moderators?.includes(userId)) {
           role = 'moderator';
         }
-        
+
         return {
           id: community._id.toString(),
           slug: communityData.slug,
@@ -101,7 +101,7 @@ export class CommunitiesService {
 
       const transformedCreated = createdCommunities.map(community => {
         const communityData = community as any;
-        
+
         return {
           id: community._id.toString(),
           slug: communityData.slug,
@@ -124,7 +124,7 @@ export class CommunitiesService {
     }
 
     // Remove duplicates (in case user is both creator and member)
-    const uniqueCommunities = allCommunities.filter((community, index, self) => 
+    const uniqueCommunities = allCommunities.filter((community, index, self) =>
       index === self.findIndex(c => c.id === community.id)
     );
 
@@ -157,173 +157,214 @@ export class CommunitiesService {
    */
   async getCommunities(filters: CommunityFilters) {
     try {
-    const {
-      search,
-      category,
-      type,
-      priceType,
-      minMembers,
-      sortBy,
-      page,
-      limit,
-      featured,
-      creatorId
-    } = filters;
-
-    // Build query
-    const query: any = { isActive: true };
-
-    // Search filter
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { short_description: { $regex: search, $options: 'i' } },
-        { tags: { $in: [new RegExp(search, 'i')] } }
-      ];
-    }
-
-    // Category filter
-    if (category) {
-      query.category = category;
-    }
-
-    // Type filter (map frontend types to backend fields)
-    if (type) {
-      switch (type) {
-        case 'community':
-          query.priceType = { $in: ['free', 'one-time', 'monthly', 'yearly'] };
-          break;
-        case 'course':
-          // This would need to be implemented based on your course schema
-          break;
-        case 'challenge':
-          // This would need to be implemented based on your challenge schema
-          break;
-        case 'product':
-          // This would need to be implemented based on your product schema
-          break;
-        case 'oneToOne':
-          // This would need to be implemented based on your session schema
-          break;
-      }
-    }
-
-    // Price type filter
-    if (priceType) {
-      if (priceType === 'free') {
-        query.priceType = 'free';
-      } else if (priceType === 'paid') {
-        query.priceType = { $in: ['one-time', 'monthly', 'yearly'] };
-      } else {
-        query.priceType = priceType;
-      }
-    }
-
-    // Minimum members filter
-    if (minMembers) {
-      query.membersCount = { $gte: minMembers };
-    }
-
-    // Featured filter
-    if (featured !== undefined) {
-      query.featured = featured;
-    }
-
-    // Creator filter
-    if (creatorId) {
-      query.createur = new Types.ObjectId(creatorId);
-    }
-
-    // Build sort
-    let sort: any = { createdAt: -1 };
-    if (sortBy) {
-      switch (sortBy) {
-        case 'popular':
-          sort = { membersCount: -1, averageRating: -1 };
-          break;
-        case 'newest':
-          sort = { createdAt: -1 };
-          break;
-        case 'members':
-          sort = { membersCount: -1 };
-          break;
-        case 'rating':
-          sort = { averageRating: -1, ratingCount: -1 };
-          break;
-        case 'price-low':
-          sort = { 'pricing.price': 1 };
-          break;
-        case 'price-high':
-          sort = { 'pricing.price': -1 };
-          break;
-      }
-    }
-
-    // Calculate pagination
-    const skip = (page - 1) * limit;
-
-    // Debug logging
-    console.log('🔍 [COMMUNITIES SERVICE] Query:', JSON.stringify(query, null, 2));
-    console.log('🔍 [COMMUNITIES SERVICE] Sort:', sort);
-    console.log('🔍 [COMMUNITIES SERVICE] Page:', page, 'Limit:', limit, 'Skip:', skip);
-
-    // Execute query
-    const [communities, total] = await Promise.all([
-      this.communityModel
-        .find(query)
-        .populate('createur', 'name email profile_picture')
-        .select('-members -admins -moderateurs -long_description')
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .exec(),
-      this.communityModel.countDocuments(query)
-    ]);
-
-    console.log('✅ [COMMUNITIES SERVICE] Found', communities.length, 'communities out of', total, 'total');
-
-    // Transform communities to match frontend format
-    const transformedCommunities = communities.map((community, index) => ({
-      id: community._id.toString(), // Use actual MongoDB ID as string
-      slug: community.slug,
-      name: community.name,
-      creator: (community.createur as any)?.name || 'Unknown',
-      creatorAvatar: (community.createur as any)?.profile_picture || 'https://placehold.co/64x64?text=MM',
-      description: community.short_description,
-      category: community.category,
-      type: 'community',
-      members: community.membersCount,
-      rating: (community as any).averageRating || 0,
-      price: community.pricing?.price || community.fees_of_join || 0,
-      priceType: community.priceType,
-      image: community.photo_de_couverture,
-      tags: community.tags,
-      featured: community.featured,
-      verified: community.isVerified,
-      createdDate: community.createdAt,
-      link: `/${community.slug}` // Add link field as expected by frontend
-    }));
-
-    return {
-      communities: transformedCommunities,
-      pagination: {
+      const {
+        search,
+        category,
+        type,
+        priceType,
+        minMembers,
+        sortBy,
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      },
-      filters: {
-        categories: await this.getAvailableCategories(),
-        sortOptions: [
-          { value: 'popular', label: 'Most Popular' },
-          { value: 'newest', label: 'Newest' },
-          { value: 'members', label: 'Most Members' },
-          { value: 'rating', label: 'Highest Rated' },
-          { value: 'price-low', label: 'Price: Low to High' },
-          { value: 'price-high', label: 'Price: High to Low' }
-        ]
+        featured,
+        creatorId
+      } = filters;
+
+      // Build query
+      const query: any = { isActive: true };
+
+      // Search filter
+      if (search) {
+        query.$or = [
+          { name: { $regex: search, $options: 'i' } },
+          { short_description: { $regex: search, $options: 'i' } },
+          { tags: { $in: [new RegExp(search, 'i')] } }
+        ];
       }
-    };
+
+      // Category filter
+      if (category) {
+        query.category = category;
+      }
+
+      // Type filter (map frontend types to backend fields)
+      if (type) {
+        switch (type) {
+          case 'community':
+            query.priceType = { $in: ['free', 'one-time', 'monthly', 'yearly'] };
+            break;
+          case 'course':
+            // This would need to be implemented based on your course schema
+            break;
+          case 'challenge':
+            // This would need to be implemented based on your challenge schema
+            break;
+          case 'product':
+            // This would need to be implemented based on your product schema
+            break;
+          case 'oneToOne':
+            // This would need to be implemented based on your session schema
+            break;
+        }
+      }
+
+      // Price type filter
+      if (priceType) {
+        if (priceType === 'free') {
+          query.priceType = 'free';
+        } else if (priceType === 'paid') {
+          query.priceType = { $in: ['one-time', 'monthly', 'yearly'] };
+        } else {
+          query.priceType = priceType;
+        }
+      }
+
+      // Minimum members filter
+      if (minMembers) {
+        query.membersCount = { $gte: minMembers };
+      }
+
+      // Featured filter
+      if (featured !== undefined) {
+        query.featured = featured;
+      }
+
+      // Creator filter
+      if (creatorId) {
+        query.createur = new Types.ObjectId(creatorId);
+      }
+
+      // Build sort
+      let sort: any = { createdAt: -1 };
+      if (sortBy) {
+        switch (sortBy) {
+          case 'popular':
+            sort = { membersCount: -1, averageRating: -1 };
+            break;
+          case 'newest':
+            sort = { createdAt: -1 };
+            break;
+          case 'members':
+            sort = { membersCount: -1 };
+            break;
+          case 'rating':
+            sort = { averageRating: -1, ratingCount: -1 };
+            break;
+          case 'price-low':
+            sort = { 'pricing.price': 1 };
+            break;
+          case 'price-high':
+            sort = { 'pricing.price': -1 };
+            break;
+        }
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Debug logging
+      console.log('🔍 [COMMUNITIES SERVICE] Query:', JSON.stringify(query, null, 2));
+      console.log('🔍 [COMMUNITIES SERVICE] Sort:', sort);
+      console.log('🔍 [COMMUNITIES SERVICE] Page:', page, 'Limit:', limit, 'Skip:', skip);
+
+      // Execute query
+      const [communities, total] = await Promise.all([
+        this.communityModel
+          .find(query)
+          .populate('createur', 'name email profile_picture')
+          .select('-members -admins -moderateurs -long_description')
+          .sort(sort)
+          .skip(skip)
+          .limit(limit)
+          .exec(),
+        this.communityModel.countDocuments(query)
+      ]);
+
+      console.log('✅ [COMMUNITIES SERVICE] Found', communities.length, 'communities out of', total, 'total');
+
+      // Helper to check if URL is a placeholder
+      const isPlaceholderUrl = (url: string): boolean => {
+        if (!url) return true;
+        return url.includes('placeholder.com') ||
+          url.includes('placehold.co') ||
+          url.includes('via.placeholder');
+      };
+
+      // Transform communities to match frontend format
+      const transformedCommunities = communities.map((community, index) => {
+        // Get the best available image (prioritize non-placeholder URLs)
+        let imageUrl = community.photo_de_couverture;
+
+        console.log(`🖼️ [BACKEND IMAGE] ${community.name}:`, {
+          photo_de_couverture: community.photo_de_couverture,
+          logo: community.logo,
+          isPlaceholder: isPlaceholderUrl(imageUrl)
+        });
+
+        // If cover image is a placeholder, try other sources
+        if (isPlaceholderUrl(imageUrl)) {
+          // Try settings heroBackground first
+          if (community.settings?.heroBackground && !isPlaceholderUrl(community.settings.heroBackground)) {
+            imageUrl = community.settings.heroBackground;
+            console.log(`  → Using heroBackground: ${imageUrl}`);
+          }
+          // Then try logo
+          else if (community.logo && !isPlaceholderUrl(community.logo)) {
+            imageUrl = community.logo;
+            console.log(`  → Using logo: ${imageUrl}`);
+          }
+          // Return empty string instead of placeholder (mobile will use local category images)
+          else {
+            imageUrl = '';
+            console.log(`  → No real image, returning empty string`);
+          }
+        } else {
+          console.log(`  → Using photo_de_couverture: ${imageUrl}`);
+        }
+
+        return {
+          id: community._id.toString(), // Use actual MongoDB ID as string
+          slug: community.slug,
+          name: community.name,
+          creator: (community.createur as any)?.name || 'Unknown',
+          creatorAvatar: (community.createur as any)?.profile_picture || 'https://placehold.co/64x64?text=MM',
+          description: community.short_description,
+          category: community.category,
+          type: 'community',
+          members: community.membersCount,
+          rating: (community as any).averageRating || 0,
+          price: community.pricing?.price || community.fees_of_join || 0,
+          priceType: community.priceType,
+          image: imageUrl, // Will be empty string if no real image available
+          logo: community.logo, // Also include logo field
+          tags: community.tags,
+          featured: community.featured,
+          verified: community.isVerified,
+          createdDate: community.createdAt,
+          link: `/${community.slug}` // Add link field as expected by frontend
+        };
+      });
+
+      return {
+        communities: transformedCommunities,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        },
+        filters: {
+          categories: await this.getAvailableCategories(),
+          sortOptions: [
+            { value: 'popular', label: 'Most Popular' },
+            { value: 'newest', label: 'Newest' },
+            { value: 'members', label: 'Most Members' },
+            { value: 'rating', label: 'Highest Rated' },
+            { value: 'price-low', label: 'Price: Low to High' },
+            { value: 'price-high', label: 'Price: High to Low' }
+          ]
+        }
+      };
     } catch (error) {
       console.error('❌ [COMMUNITIES SERVICE] Error:', error);
       throw error;
@@ -559,12 +600,12 @@ export class CommunitiesService {
   private formatTimestamp(date: Date): string {
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
+
     if (diffInSeconds < 60) return 'just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
     if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
-    
+
     return date.toLocaleDateString();
   }
 
@@ -577,7 +618,7 @@ export class CommunitiesService {
       { $group: { _id: '$category' } },
       { $sort: { _id: 1 } }
     ]);
-    
+
     return categories.map(cat => cat._id);
   }
 }

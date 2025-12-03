@@ -264,6 +264,81 @@ export class UploadService {
   }
 
   /**
+   * Upload d'une image encodée en base64 (utile pour les avatars générés côté client)
+   */
+  async uploadBase64Image(
+    base64Data: string,
+    options?: { userId?: string; folder?: string }
+  ): Promise<UploadResult> {
+    if (!base64Data) {
+      throw new BadRequestException('Aucune image fournie');
+    }
+
+    const matches = base64Data.match(/^data:(.+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      throw new BadRequestException('Format base64 invalide');
+    }
+
+    const mimeType = matches[1];
+    const encodedData = matches[2];
+    const extension = this.getExtensionFromMime(mimeType);
+
+    if (!extension) {
+      throw new BadRequestException(`Type d'image non supporté: ${mimeType}`);
+    }
+
+    if (!this.allowedTypes[FileType.IMAGE].includes(extension)) {
+      throw new BadRequestException(`Extension non autorisée: ${extension}`);
+    }
+
+    const buffer = Buffer.from(encodedData, 'base64');
+    if (buffer.length > this.maxSizes[FileType.IMAGE]) {
+      const maxSizeMB = this.maxSizes[FileType.IMAGE] / (1024 * 1024);
+      throw new BadRequestException(`Image trop volumineuse. Taille maximale: ${maxSizeMB}MB`);
+    }
+
+    if (options?.userId) {
+      const limits = await this.policyService.getEffectiveLimitsForCreator(options.userId);
+      const used = await this.getUsageBytes(options.userId);
+      const limitBytes = limits.storageGB * 1024 * 1024 * 1024;
+      if (used + buffer.length > limitBytes) {
+        throw new ForbiddenException('Quota de stockage atteint pour votre plan.');
+      }
+    }
+
+    const filename = this.generateFilename(`upload${extension}`);
+    const rootDestination = this.getDestinationPath(FileType.IMAGE);
+    const targetDirectory = options?.folder ? join(rootDestination, options.folder) : rootDestination;
+
+    if (!existsSync(targetDirectory)) {
+      mkdirSync(targetDirectory, { recursive: true });
+    }
+
+    const fs = require('fs').promises;
+    const filePath = join(targetDirectory, filename);
+    await fs.writeFile(filePath, buffer);
+
+    if (options?.userId) {
+      await this.addUsageBytes(options.userId, buffer.length);
+    }
+
+    const relativePath = options?.folder
+      ? `${FileType.IMAGE}/${options.folder}/${filename}`
+      : `${FileType.IMAGE}/${filename}`;
+    const url = `${this.baseUrl}/uploads/${relativePath}`;
+
+    return {
+      filename,
+      originalName: filename,
+      path: filePath,
+      url,
+      size: buffer.length,
+      mimetype: mimeType,
+      type: FileType.IMAGE,
+    };
+  }
+
+  /**
    * Obtenir le mimetype d'un fichier basé sur son extension
    */
   private getMimeType(filename: string): string {
@@ -289,5 +364,18 @@ export class UploadService {
     };
     
     return mimeTypes[extension] || 'application/octet-stream';
+  }
+
+  private getExtensionFromMime(mimeType: string): string | null {
+    const normalized = mimeType.toLowerCase();
+    const map: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/jpg': '.jpg',
+      'image/png': '.png',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'image/svg+xml': '.svg',
+    };
+    return map[normalized] || null;
   }
 }

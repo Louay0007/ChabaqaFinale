@@ -7,13 +7,14 @@ import ChapterTabs from "@/app/(community)/[creator]/[feature]/(loggedUser)/cour
 import CourseSidebar from "@/app/(community)/[creator]/[feature]/(loggedUser)/courses/[courseId]/components/course-sidebar"
 
 interface CoursePlayerProps {
+  creatorSlug: string
   slug: string
   courseId: string
   course: any
   enrollment: any
 }
 
-export default function CoursePlayer({ slug, courseId, course, enrollment }: CoursePlayerProps) {
+export default function CoursePlayer({ creatorSlug, slug, courseId, course, enrollment }: CoursePlayerProps) {
   const [activeTab, setActiveTab] = useState("content")
   const [selectedChapter, setSelectedChapter] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -54,6 +55,7 @@ export default function CoursePlayer({ slug, courseId, course, enrollment }: Cou
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3 space-y-6">
             <VideoPlayer 
+              creatorSlug={creatorSlug}
               currentChapter={currentChapter}
               isChapterAccessible={isChapterAccessible}
               enrollment={enrollment}

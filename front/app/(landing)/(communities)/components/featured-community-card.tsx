@@ -31,7 +31,7 @@ export function FeaturedCommunityCard({ community, index, slug }: FeaturedCommun
     const typeConfigs = {
       community: {
         badgeColor: "border-blue-500/50 text-blue-600 bg-blue-50",
-        ctaText: "Join",
+        ctaText: "Explore",
         ctaColors: "#3b82f6, #2563eb"
       },
       course: {
@@ -139,7 +139,7 @@ export function FeaturedCommunityCard({ community, index, slug }: FeaturedCommun
         </div>
 
         {/* Simple CTA Button */}
-        <Link href={`/community/${community.slug}`}>
+        <Link href={community.link || `/${community.creator}/${community.slug}`}>
           <button 
             className="w-full mt-2 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-300"
             style={{

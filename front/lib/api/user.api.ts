@@ -1,4 +1,4 @@
-import { authenticatedFetch } from "@/lib/auth"
+import { authenticatedFetch } from '@/lib/authenticated-fetch'
 
 export interface UpdateProfilePayload {
   name?: string

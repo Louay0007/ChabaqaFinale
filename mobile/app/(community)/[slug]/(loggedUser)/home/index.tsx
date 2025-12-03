@@ -1,14 +1,18 @@
 import {
   getCurrentUser,
-  mockPosts
+  mockPosts,
+  mockActiveMembers
 } from '@/lib/mock-data';
-import { getCommunityBySlug as getBackendCommunity } from '@/lib/communities-api';
-import { 
-  getPostsByCommunity, 
-  createPost, 
-  likePost, 
-  unlikePost, 
-  bookmarkPost, 
+import {
+  getCommunityBySlug as getBackendCommunity,
+  getActiveMembersByCommunity
+} from '@/lib/communities-api';
+import {
+  getPostsByCommunity,
+  createPost,
+  likePost,
+  unlikePost,
+  bookmarkPost,
   unbookmarkPost,
   convertPostForUI
 } from '@/lib/post-api';
@@ -28,6 +32,7 @@ export default function CommunityDashboard() {
   const [newPost, setNewPost] = useState("");
   const [posts, setPosts] = useState<any[]>([]);
   const [community, setCommunity] = useState<any>(null);
+  const [activeMembers, setActiveMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,21 +46,22 @@ export default function CommunityDashboard() {
   useEffect(() => {
     fetchCommunityData();
     fetchPosts();
+    fetchActiveMembers();
   }, [slug]);
-  
+
   // Fetch posts from backend
   const fetchPosts = async (pageNum: number = 1, isRefresh: boolean = false) => {
     try {
       if (!community?.id && !isRefresh) return;
-      
+
       console.log('📝 Fetching posts for community:', community?.id || slug);
-      
+
       const communityId = community?.id;
       if (!communityId && !isRefresh) {
         // Wait for community to load first
         return;
       }
-      
+
       let targetCommunityId = communityId;
       if (!targetCommunityId) {
         // Try to get community ID from slug
@@ -64,14 +70,14 @@ export default function CommunityDashboard() {
           targetCommunityId = tempCommunity.data._id || tempCommunity.data.id;
         }
       }
-      
+
       if (!targetCommunityId) {
         console.warn('⚠️ No community ID available for fetching posts');
         return;
       }
 
       console.log('🎯 About to fetch posts with communityId:', targetCommunityId);
-      
+
       // First, let's test if we can reach the debug endpoint
       try {
         const debugResp = await fetch('http://localhost:3000/api/posts/debug/count');
@@ -101,12 +107,12 @@ export default function CommunityDashboard() {
       } catch (debugError) {
         console.warn('⚠️ Debug endpoint failed:', debugError);
       }
-      
+
       const postsResponse = await getPostsByCommunity(targetCommunityId, {
         page: pageNum,
         limit: 10
       });
-      
+
       // Transform posts for UI
       const transformedPosts = postsResponse.posts.map((post: any) => ({
         id: post.id,
@@ -129,18 +135,18 @@ export default function CommunityDashboard() {
         excerpt: post.excerpt,
         thumbnail: post.thumbnail,
       }));
-      
+
       if (pageNum === 1 || isRefresh) {
         setPosts(transformedPosts);
       } else {
         setPosts(prev => [...prev, ...transformedPosts]);
       }
-      
+
       setHasMore(postsResponse.pagination.page < postsResponse.pagination.totalPages);
       console.log('✅ Posts loaded:', transformedPosts.length);
     } catch (err: any) {
       console.error('❌ Error fetching posts:', err);
-      
+
       // Fallback to mock data on first load
       if (pageNum === 1 || posts.length === 0) {
         console.log('⚠️ Falling back to mock posts');
@@ -154,16 +160,16 @@ export default function CommunityDashboard() {
       setLoading(true);
       setError(null);
       console.log('🏠 Fetching community data for home page:', slug);
-      
+
       const response = await getBackendCommunity(slug as string);
-      
+
       if (response.success && response.data) {
         // Extract creator info (backend returns populated createur object)
         const creatorData = response.data.createur;
         const creatorName = creatorData?.name || creatorData?.email?.split('@')[0] || 'Unknown Creator';
-        const creatorAvatar = creatorData?.profile_picture || creatorData?.avatar || creatorData?.photo || 
+        const creatorAvatar = creatorData?.profile_picture || creatorData?.avatar || creatorData?.photo ||
           `https://placehold.co/64x64?text=${encodeURIComponent(creatorName.charAt(0).toUpperCase())}&style=identicon`;
-        
+
         // Extract member count
         let memberCount = 0;
         if (typeof response.data.members === 'number') {
@@ -173,7 +179,7 @@ export default function CommunityDashboard() {
         } else if (response.data.membersCount) {
           memberCount = response.data.membersCount;
         }
-        
+
         // Transform backend data for community home
         const transformedCommunity = {
           id: response.data._id?.toString() || response.data.id,
@@ -197,10 +203,10 @@ export default function CommunityDashboard() {
           settings: response.data.settings || {},
           isPrivate: response.data.isPrivate || false,
         };
-        
+
         setCommunity(transformedCommunity);
         console.log('✅ Community data loaded for home:', transformedCommunity.name);
-        
+
         // Fetch posts after community data is loaded
         setTimeout(() => fetchPosts(1, true), 100);
       }
@@ -211,12 +217,54 @@ export default function CommunityDashboard() {
       setLoading(false);
     }
   };
-  
+
+  // Fetch active members from backend
+  const fetchActiveMembers = async () => {
+    try {
+      console.log('👥 [ACTIVE-MEMBERS] Fetching active members for:', slug);
+
+      const response = await getActiveMembersByCommunity(slug as string, 15);
+
+      if (response.success && response.data) {
+        console.log('📦 [ACTIVE-MEMBERS] API Response:', {
+          total: response.data.total,
+          online: response.data.online,
+          membersCount: response.data.members.length
+        });
+
+        // Transform API data for UI
+        const transformedMembers = response.data.members.map((member) => ({
+          id: member.id,
+          name: member.name,
+          avatar: member.avatar,
+          isOnline: member.isOnline, // Real online status from backend!
+        }));
+
+        console.log('✅ [ACTIVE-MEMBERS] Loaded members:', {
+          total: transformedMembers.length,
+          online: transformedMembers.filter(m => m.isOnline).length
+        });
+
+        setActiveMembers(transformedMembers);
+      }
+    } catch (error: any) {
+      console.error('❌ [ACTIVE-MEMBERS] Error fetching:', error);
+
+      // Fallback to mock data on error
+      console.log('⚠️ [ACTIVE-MEMBERS] Using fallback mock data');
+      setActiveMembers(mockActiveMembers);
+    }
+  };
+
+
   // Refresh handler
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setPage(1);
-    await fetchPosts(1, true);
+    await Promise.all([
+      fetchPosts(1, true),
+      fetchActiveMembers()
+    ]);
     setRefreshing(false);
   }, [community]);
 
@@ -252,18 +300,18 @@ export default function CommunityDashboard() {
     try {
       const post = posts.find(p => p.id === postId);
       if (!post) return;
-      
+
       // Optimistic update
       setPosts(posts.map((p: any) =>
         p.id === postId
           ? {
-              ...p,
-              isLiked: !p.isLiked,
-              likes: p.isLiked ? p.likes - 1 : p.likes + 1,
-            }
+            ...p,
+            isLiked: !p.isLiked,
+            likes: p.isLiked ? p.likes - 1 : p.likes + 1,
+          }
           : p
       ));
-      
+
       // Call backend API
       if (post.isLiked) {
         await unlikePost(postId);
@@ -278,10 +326,10 @@ export default function CommunityDashboard() {
       setPosts(posts.map((p: any) =>
         p.id === postId
           ? {
-              ...p,
-              isLiked: !p.isLiked,
-              likes: p.isLiked ? p.likes + 1 : p.likes - 1,
-            }
+            ...p,
+            isLiked: !p.isLiked,
+            likes: p.isLiked ? p.likes + 1 : p.likes - 1,
+          }
           : p
       ));
     }
@@ -291,12 +339,12 @@ export default function CommunityDashboard() {
     try {
       const post = posts.find(p => p.id === postId);
       if (!post) return;
-      
+
       // Optimistic update
       setPosts(posts.map((p: any) =>
         p.id === postId ? { ...p, isBookmarked: !p.isBookmarked } : p
       ));
-      
+
       // Call backend API
       if (post.isBookmarked) {
         await unbookmarkPost(postId);
@@ -319,20 +367,20 @@ export default function CommunityDashboard() {
       console.warn('⚠️ Cannot create post: missing content or community', { newPost: newPost.trim(), communityId: community?.id });
       return;
     }
-    
+
     try {
       setCreatingPost(true);
       console.log('✍️ Creating new post...');
       console.log('🏘️ Community data:', community);
       console.log('👤 Current user:', currentUser);
-      
+
       const postData = {
         title: newPost.substring(0, 100), // Use first 100 chars as title
         content: newPost,
         communityId: community.id,
         tags: [],
       };
-      
+
       console.log('📝 Post data being sent:', postData);
 
       // Also create a test post via debug endpoint to compare
@@ -349,9 +397,9 @@ export default function CommunityDashboard() {
       } catch (testError) {
         console.warn('⚠️ Test post creation failed:', testError);
       }
-      
+
       const createdPost = await createPost(postData);
-      
+
       // Transform for UI and add to top of feed
       const uiPost = {
         id: createdPost.id,
@@ -374,7 +422,7 @@ export default function CommunityDashboard() {
         excerpt: createdPost.excerpt,
         thumbnail: createdPost.thumbnail,
       };
-      
+
       setPosts([uiPost, ...posts]);
       setNewPost("");
       console.log('✅ Post created successfully');
@@ -391,6 +439,7 @@ export default function CommunityDashboard() {
     <MobileView
       slug={slug as string}
       community={community}
+      activeMembers={activeMembers}
       newPost={newPost}
       setNewPost={setNewPost}
       onCreatePost={handleCreatePost}

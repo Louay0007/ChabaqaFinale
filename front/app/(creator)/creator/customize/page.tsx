@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Save, Eye, Smartphone, Tablet, Monitor, Palette, Type, Layout, Zap } from "lucide-react"
-import { getCommunityBySlug } from "@/lib/mock-data"
+import { api } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 export default function CustomizeCommunityPage() {
@@ -25,48 +25,109 @@ export default function CustomizeCommunityPage() {
   const [hasChanges, setHasChanges] = useState(false)
 
   useEffect(() => {
-    const foundCommunity = getCommunityBySlug(params.slug as string)
-    if (foundCommunity) {
-      setCommunity({
-        ...foundCommunity,
-        settings: {
-          template: "modern",
-          primaryColor: foundCommunity.settings.primaryColor || "#8e78fb",
-          secondaryColor: "#47c7ea",
-          logo: foundCommunity.image,
-          welcomeMessage: "Welcome to our amazing community!",
-          features: ["Expert-led courses", "Interactive challenges", "1-on-1 mentoring", "Community support"],
-          benefits: [
-            "Access to exclusive content",
-            "Direct mentor feedback",
-            "Career guidance",
-            "Networking opportunities",
-          ],
-          showHero: true,
-          showFeatures: true,
-          showPosts: true,
-          showBenefits: true,
-          showTestimonials: true,
-          showStats: true,
-          headerStyle: "default",
-          contentWidth: "normal",
-          enableAnimations: true,
-          enableParallax: false,
-          customCSS: "",
-          metaTitle: foundCommunity.name,
-          metaDescription: foundCommunity.description,
-        },
-        longDescription:
-          foundCommunity.description + " Join our community to learn, grow, and connect with like-minded individuals.",
-        members: foundCommunity.members,
-        rating: 4.8,
-      })
+    const loadCommunity = async () => {
+      try {
+        const response = await api.communities.getBySlug(params.slug as string)
+        const foundCommunity = response.data
+        
+        if (foundCommunity) {
+          // Get community settings
+          try {
+            const settingsResponse = await api.communities.getSettings(foundCommunity.id)
+            const communitySettings = settingsResponse.data || {}
+            
+            // Type assertion for settings to include custom properties
+            const settingsWithCustomProps = communitySettings as any
+            
+            setCommunity({
+              ...foundCommunity,
+              settings: {
+                template: settingsWithCustomProps.template || "modern",
+                primaryColor: settingsWithCustomProps.primaryColor || "#8e78fb",
+                secondaryColor: settingsWithCustomProps.secondaryColor || "#47c7ea",
+                logo: settingsWithCustomProps.logo || foundCommunity.image,
+                welcomeMessage: settingsWithCustomProps.welcomeMessage || "Welcome to our amazing community!",
+                features: settingsWithCustomProps.features || ["Expert-led courses", "Interactive challenges", "1-on-1 mentoring", "Community support"],
+                benefits: settingsWithCustomProps.benefits || [
+                  "Access to exclusive content",
+                  "Direct mentor feedback",
+                  "Career guidance",
+                  "Networking opportunities",
+                ],
+                showHero: settingsWithCustomProps.showHero !== false,
+                showFeatures: settingsWithCustomProps.showFeatures !== false,
+                showPosts: settingsWithCustomProps.showPosts !== false,
+                showBenefits: settingsWithCustomProps.showBenefits !== false,
+                showTestimonials: settingsWithCustomProps.showTestimonials !== false,
+                showStats: settingsWithCustomProps.showStats !== false,
+                headerStyle: settingsWithCustomProps.headerStyle || "default",
+                contentWidth: settingsWithCustomProps.contentWidth || "normal",
+                enableAnimations: settingsWithCustomProps.enableAnimations !== false,
+                enableParallax: settingsWithCustomProps.enableParallax || false,
+                customCSS: settingsWithCustomProps.customCSS || "",
+                metaTitle: settingsWithCustomProps.metaTitle || foundCommunity.name,
+                metaDescription: settingsWithCustomProps.metaDescription || foundCommunity.description,
+              },
+              longDescription: foundCommunity.longDescription || foundCommunity.description + " Join our community to learn, grow, and connect with like-minded individuals.",
+              members: foundCommunity.members || 0,
+              rating: foundCommunity.rating || 4.8,
+            })
+          } catch (settingsError) {
+            console.error('Failed to load community settings:', settingsError)
+            // Use default settings if settings API fails
+            setCommunity({
+              ...foundCommunity,
+              settings: {
+                template: "modern",
+                primaryColor: "#8e78fb",
+                secondaryColor: "#47c7ea",
+                logo: foundCommunity.image,
+                welcomeMessage: "Welcome to our amazing community!",
+                features: ["Expert-led courses", "Interactive challenges", "1-on-1 mentoring", "Community support"],
+                benefits: [
+                  "Access to exclusive content",
+                  "Direct mentor feedback",
+                  "Career guidance",
+                  "Networking opportunities",
+                ],
+                showHero: true,
+                showFeatures: true,
+                showPosts: true,
+                showBenefits: true,
+                showTestimonials: true,
+                showStats: true,
+                headerStyle: "default",
+                contentWidth: "normal",
+                enableAnimations: true,
+                enableParallax: false,
+                customCSS: "",
+                metaTitle: foundCommunity.name,
+                metaDescription: foundCommunity.description,
+              },
+              longDescription: foundCommunity.longDescription || foundCommunity.description + " Join our community to learn, grow, and connect with like-minded individuals.",
+              members: foundCommunity.members || 0,
+              rating: foundCommunity.rating || 4.8,
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load community:', error)
+      }
     }
+
+    loadCommunity()
   }, [params.slug])
 
-  const handleSave = () => {
-    setHasChanges(false)
-    // Show success message
+  const handleSave = async () => {
+    try {
+      await api.communities.updateSettings(community.id, community.settings)
+      setHasChanges(false)
+      // Show success message
+      console.log('Community settings saved successfully')
+    } catch (error) {
+      console.error('Failed to save community settings:', error)
+      // Show error message
+    }
   }
 
   const handleInputChange = (field: string, value: any) => {

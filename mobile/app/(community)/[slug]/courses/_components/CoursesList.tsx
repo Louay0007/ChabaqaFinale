@@ -33,7 +33,7 @@ export const CoursesList: React.FC<CoursesListProps> = ({
   const renderCourseItem = ({ item }: { item: any }) => {
     const isEnrolled = userEnrollments.some((e: any) => e.courseId === item.id);
     const progress = getEnrollmentProgress(item.id);
-    const totalChapters = item.sections.reduce((acc: number, s: any) => acc + s.chapters.length, 0);
+    const totalChapters = (item.sections || []).reduce((acc: number, s: any) => acc + (s.chapters?.length || 0), 0);
 
     return (
       <CourseCard

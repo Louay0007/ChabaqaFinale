@@ -16,18 +16,20 @@ interface StorageInterface {
 
 class WebStorage implements StorageInterface {
   private prefix = PlatformUtils.getStoragePrefix();
-  
+
   async setItemAsync(key: string, value: string): Promise<void> {
     try {
       if (typeof localStorage === 'undefined') {
         throw new Error('localStorage is not available');
       }
-      
+
       // Simple base64 encoding for basic obfuscation
       const encoded = btoa(unescape(encodeURIComponent(value)));
       localStorage.setItem(this.prefix + key, encoded);
-      
-      console.log(`💾 [WEB-STORAGE] Stored key: ${key}`);
+
+      if (__DEV__) {
+        console.log(`💾 [WEB-STORAGE] Stored: ${key}`);
+      }
     } catch (error) {
       console.error(`💥 [WEB-STORAGE] Error storing ${key}:`, error);
       throw new Error(`Failed to store ${key}: ${error}`);
@@ -37,19 +39,16 @@ class WebStorage implements StorageInterface {
   async getItemAsync(key: string): Promise<string | null> {
     try {
       if (typeof localStorage === 'undefined') {
-        console.warn(`⚠️ [WEB-STORAGE] localStorage not available for key: ${key}`);
         return null;
       }
-      
+
       const encoded = localStorage.getItem(this.prefix + key);
       if (!encoded) {
-        console.log(`💾 [WEB-STORAGE] No value found for key: ${key}`);
         return null;
       }
-      
+
       // Decode from base64
       const decoded = decodeURIComponent(escape(atob(encoded)));
-      console.log(`💾 [WEB-STORAGE] Retrieved key: ${key}`);
       return decoded;
     } catch (error) {
       console.error(`💥 [WEB-STORAGE] Error retrieving ${key}:`, error);
@@ -60,12 +59,13 @@ class WebStorage implements StorageInterface {
   async deleteItemAsync(key: string): Promise<void> {
     try {
       if (typeof localStorage === 'undefined') {
-        console.warn(`⚠️ [WEB-STORAGE] localStorage not available, cannot delete: ${key}`);
         return;
       }
-      
+
       localStorage.removeItem(this.prefix + key);
-      console.log(`💾 [WEB-STORAGE] Deleted key: ${key}`);
+      if (__DEV__) {
+        console.log(`💾 [WEB-STORAGE] Deleted: ${key}`);
+      }
     } catch (error) {
       console.error(`💥 [WEB-STORAGE] Error deleting ${key}:`, error);
       throw new Error(`Failed to delete ${key}: ${error}`);
@@ -75,14 +75,16 @@ class WebStorage implements StorageInterface {
 
 class NativeStorage implements StorageInterface {
   private prefix = PlatformUtils.getStoragePrefix();
-  
+
   async setItemAsync(key: string, value: string): Promise<void> {
     try {
       const prefixedKey = this.prefix + key;
       await SecureStore.setItemAsync(prefixedKey, value);
-      console.log(`🔒 [NATIVE-STORAGE] Stored key: ${key}`);
+      if (__DEV__) {
+        console.log(`🔒 [STORAGE] Stored: ${key}`);
+      }
     } catch (error) {
-      console.error(`💥 [NATIVE-STORAGE] Error storing ${key}:`, error);
+      console.error(`💥 [STORAGE] Error storing ${key}:`, error);
       throw new Error(`Failed to store ${key}: ${error}`);
     }
   }
@@ -91,16 +93,9 @@ class NativeStorage implements StorageInterface {
     try {
       const prefixedKey = this.prefix + key;
       const value = await SecureStore.getItemAsync(prefixedKey);
-      
-      if (value) {
-        console.log(`🔒 [NATIVE-STORAGE] Retrieved key: ${key}`);
-      } else {
-        console.log(`🔒 [NATIVE-STORAGE] No value found for key: ${key}`);
-      }
-      
       return value;
     } catch (error) {
-      console.error(`💥 [NATIVE-STORAGE] Error retrieving ${key}:`, error);
+      console.error(`💥 [STORAGE] Error retrieving ${key}:`, error);
       return null;
     }
   }
@@ -109,9 +104,11 @@ class NativeStorage implements StorageInterface {
     try {
       const prefixedKey = this.prefix + key;
       await SecureStore.deleteItemAsync(prefixedKey);
-      console.log(`🔒 [NATIVE-STORAGE] Deleted key: ${key}`);
+      if (__DEV__) {
+        console.log(`🔒 [STORAGE] Deleted: ${key}`);
+      }
     } catch (error) {
-      console.error(`💥 [NATIVE-STORAGE] Error deleting ${key}:`, error);
+      console.error(`💥 [STORAGE] Error deleting ${key}:`, error);
       throw new Error(`Failed to delete ${key}: ${error}`);
     }
   }
@@ -119,13 +116,13 @@ class NativeStorage implements StorageInterface {
 
 // Create platform-specific storage instance
 const createStorage = (): StorageInterface => {
-  console.log(`🏠 [SECURE-STORAGE] Initializing storage for ${PlatformUtils.getPlatformName()}`);
-  
+  if (__DEV__) {
+    console.log(`🔒 [STORAGE] Initialized for ${PlatformUtils.getPlatformName()}`);
+  }
+
   if (PlatformUtils.isWeb) {
-    console.log('🌐 [SECURE-STORAGE] Using Web storage (localStorage with base64 encoding)');
     return new WebStorage();
   } else {
-    console.log('📱 [SECURE-STORAGE] Using Native secure storage (ExpoSecureStore)');
     return new NativeStorage();
   }
 };
@@ -145,13 +142,13 @@ export const setSecureItem = async (key: string, value: string): Promise<void> =
     await SecureStorage.setItemAsync(key, value);
   } catch (error) {
     console.error(`💥 [SECURE-STORAGE] Error storing ${key}:`, error);
-    
+
     // Fallback for web platform issues
     if (PlatformUtils.isWeb && error instanceof Error && error.message.includes('localStorage')) {
       console.warn(`⚠️ [SECURE-STORAGE] localStorage unavailable, data will not persist`);
       return; // Don't throw, just warn
     }
-    
+
     throw error;
   }
 };
@@ -170,13 +167,13 @@ export const removeSecureItem = async (key: string): Promise<void> => {
     await SecureStorage.deleteItemAsync(key);
   } catch (error) {
     console.error(`💥 [SECURE-STORAGE] Error removing ${key}:`, error);
-    
+
     // Don't throw on web platform issues during cleanup
     if (PlatformUtils.isWeb && error instanceof Error && error.message.includes('localStorage')) {
       console.warn(`⚠️ [SECURE-STORAGE] localStorage unavailable during cleanup`);
       return;
     }
-    
+
     throw error;
   }
 };
@@ -184,16 +181,16 @@ export const removeSecureItem = async (key: string): Promise<void> => {
 // Storage diagnostics
 export const diagnoseStorage = async (): Promise<void> => {
   console.log('🔍 [SECURE-STORAGE] Running storage diagnostics...');
-  
+
   try {
     // Test basic storage operations
     const testKey = 'test_key';
     const testValue = 'test_value_123';
-    
+
     await setSecureItem(testKey, testValue);
     const retrieved = await getSecureItem(testKey);
     await removeSecureItem(testKey);
-    
+
     if (retrieved === testValue) {
       console.log('✅ [SECURE-STORAGE] Storage test passed');
     } else {

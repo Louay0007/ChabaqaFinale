@@ -55,7 +55,7 @@ function transformCommunityToExplore(community: Community) {
     priceType: mapPriceType(community.priceType),
     image: primaryImage,
     featured: community.featured,
-    link: `/community/${community.slug}`
+    link: `/${community.creator.name}/${community.slug}`
   }
 }
 

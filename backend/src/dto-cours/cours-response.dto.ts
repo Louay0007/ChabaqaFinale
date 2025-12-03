@@ -48,8 +48,7 @@ export class CourseSectionResponseDto {
  */
 export class CreatorInfoDto {
   id: string;
-  nom: string;
-  prenom: string;
+  name: string;
   avatar?: string;
   email: string;
 }
@@ -92,7 +91,7 @@ export class CoursResponseDto {
   ressources?: CourseResourceResponseDto[];
   createdAt: string;
   updatedAt: string;
-  
+
   // Informations populées
   creator?: CreatorInfoDto;
   community?: CommunityInfoDto;

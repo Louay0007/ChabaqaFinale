@@ -52,9 +52,11 @@ export default function CoursesPageContent({
     const course = allCourses.find((c) => c.id === courseId)
     if (!course) return null
 
-    const totalChapters = course.sections.reduce((acc: number, s: any) => acc + s.chapters.length, 0)
-    const completed = enrollment.progress.filter((p: any) => p.isCompleted).length
-    return { completed, total: totalChapters, percentage: (completed / totalChapters) * 100 }
+    const totalChapters = course.sections?.reduce((acc: number, s: any) => acc + (s.chapters?.length || 0), 0) || 0
+    // enrollment.progress is a number (percentage), completedChapters is an array of chapter IDs
+    const completed = enrollment.completedChapters?.length || 0
+    const percentage = totalChapters > 0 ? (completed / totalChapters) * 100 : 0
+    return { completed, total: totalChapters, percentage }
   }
 
   const getCoursePricing = (course: any) => {

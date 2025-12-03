@@ -1,5 +1,5 @@
 import useSWR from 'swr'
-import { authenticatedFetch } from '@/lib/auth'
+import { authenticatedFetch } from '@/lib/authenticated-fetch'
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
 

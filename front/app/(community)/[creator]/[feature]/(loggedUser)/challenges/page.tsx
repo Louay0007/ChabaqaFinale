@@ -1,15 +1,31 @@
-import React from 'react'
+import { notFound } from "next/navigation"
 import ChallengesPageContent from '@/app/(community)/[creator]/[feature]/(loggedUser)/challenges/components/challenges-page-content'
-import { getCommunityBySlug, getChallengesByCommunity } from "@/lib/mock-data"
+import { challengesCommunityApi } from "@/lib/api/challenges-community.api"
 
 export default async function ChallengesPage({ 
   params 
 }: { 
-  params: Promise<{ feature: string }> 
+  params: Promise<{ creator: string; feature: string }> 
 }) {
-  const { feature } = await params
-  const community = getCommunityBySlug(feature)
-  const allChallenges = getChallengesByCommunity(community?.id || "")
+  const { creator, feature } = await params
+  
+  try {
+    const data = await challengesCommunityApi.getChallengesPageData(feature)
+    
+    if (!data.community) {
+      notFound()
+    }
 
-  return <ChallengesPageContent slug={feature} community={community} allChallenges={allChallenges} />
+    return (
+      <ChallengesPageContent 
+        creatorSlug={creator} 
+        slug={feature} 
+        community={data.community} 
+        allChallenges={data.challenges} 
+      />
+    )
+  } catch (error) {
+    console.error('Error loading challenges page:', error)
+    notFound()
+  }
 }

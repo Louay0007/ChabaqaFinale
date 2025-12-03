@@ -9,21 +9,40 @@ export interface GetCommunitiesParams extends PaginationParams {
 }
 
 export interface CreateCommunityData {
+  // Required fields
   name: string;
-  slug: string;
-  description: string;
+  country: string;
+  status: 'public' | 'private';
+  joinFee: 'free' | 'paid';
+  feeAmount: string;
+  currency: 'USD' | 'TND' | 'EUR';
+  socialLinks: {
+    instagram?: string;
+    tiktok?: string;
+    facebook?: string;
+    youtube?: string;
+    linkedin?: string;
+    website?: string;
+    twitter?: string;
+    discord?: string;
+    behance?: string;
+    github?: string;
+  };
+
+  // Optional fields
+  bio?: string; // Backend uses 'bio', not 'description'
+  slug?: string;
   longDescription?: string;
-  category: string;
-  tags: string[];
-  price?: number;
-  priceType: 'free' | 'monthly' | 'yearly' | 'one-time';
+  category?: string;
+  tags?: string[];
   image?: string;
+  logo?: string;
   coverImage?: string;
 }
 
-export interface UpdateCommunityData extends Partial<CreateCommunityData> {}
+export interface UpdateCommunityData extends Partial<CreateCommunityData> { }
 
-export interface UpdateCommunitySettingsData extends Partial<Omit<CommunitySettings, 'id' | 'communityId' | 'updatedAt'>> {}
+export interface UpdateCommunitySettingsData extends Partial<Omit<CommunitySettings, 'id' | 'communityId' | 'updatedAt'>> { }
 
 // Communities API
 export const communitiesApi = {
@@ -35,6 +54,11 @@ export const communitiesApi = {
   // Create community
   create: async (data: CreateCommunityData): Promise<ApiSuccessResponse<Community>> => {
     return apiClient.post<ApiSuccessResponse<Community>>('/community-aff-crea-join/create', data);
+  },
+
+  // Get community by ID
+  getById: async (id: string): Promise<ApiSuccessResponse<Community>> => {
+    return apiClient.get<ApiSuccessResponse<Community>>(`/community-aff-crea-join/${id}`);
   },
 
   // Get community by slug or ID

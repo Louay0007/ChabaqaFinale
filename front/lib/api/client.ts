@@ -35,29 +35,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/a
 
 class ApiClient {
   private baseURL: string;
-  private refreshPromise: Promise<string | null> | null = null;
+  private refreshPromise: Promise<boolean> | null = null;
+  private isRefreshing: boolean = false;
 
   constructor() {
     this.baseURL = API_BASE_URL;
-  }
-
-  private getAccessToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('accessToken');
-    }
-    return null;
-  }
-
-  private setAccessToken(token: string): void {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('accessToken', token);
-    }
-  }
-
-  private removeAccessToken(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-    }
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -66,6 +48,21 @@ class ApiClient {
         message: 'An error occurred',
         statusCode: response.status,
       }));
+
+      // For 401 errors on /auth/me, don't redirect - allow graceful handling
+      // Only redirect for other 401 errors on protected resources
+      if (response.status === 401 && typeof window !== 'undefined') {
+        // Check if this is a protected route that requires login
+        const protectedRoutes = ['/creator', '/dashboard', '/settings', '/profile', '/admin'];
+        const currentPath = window.location.pathname;
+        const isProtectedRoute = protectedRoutes.some(route => currentPath.startsWith(route));
+
+        // Only redirect if on a protected route
+        if (isProtectedRoute) {
+          window.location.href = '/signin';
+        }
+      }
+
       throw error;
     }
     return response.json();
@@ -85,25 +82,39 @@ class ApiClient {
 
   private getHeaders(isFormData: boolean = false): HeadersInit {
     const headers: HeadersInit = {};
-    
     if (!isFormData) {
       headers['Content-Type'] = 'application/json';
     }
-    // IMPORTANT: Do not include Authorization header. Rely on httpOnly cookies (credentials: 'include').
-    // This prevents stale localStorage tokens from overriding the real session and showing the wrong user.
+    // Add Authorization header if we have an access token
+    // Only add on client side to avoid SSR issues
+    if (typeof window !== 'undefined') {
+      try {
+        const { tokenStorage } = require('@/lib/token-storage');
+        const accessToken = tokenStorage.getAccessToken();
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+      } catch (error) {
+        // Silently fail - user might not be authenticated
+      }
+    }
+
     return headers;
   }
 
   // Generic HTTP methods
   async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
     const url = this.buildUrl(endpoint, params);
-    const doRequest = async () => fetch(url, { method: 'GET', headers: this.getHeaders(), credentials: 'include' });
-    const response = await doRequest();
+    const doRequest = async () => fetch(url, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    let response = await doRequest();
     if (response.status === 401) {
       const refreshed = await this.tryRefreshToken();
       if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
+        response = await doRequest();
       }
     }
     return this.handleResponse<T>(response);
@@ -111,14 +122,16 @@ class ApiClient {
 
   async post<T>(endpoint: string, data?: any): Promise<T> {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
-      method: 'POST', headers: this.getHeaders(), credentials: 'include', body: data ? JSON.stringify(data) : undefined,
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: data ? JSON.stringify(data) : undefined,
     });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
       const refreshed = await this.tryRefreshToken();
       if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
+        response = await doRequest();
       }
     }
     return this.handleResponse<T>(response);
@@ -126,14 +139,16 @@ class ApiClient {
 
   async patch<T>(endpoint: string, data?: any): Promise<T> {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
-      method: 'PATCH', headers: this.getHeaders(), credentials: 'include', body: data ? JSON.stringify(data) : undefined,
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: data ? JSON.stringify(data) : undefined,
     });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
       const refreshed = await this.tryRefreshToken();
       if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
+        response = await doRequest();
       }
     }
     return this.handleResponse<T>(response);
@@ -141,14 +156,16 @@ class ApiClient {
 
   async put<T>(endpoint: string, data?: any): Promise<T> {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
-      method: 'PUT', headers: this.getHeaders(), credentials: 'include', body: data ? JSON.stringify(data) : undefined,
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: data ? JSON.stringify(data) : undefined,
     });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
       const refreshed = await this.tryRefreshToken();
       if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
+        response = await doRequest();
       }
     }
     return this.handleResponse<T>(response);
@@ -156,14 +173,15 @@ class ApiClient {
 
   async delete<T>(endpoint: string): Promise<T> {
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
-      method: 'DELETE', headers: this.getHeaders(), credentials: 'include',
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include',
     });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
       const refreshed = await this.tryRefreshToken();
       if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
+        response = await doRequest();
       }
     }
     return this.handleResponse<T>(response);
@@ -175,14 +193,16 @@ class ApiClient {
     formData.append('file', file);
 
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
-      method: 'POST', headers: this.getHeaders(true), credentials: 'include', body: formData,
+      method: 'POST',
+      headers: this.getHeaders(true),
+      credentials: 'include',
+      body: formData,
     });
-    const response = await doRequest();
+    let response = await doRequest();
     if (response.status === 401) {
       const refreshed = await this.tryRefreshToken();
       if (refreshed) {
-        const retry = await doRequest();
-        return this.handleResponse<T>(retry);
+        response = await doRequest();
       }
     }
     return this.handleResponse<T>(response);
@@ -204,50 +224,55 @@ class ApiClient {
     return this.handleResponse<T>(response);
   }
 
-  // Auth methods
-  setToken(token: string): void {
-    this.setAccessToken(token);
-  }
+  // Token refresh logic (single-flight with better error handling)
+  private async tryRefreshToken(): Promise<boolean> {
+    if (this.isRefreshing) {
+      // Wait for ongoing refresh to complete
+      while (this.isRefreshing) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      return false;
+    }
 
-  clearToken(): void {
-    this.removeAccessToken();
-  }
+    if (this.refreshPromise) {
+      await this.refreshPromise;
+      return false;
+    }
 
-  // Token refresh logic (single-flight)
-  private async tryRefreshToken(): Promise<string | null> {
-    if (this.refreshPromise) return this.refreshPromise;
+    this.isRefreshing = true;
     this.refreshPromise = (async () => {
       try {
+        if (typeof window === 'undefined') {
+          return false;
+        }
+
+        // Attempt refresh using cookies
         const res = await fetch(`${this.baseURL}/auth/refresh`, {
           method: 'POST',
-          // Do NOT include Authorization header when refreshing
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+          credentials: 'include', // Send cookies
+          body: JSON.stringify({}), // Empty body, backend should read cookie
         });
+
         if (!res.ok) {
-          this.clearToken();
-          return null;
+          return false;
         }
-        const json = await res.json().catch(() => null);
-        const token = (json?.data?.accessToken)
-          || (json?.data?.access_token)
-          || json?.accessToken
-          || json?.access_token
-          || null;
-        if (token) {
-          this.setToken(token);
-        } else {
-          this.clearToken();
-        }
-        return token;
-      } catch {
-        this.clearToken();
-        return null;
+
+        // We don't need to manually set tokens in storage anymore
+        // The backend Set-Cookie header will handle it for the browser
+
+        return true;
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+        return false;
       } finally {
+        this.isRefreshing = false;
         this.refreshPromise = null;
       }
     })();
-    return this.refreshPromise;
+
+    const result = await this.refreshPromise;
+    return result;
   }
 }
 

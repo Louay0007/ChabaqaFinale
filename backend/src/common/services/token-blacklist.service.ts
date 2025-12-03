@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { RevokedToken, RevokedTokenDocument } from '../../schema/revoked-token.schema';
+import { Types as MongooseTypes } from 'mongoose';
 
 @Injectable()
 export class TokenBlacklistService {
@@ -34,33 +35,49 @@ export class TokenBlacklistService {
   }
 
   /**
-   * Vérifier si un token est révoqué
-   */
-  async isTokenRevoked(tokenId: string): Promise<boolean> {
-    const revokedToken = await this.revokedTokenModel.findOne({
-      tokenId,
-      expiresAt: { $gt: new Date() }, // Seulement si pas encore expiré
-    });
-    
-    return !!revokedToken;
-  }
+    * Vérifier si un token est révoqué
+    */
+   async isTokenRevoked(tokenId: string, userId?: string): Promise<boolean> {
+     // First check if the specific token is revoked
+     const revokedToken = await this.revokedTokenModel.findOne({
+       tokenId,
+       expiresAt: { $gt: new Date() }, // Seulement si pas encore expiré
+     });
+
+     if (revokedToken) {
+       return true;
+     }
+
+     // Then check if all tokens for the user are revoked
+     if (userId) {
+       const allRevoked = await this.revokedTokenModel.findOne({
+         userId,
+         tokenType: 'all',
+         expiresAt: { $gt: new Date() },
+       });
+       if (allRevoked) {
+         return true;
+       }
+     }
+
+     return false;
+   }
 
   /**
-   * Révoquer tous les tokens d'un utilisateur
-   */
-  async revokeAllUserTokens(userId: Types.ObjectId): Promise<void> {
-    // Pour cette implémentation, nous ne révoquons que les refresh tokens
-    // car les access tokens ont une durée courte
-    const currentTime = new Date();
-    const futureTime = new Date(currentTime.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 jours
+    * Révoquer tous les tokens d'un utilisateur
+    */
+   async revokeAllUserTokens(userId: Types.ObjectId): Promise<void> {
+     const currentTime = new Date();
+     const futureTime = new Date(currentTime.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 jours
 
-    await this.revokedTokenModel.create({
-      userId,
-      tokenId: `user-${userId}-logout-${Date.now()}`, // Token fictif pour marquer le logout
-      tokenType: 'refresh',
-      expiresAt: futureTime,
-    });
-  }
+     // Create a special entry to mark all tokens revoked for this user
+     await this.revokedTokenModel.create({
+       userId,
+       tokenId: `all-tokens-revoked-${Date.now()}`,
+       tokenType: 'all',
+       expiresAt: futureTime,
+     });
+   }
 
   /**
    * Révoquer un token spécifique avec ses informations JWT

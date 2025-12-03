@@ -59,9 +59,19 @@ export const coursesApi = {
     return apiClient.delete<ApiSuccessResponse<void>>(`/courses/${id}`);
   },
 
-  // Get courses by community
-  getByCommunity: async (communityId: string): Promise<ApiSuccessResponse<Course[]>> => {
-    return apiClient.get<ApiSuccessResponse<Course[]>>(`/courses/community/${communityId}`);
+  // Get courses by community (using slug)
+  getByCommunity: async (slug: string, params?: { page?: number; limit?: number; published?: boolean }): Promise<any> => {
+    return apiClient.get(`/cours/community/${slug}`, params);
+  },
+  
+  // Get user enrolled courses
+  getMyCourses: async (params?: PaginationParams): Promise<any> => {
+    return apiClient.get('/cours/user/mes-cours', params);
+  },
+  
+  // Get user progress for all courses
+  getUserProgress: async (params?: PaginationParams): Promise<any> => {
+    return apiClient.get('/cours/user/progress', params);
   },
 
   // Get course sections

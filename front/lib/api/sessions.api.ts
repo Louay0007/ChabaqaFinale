@@ -59,9 +59,9 @@ export const sessionsApi = {
     return apiClient.delete<ApiSuccessResponse<void>>(`/sessions/${id}`);
   },
 
-  // Get sessions by community
-  getByCommunity: async (communityId: string): Promise<ApiSuccessResponse<Session[]>> => {
-    return apiClient.get<ApiSuccessResponse<Session[]>>(`/sessions/community/${communityId}`);
+  // Get sessions by community (using slug)
+  getByCommunity: async (slug: string): Promise<any> => {
+    return apiClient.get(`/sessions/community/${slug}`);
   },
 
   // Book session

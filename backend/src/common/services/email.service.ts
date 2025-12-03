@@ -3,20 +3,43 @@ import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private transporter: nodemailer.Transporter | null = null;
+  private useEthereal: boolean = false;
   private readonly logger = new Logger(EmailService.name);
 
   constructor() {
-    this.initializeTransporter();
+    // Initialize transporter asynchronously
+    this.initializeTransporter()
+      .then(transporter => {
+        this.transporter = transporter;
+        if (process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+          this.logger.log('✅ Email SMTP configuré avec succès');
+        } else {
+          this.logger.log('📧 Service Ethereal Email configuré pour les tests');
+        }
+      })
+      .catch(err => {
+        this.logger.error('❌ Échec d\'initialisation du transporteur email:', err.message);
+        // Try to fallback to Ethereal
+        this.createEtherealAccount()
+          .then(transporter => {
+            this.transporter = transporter;
+            this.useEthereal = true;
+            this.logger.log('✅ Fallback vers Ethereal Email réussi');
+          })
+          .catch(fallbackErr => {
+            this.logger.error('💥 Fallback échoué:', fallbackErr.message);
+            this.logger.warn('⚠️ Le service email n\'est pas disponible. Les codes 2FA seront loggés dans la console.');
+          });
+      });
   }
 
-  private async initializeTransporter() {
-    try {
+  private async initializeTransporter(usePool: boolean = false): Promise<nodemailer.Transporter> {
       // Email SMTP Configuration (using your env variables)
       if (process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-        // Enhanced Gmail SMTP configuration
-        this.transporter = nodemailer.createTransport({
-          service: 'Gmail', // Use Gmail service for better compatibility
+      // Gmail SMTP configuration - don't use pool to avoid connection issues
+      const transportOptions: any = {
+        service: 'Gmail',
           host: process.env.EMAIL_HOST,
           port: parseInt(process.env.EMAIL_PORT || '587'),
           secure: false, // true for 465, false for other ports
@@ -26,36 +49,31 @@ export class EmailService {
           },
           tls: {
             rejectUnauthorized: false,
-            ciphers: 'SSLv3'
+          minVersion: 'TLSv1.2',
           },
-          // Additional Gmail-specific options
-          pool: true,
-          maxConnections: 5,
-          maxMessages: 100,
-          rateLimit: 14, // Max 14 messages per second
-        });
+        // Connection timeouts
+        connectionTimeout: 10000, // 10 seconds
+        greetingTimeout: 5000, // 5 seconds
+        socketTimeout: 10000, // 10 seconds
+      };
 
-        // Test the SMTP connection
-        await this.transporter.verify();
-        this.logger.log('✅ Email SMTP configuré et vérifié avec succès');
+      // Only use pool if explicitly requested (not recommended for Gmail)
+      if (usePool) {
+        transportOptions.pool = true;
+        transportOptions.maxConnections = 1; // Single connection
+        transportOptions.maxMessages = 1; // One message per connection
+      }
+
+      return nodemailer.createTransport(transportOptions);
       } else {
         // Use Ethereal Email (test service) as fallback
-        this.transporter = await this.createEtherealAccount();
-        this.logger.log('📧 Service Ethereal Email configuré pour les tests');
-      }
-    } catch (error) {
-      this.logger.error('❌ Erreur lors de la configuration SMTP:', error.message);
-      
-      // Fallback to Ethereal if Gmail fails
-      try {
-        this.logger.warn('🔄 Tentative de fallback vers Ethereal Email...');
-        this.transporter = await this.createEtherealAccount();
-        this.logger.log('✅ Fallback réussi vers Ethereal Email');
-      } catch (fallbackError) {
-        this.logger.error('💥 Fallback échoué:', fallbackError.message);
-        throw new Error('Impossible de configurer le service email');
-      }
+      return await this.createEtherealAccount();
     }
+  }
+
+  private async createTransporterForSend(): Promise<nodemailer.Transporter> {
+    // Create a fresh connection for each send to avoid Gmail connection issues
+    return await this.initializeTransporter(false);
   }
 
   private async createEtherealAccount(): Promise<nodemailer.Transporter> {
@@ -90,15 +108,20 @@ export class EmailService {
     };
 
     try {
+      // Ensure transporter is available
+      if (!this.transporter) {
+        this.transporter = await this.createTransporterForSend();
+      }
+
       this.logger.log(`📧 Tentative d'envoi d'email à: ${email}`);
       const result = await this.transporter.sendMail(mailOptions);
       this.logger.log('✅ Email envoyé avec succès');
       
       // Si c'est Ethereal Email, afficher l'URL de prévisualisation
-      if (result.messageId.includes('ethereal')) {
+      if (result.messageId && result.messageId.includes('ethereal')) {
         this.logger.log(`🔗 Prévisualisation: https://ethereal.email/message/${result.messageId}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('❌ Erreur lors de l\'envoi d\'email:', error.message);
       throw new Error(`Erreur lors de l'envoi de l'email: ${error.message}`);
     }
@@ -106,8 +129,9 @@ export class EmailService {
 
   /**
    * Envoie un email avec code 2FA pour la connexion
+   * Returns true if sent successfully, false otherwise (non-blocking)
    */
-  async send2FACode(email: string, code: string, userName: string): Promise<void> {
+  async send2FACode(email: string, code: string, userName: string): Promise<boolean> {
     const mailOptions = {
       from: process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@chabaqa.org',
       to: email,
@@ -115,23 +139,84 @@ export class EmailService {
       html: this.generate2FAEmailTemplate(code, userName),
     };
 
-    try {
-      this.logger.log(`📧 Tentative d'envoi d'email 2FA à: ${email}`);
-      // Log the 2FA code to server logs for testing environments
+    // Always log the code in non-production environments for testing
       if (process.env.NODE_ENV !== 'production') {
         this.logger.warn(`🔐 2FA code (test): ${code} for ${email}`);
       }
-      const result = await this.transporter.sendMail(mailOptions);
+
+    // Retry logic with exponential backoff
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      let currentTransporter: nodemailer.Transporter | null = null;
+      
+      try {
+        // Create a fresh connection for each attempt to avoid Gmail connection issues
+        this.logger.log(`📧 Tentative ${attempt}/${maxRetries} d'envoi d'email 2FA à: ${email}`);
+        
+        // If previous attempts failed with connection errors, try Ethereal
+        if (attempt > 1 && lastError?.message.includes('Connection')) {
+          this.logger.warn('🔄 Tentative avec Ethereal Email (fallback)...');
+          currentTransporter = await this.createEtherealAccount();
+          this.useEthereal = true;
+        } else {
+          // Try Gmail first, fallback to Ethereal if not configured
+          currentTransporter = await this.createTransporterForSend();
+        }
+        
+        const result = await Promise.race([
+          currentTransporter.sendMail(mailOptions),
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Email send timeout')), 10000)
+          )
+        ]) as nodemailer.SentMessageInfo;
+
       this.logger.log('✅ Email 2FA envoyé avec succès');
       
       // Si c'est Ethereal Email, afficher l'URL de prévisualisation
-      if (result.messageId.includes('ethereal')) {
+        if (result.messageId && result.messageId.includes('ethereal')) {
         this.logger.log(`🔗 Prévisualisation: https://ethereal.email/message/${result.messageId}`);
       }
-    } catch (error) {
-      this.logger.error('❌ Erreur lors de l\'envoi d\'email 2FA:', error.message);
-      throw new Error(`Erreur lors de l'envoi de l'email 2FA: ${error.message}`);
+        
+        // Close the connection if we created a new one
+        if (currentTransporter && currentTransporter.close) {
+          currentTransporter.close();
+        }
+        
+        return true;
+      } catch (error: any) {
+        lastError = error;
+        this.logger.warn(`⚠️ Tentative ${attempt}/${maxRetries} échouée: ${error.message}`);
+        
+        // Close the failed connection
+        if (currentTransporter && currentTransporter.close) {
+          try {
+            currentTransporter.close();
+          } catch (closeError) {
+            // Ignore close errors
+          }
+        }
+        
+        // If it's a connection error and we haven't tried Ethereal yet, wait before retry
+        if (error.message.includes('Connection') || error.message.includes('closed') || error.message.includes('timeout')) {
+          if (attempt < maxRetries) {
+            // Wait before retry (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          }
+        } else {
+          // For other errors, don't retry
+          break;
+        }
+      }
     }
+
+    // If all retries failed, log but don't throw (non-blocking)
+    this.logger.error(`❌ Échec d'envoi d'email 2FA après ${maxRetries} tentatives:`, lastError?.message);
+    this.logger.warn(`⚠️ Le code 2FA ${code} a été généré mais l'email n'a pas pu être envoyé.`);
+    this.logger.warn(`⚠️ En développement, le code est disponible dans les logs ci-dessus.`);
+    
+    return false;
   }
 
   /**
@@ -147,15 +232,20 @@ export class EmailService {
     };
 
     try {
+      // Ensure transporter is available
+      if (!this.transporter) {
+        this.transporter = await this.createTransporterForSend();
+      }
+
       this.logger.log(`📧 Tentative d'envoi d'email générique à: ${data.to}`);
       const result = await this.transporter.sendMail(mailOptions);
       this.logger.log('✅ Email générique envoyé avec succès');
       
       // Si c'est Ethereal Email, afficher l'URL de prévisualisation
-      if (result.messageId.includes('ethereal')) {
+      if (result.messageId && result.messageId.includes('ethereal')) {
         this.logger.log(`🔗 Prévisualisation: https://ethereal.email/message/${result.messageId}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('❌ Erreur lors de l\'envoi d\'email générique:', error.message);
       throw new Error(`Erreur lors de l'envoi de l'email générique: ${error.message}`);
     }

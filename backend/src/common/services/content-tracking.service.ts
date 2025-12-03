@@ -308,6 +308,66 @@ export class ContentTrackingService {
   }
 
   /**
+   * Obtenir la progression d'un utilisateur pour plusieurs types de contenus
+   */
+  async getUserProgressOverview(
+    userId: string,
+    contentTypes?: TrackableContentType[],
+    page: number = 1,
+    limit: number = 20,
+    contentFilters?: Partial<Record<TrackableContentType, string[]>>
+  ) {
+    const skip = (page - 1) * limit;
+    const filter: any = {
+      userId: new Types.ObjectId(userId),
+    };
+
+    if (contentTypes && contentTypes.length > 0) {
+      filter.contentType = { $in: contentTypes };
+    }
+
+    if (contentFilters) {
+      const orFilters = Object.entries(contentFilters)
+        .filter(([, ids]) => ids && ids.length > 0)
+        .map(([contentType, ids]) => ({
+          contentType,
+          contentId: { $in: ids },
+        }));
+
+      if (orFilters.length === 0) {
+        return {
+          items: [],
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+        };
+      }
+
+      filter.$or = orFilters;
+    }
+
+    const [items, total] = await Promise.all([
+      this.contentProgressModel
+        .find(filter)
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.contentProgressModel.countDocuments(filter),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
    * Obtenir les statistiques d'un contenu
    */
   async getContentStats(contentId: string, contentType: TrackableContentType) {

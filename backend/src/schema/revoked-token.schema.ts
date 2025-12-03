@@ -45,7 +45,7 @@ export class RevokedToken {
    */
   @Prop({
     required: true,
-    enum: ['access', 'refresh'],
+    enum: ['access', 'refresh', 'all'],
     default: 'refresh'
   })
   tokenType: string;

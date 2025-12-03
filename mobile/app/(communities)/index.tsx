@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import PlatformUtils from '@/lib/platform-utils';
 import { useAdaptiveColors } from '@/hooks/useAdaptiveColors';
 import { ExploreData } from '@/lib/data-communities';
 import { getCommunities, Community } from '@/lib/communities-api';
@@ -51,7 +52,7 @@ export default function CommunitiesScreen() {
     try {
       setLoading(true);
       console.log('🔄 Fetching communities from backend...');
-      
+
       const response = await getCommunities({
         page: 1,
         limit: 50,
@@ -59,16 +60,34 @@ export default function CommunitiesScreen() {
 
       if (response.success && response.data) {
         console.log('📦 Raw backend data sample:', response.data[0]);
-        
+
         // Transform backend data to match frontend format
         const transformedCommunities = response.data.map((community: any) => {
-          // Extract creator info (backend returns it as a string in the transformed response)
-          const creatorName = community.creator || 'Unknown Creator';
-          const creatorAvatar = community.creatorAvatar || 'https://placehold.co/64x64?text=' + creatorName.charAt(0);
-          
-          // Get image URLs - backend provides multiple image fields
-          const imageUrl = community.image || community.coverImage || community.logo || 'https://via.placeholder.com/800x400';
-          
+          // Helper to fix URLs
+          const fixUrl = (url: string | null | undefined) => {
+            if (!url) return null;
+            const apiBase = PlatformUtils.getApiUrl();
+            if (url.startsWith('http')) {
+              return url.replace('http://localhost:3000', apiBase)
+                .replace('http://127.0.0.1:3000', apiBase);
+            }
+            return `${apiBase}${url.startsWith('/') ? '' : '/'}${url}`;
+          };
+
+          // Extract creator info
+          let creatorName = 'Unknown Creator';
+          let rawCreatorAvatar = null;
+
+          if (typeof community.creator === 'object' && community.creator !== null) {
+            creatorName = community.creator.name || 'Unknown Creator';
+            rawCreatorAvatar = community.creator.avatar;
+          } else if (typeof community.creator === 'string') {
+            creatorName = community.creator;
+            rawCreatorAvatar = community.creatorAvatar;
+          }
+
+          const creatorAvatar = fixUrl(rawCreatorAvatar) || `https://placehold.co/64x64?text=${creatorName.charAt(0)}`;
+
           // Map category images based on category name
           const getCategoryImage = (category: string) => {
             const categoryImages: { [key: string]: any } = {
@@ -82,6 +101,34 @@ export default function CommunitiesScreen() {
             return categoryImages[category] || require('@/assets/images/email-marketing.png');
           };
 
+          // Get image URLs - backend returns cover image in 'image' field
+          const rawImageUrl = community.image || community.logo;
+          let finalImageUrl: string | number;
+
+          // Check if URL is a placeholder URL that mobile can't access
+          const isPlaceholderUrl = (url: string) => {
+            return url.includes('placeholder.com') || url.includes('placehold.co');
+          };
+
+          if (rawImageUrl && rawImageUrl.trim() && !isPlaceholderUrl(rawImageUrl)) {
+            // If we have a valid non-placeholder URL, fix it and use it
+            const fixedUrl = fixUrl(rawImageUrl);
+            finalImageUrl = fixedUrl || getCategoryImage(community.category || 'General');
+          } else {
+            // If no URL, placeholder URL, or mobile can't access it, use category fallback
+            finalImageUrl = getCategoryImage(community.category || 'General');
+          }
+
+          // DEBUG: Log image data
+          console.log('🖼️ [IMAGE DEBUG]', {
+            communityName: community.name,
+            rawImage: community.image,
+            rawImageUrl,
+            isPlaceholder: rawImageUrl ? isPlaceholderUrl(rawImageUrl) : false,
+            finalImageUrl: typeof finalImageUrl === 'string' ? finalImageUrl : 'LOCAL_ASSET',
+            category: community.category
+          });
+
           const transformed = {
             id: community.id || community._id || '',
             slug: community.slug || '',
@@ -94,17 +141,17 @@ export default function CommunitiesScreen() {
             rating: community.rating || community.averageRating || 0,
             price: community.price || community.fees_of_join || 0,
             priceType: community.priceType || 'free',
-            // Use category-based image for now (local assets work better in mobile)
-            image: getCategoryImage(community.category || 'General'),
-            // Store the URL for future use
-            imageUrl: imageUrl,
+            // Use the final processed image URL
+            image: finalImageUrl,
+            // Store the URL for future use (only if it's a string URL)
+            imageUrl: typeof finalImageUrl === 'string' ? finalImageUrl : '',
             tags: community.tags || [],
             featured: community.featured || false,
             verified: community.verified || community.isVerified || false,
             type: community.type || 'community',
             link: `/(communities)/${community.slug}`,
           };
-          
+
           return transformed;
         });
 
@@ -144,16 +191,16 @@ export default function CommunitiesScreen() {
       // Map category names to types for filtering
       const categoryToTypeMap: { [key: string]: string } = {
         'Community': 'community',
-        'Course': 'course', 
+        'Course': 'course',
         'Challenge': 'challenge',
         'Product': 'product',
         '1-to-1 Sessions': 'oneToOne',
         'Event': 'event'
       };
-      
+
       const targetType = categoryToTypeMap[selectedCategory];
       if (targetType) {
-        filtered = filtered.filter(community => 
+        filtered = filtered.filter(community =>
           community.type === targetType
         );
       }
@@ -199,7 +246,7 @@ export default function CommunitiesScreen() {
     <View style={[communityStyles.topNavBar, { backgroundColor: adaptiveColors.cardBackground, borderBottomColor: adaptiveColors.cardBorder }]}>
       {/* Left section - Menu + Logo */}
       <View style={communityStyles.navLeft}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={communityStyles.menuButton}
           onPress={() => {
             setSidebarVisible(true);
@@ -225,7 +272,7 @@ export default function CommunitiesScreen() {
       </Text>
       <Text style={[communityStyles.headerSubtitle, { color: adaptiveColors.secondaryText }]}>
         or{' '}
-        <Text 
+        <Text
           style={{ color: '#8e78fb', fontWeight: '600' }}
           onPress={() => router.push('/(build_community)')}
         >
@@ -251,7 +298,7 @@ export default function CommunitiesScreen() {
       <StatusBar style={adaptiveColors.isDark ? "light" : "dark"} />
       {/* Top Navigation Bar */}
       {renderTopBar()}
-      
+
       {/* Header */}
       {renderHeader()}
 
@@ -262,7 +309,7 @@ export default function CommunitiesScreen() {
         selectedCategory={selectedCategory}
         onCategoryChange={setSelectedCategory}
         selectedSort=""
-        onSortChange={() => {}}
+        onSortChange={() => { }}
         categories={categories}
         sortOptions={[]}
       />
@@ -287,7 +334,7 @@ export default function CommunitiesScreen() {
       />
 
       {/* Sidebar */}
-      <Sidebar 
+      <Sidebar
         key={sidebarKey}
         isVisible={sidebarVisible}
         onClose={() => setSidebarVisible(false)}

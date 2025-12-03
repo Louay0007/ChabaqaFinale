@@ -15,4 +15,4 @@ import { CacheService } from '../services/cache.service';
   providers: [CacheService],
   exports: [CacheService, NestCacheModule],
 })
-export class CacheModule {}
+export class CacheModule { }

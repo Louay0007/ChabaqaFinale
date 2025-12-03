@@ -469,9 +469,14 @@ export const getMyJoinedCommunities = async (): Promise<{
   try {
     console.log('📚 [COMMUNITIES] Fetching joined communities');
     const accessToken = await getAccessToken();
-    
+
     if (!accessToken) {
-      throw new Error('Not authenticated');
+      console.log('⚠️ [COMMUNITIES] No access token, returning empty list');
+      return {
+        success: false,
+        message: 'Not authenticated',
+        data: []
+      };
     }
 
     const resp = await tryEndpoints<{
@@ -486,11 +491,36 @@ export const getMyJoinedCommunities = async (): Promise<{
       timeout: 30000,
     });
 
+    // Handle 401 Unauthorized
+    if (resp.status === 401) {
+      console.log('⚠️ [COMMUNITIES] Token expired or invalid, returning empty list');
+      return {
+        success: false,
+        message: 'Authentication required',
+        data: []
+      };
+    }
+
+    // Check if response has data
+    if (!resp.data || !resp.data.data) {
+      console.log('⚠️ [COMMUNITIES] No data in response, returning empty list');
+      return {
+        success: false,
+        message: 'No data received',
+        data: []
+      };
+    }
+
     console.log('✅ [COMMUNITIES] Joined communities:', resp.data.data.length);
     return resp.data;
   } catch (error: any) {
     console.error('💥 [COMMUNITIES] Error fetching joined communities:', error);
-    throw new Error(error.message || 'Failed to fetch joined communities');
+    // Return empty array instead of throwing
+    return {
+      success: false,
+      message: error.message || 'Failed to fetch joined communities',
+      data: []
+    };
   }
 };
 
@@ -569,6 +599,65 @@ export const joinCommunity = async (
   }
 };
 
+/**
+ * Get active/online members of a community by slug
+ */
+export const getActiveMembersByCommunity = async (
+  slug: string,
+  limit: number = 20
+): Promise<{
+  success: boolean;
+  message: string;
+  data: {
+    members: Array<{
+      id: string;
+      name: string;
+      email: string;
+      avatar: string;
+      bio: string;
+      isOnline: boolean;
+      lastActive: Date;
+    }>;
+    total: number;
+    online: number;
+  };
+}> => {
+  try {
+    console.log('👥 [ACTIVE-MEMBERS-API] Fetching active members for:', slug, 'limit:', limit);
+
+    const resp = await tryEndpoints<{
+      success: boolean;
+      message: string;
+      data: {
+        members: Array<{
+          id: string;
+          name: string;
+          email: string;
+          avatar: string;
+          bio: string;
+          isOnline: boolean;
+          lastActive: Date;
+        }>;
+        total: number;
+        online: number;
+      };
+    }>(`/api/community-aff-crea-join/${slug}/active-members?limit=${limit}`, {
+      method: 'GET',
+      timeout: 10000,
+    });
+
+    console.log('✅ [ACTIVE-MEMBERS-API] Fetched:', {
+      total: resp.data.data.total,
+      online: resp.data.data.online
+    });
+
+    return resp.data;
+  } catch (error: any) {
+    console.error('❌ [ACTIVE-MEMBERS-API] Error:', error);
+    throw new Error(error.message || 'Failed to fetch active members');
+  }
+};
+
 export default {
   getCommunities,
   getCommunityBySlug,
@@ -579,6 +668,7 @@ export default {
   getMyJoinedCommunities,
   getCommunityRanking,
   joinCommunity,
+  getActiveMembersByCommunity,
   formatPrice,
   formatMemberCount,
   formatRating,

@@ -384,18 +384,36 @@ export default function CommunityAnalyticsPage() {
                   Top {selectedFeature.charAt(0).toUpperCase() + selectedFeature.slice(1)}
                 </h3>
                 <div className="space-y-3">
-                  {[1, 2, 3].map((index) => (
-                    <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg gap-2">
+                  {topItems.map((item, index) => (
+                    <div key={item.id || index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg gap-2">
                       <div className="flex-1">
-                        <h4 className="text-sm sm:text-base font-medium">Item {index}</h4>
-                        <p className="text-xs sm:text-sm text-gray-500">Performance metrics</p>
+                        <h4 className="text-sm sm:text-base font-medium">{item.title || `Item ${index + 1}`}</h4>
+                        <p className="text-xs sm:text-sm text-gray-500">
+                          {selectedFeature === 'courses' && `${item.enrollments || 0} enrollments`}
+                          {selectedFeature === 'challenges' && `${item.participants || 0} participants`}
+                          {selectedFeature === 'events' && `${item.registrations || 0} registrations`}
+                          {selectedFeature === 'products' && `${item.sales || 0} sales`}
+                        </p>
                       </div>
                       <div className="text-left sm:text-right">
-                        <p className="text-sm sm:text-base font-medium">1,234 views</p>
-                        <p className="text-xs sm:text-sm text-green-600">+12% from last period</p>
+                        <p className="text-sm sm:text-base font-medium">
+                          {item.views || item.revenue || item.completions || item.participants || '0'}{' '}
+                          {selectedFeature === 'courses' && 'views'}
+                          {selectedFeature === 'challenges' && 'participants'}
+                          {selectedFeature === 'events' && 'registrations'}
+                          {selectedFeature === 'products' && 'sales'}
+                        </p>
+                        <p className="text-xs sm:text-sm text-green-600">
+                          {item.change || item.growth || '+0%'} from last period
+                        </p>
                       </div>
                     </div>
                   ))}
+                  {topItems.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No top {selectedFeature} found for this time period.
+                    </div>
+                  )}
                   {userPlan === "starter" && (
                     <div className="mt-4 p-3 sm:p-4 bg-gray-50 rounded-lg border border-dashed">
                       <div className="flex items-center justify-between">
@@ -418,14 +436,71 @@ export default function CommunityAnalyticsPage() {
               <div>
                 <h3 className="text-base sm:text-lg font-semibold mb-4">Detailed Analytics</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <div className="p-3 sm:p-4 border rounded-lg">
-                    <h4 className="text-sm font-medium mb-2">Completion Rate</h4>
-                    <p className="text-xl sm:text-2xl font-bold">75%</p>
-                  </div>
-                  <div className="p-3 sm:p-4 border rounded-lg">
-                    <h4 className="text-sm font-medium mb-2">Average Duration</h4>
-                    <p className="text-xl sm:text-2xl font-bold">45 mins</p>
-                  </div>
+                  {selectedFeature === 'courses' && (
+                    <>
+                      <div className="p-3 sm:p-4 border rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Completion Rate</h4>
+                        <p className="text-xl sm:text-2xl font-bold">
+                          {overview?.completionRate || overview?.courseCompletionRate || '0'}%
+                        </p>
+                      </div>
+                      <div className="p-3 sm:p-4 border rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Average Duration</h4>
+                        <p className="text-xl sm:text-2xl font-bold">
+                          {overview?.avgDuration || overview?.averageDuration || '0'} mins
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {selectedFeature === 'challenges' && (
+                    <>
+                      <div className="p-3 sm:p-4 border rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Completion Rate</h4>
+                        <p className="text-xl sm:text-2xl font-bold">
+                          {overview?.challengeCompletionRate || '0'}%
+                        </p>
+                      </div>
+                      <div className="p-3 sm:p-4 border rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Average Submissions</h4>
+                        <p className="text-xl sm:text-2xl font-bold">
+                          {overview?.avgSubmissions || overview?.averageSubmissions || '0'}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {selectedFeature === 'events' && (
+                    <>
+                      <div className="p-3 sm:p-4 border rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Attendance Rate</h4>
+                        <p className="text-xl sm:text-2xl font-bold">
+                          {overview?.attendanceRate || '0'}%
+                        </p>
+                      </div>
+                      <div className="p-3 sm:p-4 border rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Average Duration</h4>
+                        <p className="text-xl sm:text-2xl font-bold">
+                          {overview?.avgDurationHours || overview?.averageDuration || '0'}h
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {selectedFeature === 'products' && (
+                    <>
+                      <div className="p-3 sm:p-4 border rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Average Rating</h4>
+                        <p className="text-xl sm:text-2xl font-bold">
+                          {overview?.avgRating || overview?.averageRating || '0'}{' '}
+                          <span className="text-yellow-400">⭐</span>
+                        </p>
+                      </div>
+                      <div className="p-3 sm:p-4 border rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Customer Satisfaction</h4>
+                        <p className="text-xl sm:text-2xl font-bold">
+                          {overview?.customerSatisfaction || '0'}%
+                        </p>
+                      </div>
+                    </>
+                  )}
                   {userPlan === "starter" && (
                     <>
                       <div className="p-3 sm:p-4 border rounded-lg bg-gray-50 border-dashed">
@@ -453,19 +528,41 @@ export default function CommunityAnalyticsPage() {
                 <div>
                   <h3 className="text-base sm:text-lg font-semibold mb-4">Performance Trends</h3>
                   <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={membershipData}>
+                    <AreaChart data={membershipData.length > 0 ? membershipData : engagementData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                      <XAxis
+                        dataKey={membershipData.length > 0 ? "month" : "day"}
+                        tick={{ fontSize: 12 }}
+                      />
                       <YAxis tick={{ fontSize: 12 }} />
                       <Tooltip />
                       <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      <Area
-                        type="monotone"
-                        dataKey="totalMembers"
-                        name="Views"
-                        stroke="rgb(99, 102, 241)"
-                        fill="rgba(99, 102, 241, 0.1)"
-                      />
+                      {membershipData.length > 0 ? (
+                        <>
+                          <Area
+                            type="monotone"
+                            dataKey="totalMembers"
+                            name="Total Members"
+                            stroke="rgb(99, 102, 241)"
+                            fill="rgba(99, 102, 241, 0.1)"
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="activeMembers"
+                            name="Active Members"
+                            stroke="rgb(34, 197, 94)"
+                            fill="rgba(34, 197, 94, 0.1)"
+                          />
+                        </>
+                      ) : (
+                        <Area
+                          type="monotone"
+                          dataKey="engagement"
+                          name="Engagement"
+                          stroke="rgb(99, 102, 241)"
+                          fill="rgba(99, 102, 241, 0.1)"
+                        />
+                      )}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>

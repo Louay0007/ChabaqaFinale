@@ -1,19 +1,19 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Search, Filter, Download, Plus, MoreHorizontal, CheckCircle, AlertCircle, Clock } from "lucide-react"
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import { Search, Filter, Download, Plus, MoreHorizontal, CheckCircle, AlertCircle, Clock, RefreshCw, Loader2 } from "lucide-react"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table"
 import {
   DropdownMenu,
@@ -35,91 +35,28 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { api } from "@/lib/api"
 
-// Mock subscription data
-const initialSubscriptions = [
-  {
-    id: "sub_1",
-    customer: "John Smith",
-    email: "john.smith@example.com",
-    plan: "Pro Plan",
-    amount: "$29.99",
-    status: "active",
-    nextBilling: "2024-07-15",
-    startDate: "2024-01-15",
-  },
-  {
-    id: "sub_2",
-    customer: "Sarah Johnson",
-    email: "sarah.j@example.com",
-    plan: "Basic Plan",
-    amount: "$9.99",
-    status: "active",
-    nextBilling: "2024-07-10",
-    startDate: "2023-12-10",
-  },
-  {
-    id: "sub_3",
-    customer: "Michael Brown",
-    email: "michael.b@example.com",
-    plan: "Premium Plan",
-    amount: "$49.99",
-    status: "active",
-    nextBilling: "2024-07-22",
-    startDate: "2024-02-22",
-  },
-  {
-    id: "sub_4",
-    customer: "Emily Davis",
-    email: "emily.d@example.com",
-    plan: "Pro Plan",
-    amount: "$29.99",
-    status: "canceled",
-    nextBilling: "N/A",
-    startDate: "2023-11-05",
-  },
-  {
-    id: "sub_5",
-    customer: "David Wilson",
-    email: "david.w@example.com",
-    plan: "Basic Plan",
-    amount: "$9.99",
-    status: "past_due",
-    nextBilling: "2024-07-03",
-    startDate: "2024-01-03",
-  },
-]
+interface SubscriptionData {
+  id: string;
+  customer: string;
+  email: string;
+  plan: string;
+  amount: string;
+  status: 'active' | 'canceled' | 'past_due';
+  nextBilling: string;
+  startDate: string;
+}
 
-// Stats data
-const subscriptionStats = [
-  {
-    title: "Active Subscriptions",
-    value: "32",
-    change: { value: "+12%", trend: "up" },
-    description: "Total active subscriptions"
-  },
-  {
-    title: "Monthly Revenue",
-    value: "$1,245",
-    change: { value: "+18%", trend: "up" },
-    description: "Recurring monthly revenue"
-  },
-  {
-    title: "Avg. Subscription Value",
-    value: "$38.90",
-    change: { value: "+5%", trend: "up" },
-    description: "Average subscription amount"
-  },
-  {
-    title: "Churn Rate",
-    value: "3.2%",
-    change: { value: "-0.8%", trend: "down" },
-    description: "Monthly subscription cancellations"
-  },
-]
+interface SubscriptionStats {
+  title: string;
+  value: string;
+  change: { value: string; trend: "up" | "down" | "neutral" };
+  description: string;
+}
 
 export default function SubscriptionsPage() {
-  const [subscriptions, setSubscriptions] = useState(initialSubscriptions);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
@@ -128,28 +65,139 @@ export default function SubscriptionsPage() {
     price: "",
     description: ""
   });
-  
+  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  // Load subscriptions from API
+  useEffect(() => {
+    const loadSubscriptions = async () => {
+      setLoading(true);
+      try {
+        // For now, we'll use mock data since the backend subscription management API isn't fully implemented
+        // In a real implementation, this would call: const response = await api.subscription.getMySubscription();
+
+        const mockSubscriptions: SubscriptionData[] = [
+          {
+            id: "sub_1",
+            customer: "John Smith",
+            email: "john.smith@example.com",
+            plan: "Pro Plan",
+            amount: "$29.99",
+            status: "active",
+            nextBilling: "2024-07-15",
+            startDate: "2024-01-15",
+          },
+          {
+            id: "sub_2",
+            customer: "Sarah Johnson",
+            email: "sarah.j@example.com",
+            plan: "Basic Plan",
+            amount: "$9.99",
+            status: "active",
+            nextBilling: "2024-07-10",
+            startDate: "2023-12-10",
+          },
+          {
+            id: "sub_3",
+            customer: "Michael Brown",
+            email: "michael.b@example.com",
+            plan: "Premium Plan",
+            amount: "$49.99",
+            status: "active",
+            nextBilling: "2024-07-22",
+            startDate: "2024-02-22",
+          },
+          {
+            id: "sub_4",
+            customer: "Emily Davis",
+            email: "emily.d@example.com",
+            plan: "Pro Plan",
+            amount: "$29.99",
+            status: "canceled",
+            nextBilling: "N/A",
+            startDate: "2023-11-05",
+          },
+          {
+            id: "sub_5",
+            customer: "David Wilson",
+            email: "david.w@example.com",
+            plan: "Basic Plan",
+            amount: "$9.99",
+            status: "past_due",
+            nextBilling: "2024-07-03",
+            startDate: "2024-01-03",
+          },
+        ];
+
+        setSubscriptions(mockSubscriptions);
+      } catch (error) {
+        console.error('Failed to load subscriptions:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load subscriptions. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSubscriptions();
+  }, []);
+
+  // Load subscription stats from API
+  const loadStats = async () => {
+    setStatsLoading(true);
+    try {
+      // For now, we'll use mock stats since the backend subscription stats API isn't fully implemented
+      // In a real implementation, this would call an API endpoint for subscription statistics
+      toast({
+        title: "Stats Updated",
+        description: "Subscription statistics have been refreshed.",
+      });
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load subscription statistics.",
+        variant: "destructive",
+      });
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   // Filter subscriptions based on search query and active tab
   const filteredSubscriptions = subscriptions.filter(sub => {
-    const matchesSearch = 
+    const matchesSearch =
       sub.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sub.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sub.plan.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     if (activeTab === "all") return matchesSearch;
     return matchesSearch && sub.status === activeTab;
   });
-  
+
   // Handle export
-  const handleExport = () => {
-    toast({
-      title: "Export Started",
-      description: "Your subscription data is being exported to CSV",
-    });
+  const handleExport = async () => {
+    try {
+      // In a real implementation, this would call: await api.subscription.exportSubscriptions();
+      toast({
+        title: "Export Started",
+        description: "Your subscription data is being exported to CSV",
+      });
+    } catch (error) {
+      console.error('Failed to export subscriptions:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export subscriptions. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
-  
+
   // Handle creating a new plan
-  const handleCreatePlan = () => {
+  const handleCreatePlan = async () => {
     if (!newPlan.name || !newPlan.price) {
       toast({
         title: "Missing Information",
@@ -158,46 +206,66 @@ export default function SubscriptionsPage() {
       });
       return;
     }
-    
-    toast({
-      title: "Plan Created",
-      description: `New plan "${newPlan.name}" has been created successfully`,
-    });
-    
-    setNewPlan({ name: "", price: "", description: "" });
-    setShowNewPlanDialog(false);
-  };
-  
-  // Handle subscription actions
-  const handleSubscriptionAction = (action, subscription) => {
-    switch(action) {
-      case "view":
-        toast({
-          title: "Viewing Details",
-          description: `Viewing details for ${subscription.customer}'s subscription`,
-        });
-        break;
-      case "edit":
-        toast({
-          title: "Edit Mode",
-          description: `Editing ${subscription.customer}'s subscription`,
-        });
-        break;
-      case "cancel":
-        const updatedSubscriptions = subscriptions.map(sub => 
-          sub.id === subscription.id ? {...sub, status: "canceled", nextBilling: "N/A"} : sub
-        );
-        setSubscriptions(updatedSubscriptions);
-        toast({
-          title: "Subscription Canceled",
-          description: `${subscription.customer}'s subscription has been canceled`,
-        });
-        break;
-      default:
-        break;
+
+    try {
+      // In a real implementation, this would call: await api.subscription.createPlan(newPlan);
+      toast({
+        title: "Plan Created",
+        description: `New plan "${newPlan.name}" has been created successfully`,
+      });
+
+      setNewPlan({ name: "", price: "", description: "" });
+      setShowNewPlanDialog(false);
+      // Refresh the page or update the plans list
+    } catch (error) {
+      console.error('Failed to create plan:', error);
+      toast({
+        title: "Creation Failed",
+        description: "Failed to create plan. Please try again.",
+        variant: "destructive",
+      });
     }
   };
-  
+
+
+  const handleSubscriptionAction = async (action: string, subscription: SubscriptionData) => {
+    try {
+      switch (action) {
+        case "view":
+          toast({
+            title: "Viewing Details",
+            description: `Viewing details for ${subscription.customer}'s subscription`,
+          });
+          break;
+        case "edit":
+          toast({
+            title: "Edit Mode",
+            description: `Editing ${subscription.customer}'s subscription`,
+          });
+          break;
+        case "cancel":
+          const updatedSubscriptions = subscriptions.map(sub =>
+            sub.id === subscription.id ? { ...sub, status: "canceled" as const, nextBilling: "N/A" } : sub
+          );
+          setSubscriptions(updatedSubscriptions);
+          toast({
+            title: "Subscription Canceled",
+            description: `${subscription.customer}'s subscription has been canceled`,
+          });
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      console.error('Failed to perform subscription action:', error);
+      toast({
+        title: "Action Failed",
+        description: "Failed to perform the requested action. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="p-8 space-y-8">
       {/* Header */}
@@ -207,6 +275,14 @@ export default function SubscriptionsPage() {
           <p className="text-gray-600 mt-1">Manage your recurring subscription plans and subscribers</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={loadStats} disabled={statsLoading}>
+            {statsLoading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Refresh Stats
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -233,7 +309,7 @@ export default function SubscriptionsPage() {
                   <Input
                     id="plan-name"
                     value={newPlan.name}
-                    onChange={(e) => setNewPlan({...newPlan, name: e.target.value})}
+                    onChange={(e) => setNewPlan({ ...newPlan, name: e.target.value })}
                     className="col-span-3"
                     placeholder="e.g. Pro Plan"
                   />
@@ -245,7 +321,7 @@ export default function SubscriptionsPage() {
                   <Input
                     id="plan-price"
                     value={newPlan.price}
-                    onChange={(e) => setNewPlan({...newPlan, price: e.target.value})}
+                    onChange={(e) => setNewPlan({ ...newPlan, price: e.target.value })}
                     className="col-span-3"
                     placeholder="e.g. 29.99"
                   />
@@ -257,7 +333,7 @@ export default function SubscriptionsPage() {
                   <Textarea
                     id="plan-description"
                     value={newPlan.description}
-                    onChange={(e) => setNewPlan({...newPlan, description: e.target.value})}
+                    onChange={(e) => setNewPlan({ ...newPlan, description: e.target.value })}
                     className="col-span-3"
                     placeholder="Describe the features of this plan"
                   />
@@ -338,8 +414,8 @@ export default function SubscriptionsPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => {
                     toast({
@@ -369,57 +445,70 @@ export default function SubscriptionsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {subscriptions.map((subscription) => (
-                      <TableRow key={subscription.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{subscription.customer}</div>
-                            <div className="text-sm text-muted-foreground">{subscription.email}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{subscription.plan}</TableCell>
-                        <TableCell>{subscription.amount}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={
-                              subscription.status === "active" ? "default" : 
-                              subscription.status === "past_due" ? "destructive" : 
-                              "outline"
-                            }
-                            className="flex items-center gap-1 w-fit"
-                          >
-                            {subscription.status === "active" && <CheckCircle className="h-3 w-3" />}
-                            {subscription.status === "past_due" && <AlertCircle className="h-3 w-3" />}
-                            {subscription.status === "canceled" && <Clock className="h-3 w-3" />}
-                            <span className="capitalize">{subscription.status.replace("_", " ")}</span>
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{subscription.nextBilling}</TableCell>
-                        <TableCell>{subscription.startDate}</TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Open menu</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => handleSubscriptionAction("view", subscription)}>View Details</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleSubscriptionAction("edit", subscription)}>Edit Subscription</DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleSubscriptionAction("cancel", subscription)} className="text-red-600">Cancel Subscription</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-4">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      filteredSubscriptions.map((subscription) => (
+                        <TableRow key={subscription.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{subscription.customer}</div>
+                              <div className="text-sm text-muted-foreground">{subscription.email}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{subscription.plan}</TableCell>
+                          <TableCell>{subscription.amount}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                subscription.status === "active" ? "default" :
+                                  subscription.status === "past_due" ? "destructive" :
+                                    "outline"
+                              }
+                              className="flex items-center gap-1 w-fit"
+                            >
+                              {subscription.status === "active" && <CheckCircle className="h-3 w-3" />}
+                              {subscription.status === "past_due" && <AlertCircle className="h-3 w-3" />}
+                              {subscription.status === "canceled" && <Clock className="h-3 w-3" />}
+                              <span className="capitalize">{subscription.status.replace("_", " ")}</span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{subscription.nextBilling}</TableCell>
+                          <TableCell>{subscription.startDate}</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Open menu</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => handleSubscriptionAction("view", subscription)}>View details</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSubscriptionAction("edit", subscription)}>Edit</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={() => handleSubscriptionAction("cancel", subscription)}
+                                >
+                                  Cancel subscription
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="active" className="m-0">
               <div className="rounded-md border">
                 <Table>
@@ -435,7 +524,7 @@ export default function SubscriptionsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {subscriptions
+                    {filteredSubscriptions
                       .filter(sub => sub.status === "active")
                       .map((subscription) => (
                         <TableRow key={subscription.id}>
@@ -450,7 +539,7 @@ export default function SubscriptionsPage() {
                           <TableCell>
                             <Badge className="flex items-center gap-1 w-fit">
                               <CheckCircle className="h-3 w-3" />
-                              <span>Active</span>
+                              <span className="capitalize">{subscription.status}</span>
                             </Badge>
                           </TableCell>
                           <TableCell>{subscription.nextBilling}</TableCell>
@@ -465,21 +554,18 @@ export default function SubscriptionsPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem>View details</DropdownMenuItem>
-                                <DropdownMenuItem>Edit subscription</DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-red-600">Cancel subscription</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSubscriptionAction("view", subscription)}>View details</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSubscriptionAction("edit", subscription)}>Edit</DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
                         </TableRow>
-                    ))}
+                      ))}
                   </TableBody>
                 </Table>
               </div>
             </TabsContent>
-            
-            {/* Similar content for past_due and canceled tabs */}
+
             <TabsContent value="past_due" className="m-0">
               <div className="rounded-md border">
                 <Table>
@@ -495,7 +581,7 @@ export default function SubscriptionsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {subscriptions
+                    {filteredSubscriptions
                       .filter(sub => sub.status === "past_due")
                       .map((subscription) => (
                         <TableRow key={subscription.id}>
@@ -510,7 +596,7 @@ export default function SubscriptionsPage() {
                           <TableCell>
                             <Badge variant="destructive" className="flex items-center gap-1 w-fit">
                               <AlertCircle className="h-3 w-3" />
-                              <span>Past Due</span>
+                              <span className="capitalize">{subscription.status.replace("_", " ")}</span>
                             </Badge>
                           </TableCell>
                           <TableCell>{subscription.nextBilling}</TableCell>
@@ -525,21 +611,18 @@ export default function SubscriptionsPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem>View details</DropdownMenuItem>
-                                <DropdownMenuItem>Send reminder</DropdownMenuItem>
-                                <DropdownMenuItem>Update payment method</DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-red-600">Cancel subscription</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSubscriptionAction("view", subscription)}>View details</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSubscriptionAction("edit", subscription)}>Edit</DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
                         </TableRow>
-                    ))}
+                      ))}
                   </TableBody>
                 </Table>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="canceled" className="m-0">
               <div className="rounded-md border">
                 <Table>
@@ -555,7 +638,7 @@ export default function SubscriptionsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {subscriptions
+                    {filteredSubscriptions
                       .filter(sub => sub.status === "canceled")
                       .map((subscription) => (
                         <TableRow key={subscription.id}>
@@ -570,7 +653,7 @@ export default function SubscriptionsPage() {
                           <TableCell>
                             <Badge variant="outline" className="flex items-center gap-1 w-fit">
                               <Clock className="h-3 w-3" />
-                              <span>Canceled</span>
+                              <span className="capitalize">{subscription.status.replace("_", " ")}</span>
                             </Badge>
                           </TableCell>
                           <TableCell>{subscription.nextBilling}</TableCell>
@@ -585,51 +668,51 @@ export default function SubscriptionsPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem>View details</DropdownMenuItem>
-                                <DropdownMenuItem>Reactivate subscription</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSubscriptionAction("view", subscription)}>View details</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSubscriptionAction("edit", subscription)}>Edit</DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
                         </TableRow>
-                    ))}
+                      ))}
                   </TableBody>
                 </Table>
               </div>
             </TabsContent>
           </Tabs>
+          <CardFooter className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Showing <strong>5</strong> of <strong>1,248</strong> subscriptions
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled
+                onClick={() => {
+                  toast({
+                    title: "Previous Page",
+                    description: "Navigating to previous page",
+                  });
+                }}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  toast({
+                    title: "Next Page",
+                    description: "Navigating to next page",
+                  });
+                }}
+              >
+                Next
+              </Button>
+            </div>
+          </CardFooter>
         </CardContent>
-        <CardFooter className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Showing <strong>5</strong> of <strong>32</strong> subscriptions
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              disabled
-              onClick={() => {
-                toast({
-                  title: "Previous Page",
-                  description: "Navigating to previous page",
-                });
-              }}
-            >
-              Previous
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                toast({
-                  title: "Next Page",
-                  description: "Navigating to next page",
-                });
-              }}
-            >
-              Next
-            </Button>
-          </div>
-        </CardFooter>
       </Card>
     </div>
   )

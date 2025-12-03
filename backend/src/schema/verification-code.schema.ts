@@ -66,11 +66,11 @@ export class VerificationCode {
   code: string;
 
   /**
-   * Type de vérification ('password_reset' ou '2fa')
+   * Type de vérification ('password_reset', '2fa', ou '2fa_login')
    */
   @Prop({
     required: true,
-    enum: ['password_reset', '2fa'],
+    enum: ['password_reset', '2fa', '2fa_login'],
     default: 'password_reset'
   })
   type: string;

@@ -33,7 +33,7 @@ export function CommunityCard({ community, viewMode = "grid" }: CommunityCardPro
     const typeConfigs = {
       community: {
         badgeColor: "border-blue-500/50 text-blue-600 bg-blue-50",
-        ctaText: "Join",
+        ctaText: "Explore",
         ctaGradient: "from-[#5d67ff] to-[#8e78fb]",
       },
       course: {
@@ -189,7 +189,7 @@ export function CommunityCard({ community, viewMode = "grid" }: CommunityCardPro
               </div>
 
               {/* CTA Button with type-specific styling */}
-              <Link href={`/${community.slug}`}>
+              <Link href={community.link || `/${community.creator}/${community.slug}`}>
                 <button 
                   className="px-8 py-1.5 text-sm font-semibold rounded-lg text-white shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-300"
                   style={{
@@ -282,16 +282,13 @@ export function CommunityCard({ community, viewMode = "grid" }: CommunityCardPro
         </div>
 
         {/* CTA with type-specific styling */}
-        <Link   href={`${community.creator
-    .toLowerCase()
-    .replace(/\s+/g, "-")}/${community.slug}`}
->
-            <button 
-              className="w-full mt-2 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-300"
-              style={{
-                background: "linear-gradient(to right, #8e78fb, #8e78fb)"
-              }}
-            >
+        <Link href={community.link || `/${community.creator}/${community.slug}`}>
+          <button 
+            className="w-full mt-2 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-300"
+            style={{
+              background: "linear-gradient(to right, #8e78fb, #8e78fb)"
+            }}
+          >
             {typeConfig.ctaText}
           </button>
         </Link>

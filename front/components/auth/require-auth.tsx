@@ -2,23 +2,35 @@
 
 import { useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { useAuthContext } from "@/app/providers/auth-provider"
 
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuthContext()
   const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
-    if (loading) return
-    if (!isAuthenticated) {
-      const redirect = encodeURIComponent(pathname || "/")
-      router.replace(`/signin?redirect=${redirect}`)
-    }
-  }, [isAuthenticated, loading, pathname, router])
+    // Only check authentication for creator routes, not signin page
+    if (pathname?.startsWith('/creator') && pathname !== '/signin') {
+      const checkAuth = () => {
+        if (typeof window !== 'undefined') {
+          const hasToken = document.cookie.includes('accessToken=')
+          if (!hasToken) {
+            // Only redirect if we're not already on signin page
+            if (pathname !== '/signin') {
+              router.replace(`/signin`)
+            }
+          }
+        }
+      }
 
-  if (loading) return null
-  if (!isAuthenticated) return null
+      // Check immediately
+      checkAuth()
+      
+      // Also check after a short delay to ensure cookies are set
+      const timer = setTimeout(checkAuth, 100)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [router, pathname])
 
   return <>{children}</>
 }

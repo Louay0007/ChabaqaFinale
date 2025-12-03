@@ -6,33 +6,34 @@ import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon, Star } from "lucide-react"
 import { format } from "date-fns"
 
-const bookedSessions = [
-  {
-    id: "1",
-    session: {
-      title: "1-on-1 Code Review Session",
-      price: 150,
-      mentor: {
-        name: "Sarah Johnson"
-      }
-    },
-    scheduledAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "2",
-    session: {
-      title: "Career Mentorship Session",
-      price: 120,
-      mentor: {
-        name: "Sarah Johnson"
-      }
-    },
-    scheduledAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-  },
-]
+interface CalendarViewProps {
+  sessions: any[]
+  userBookings: any[]
+}
 
-export default function CalendarView() {
+export default function CalendarView({ sessions, userBookings }: CalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
+
+  // Filter upcoming bookings (not cancelled)
+  const upcomingBookings = userBookings?.filter(b => {
+    if (b.status === 'cancelled') return false
+    const scheduledAt = new Date(b.scheduledAt)
+    return scheduledAt >= new Date()
+  }) || []
+
+  // Get booked dates for calendar modifiers
+  const bookedDates = upcomingBookings.map(booking => new Date(booking.scheduledAt))
+
+  // Calculate stats
+  const sessionsThisMonth = upcomingBookings.filter(b => {
+    const scheduledAt = new Date(b.scheduledAt)
+    const now = new Date()
+    return scheduledAt.getMonth() === now.getMonth() && scheduledAt.getFullYear() === now.getFullYear()
+  }).length
+
+  const totalSpent = upcomingBookings.reduce((acc, booking) => {
+    return acc + (booking.session?.price || 0)
+  }, 0)
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -49,7 +50,7 @@ export default function CalendarView() {
               onSelect={setSelectedDate}
               className="rounded-md border w-full"
               modifiers={{
-                booked: bookedSessions.map((booking) => booking.scheduledAt),
+                booked: bookedDates,
               }}
               modifiersStyles={{
                 booked: { backgroundColor: "#f0f9ff", color: "#0369a1", fontWeight: "bold" },
@@ -65,17 +66,25 @@ export default function CalendarView() {
             <CardTitle className="text-lg">Upcoming Sessions</CardTitle>
           </CardHeader>
           <CardContent>
-            {bookedSessions.length > 0 ? (
+            {upcomingBookings.length > 0 ? (
               <div className="space-y-4">
-                {bookedSessions.map((booking) => (
+                {upcomingBookings.map((booking) => {
+                  const session = booking.session
+                  const scheduledAt = new Date(booking.scheduledAt)
+                  const mentor = session?.mentor || {
+                    name: session?.creatorName || 'Unknown',
+                  }
+
+                  return (
                   <div key={booking.id} className="p-3 bg-sessions-50 rounded-lg">
-                    <div className="font-medium text-sm">{booking.session.title}</div>
+                      <div className="font-medium text-sm">{session?.title || 'Session'}</div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {format(booking.scheduledAt, "MMM dd, h:mm a")}
+                        {format(scheduledAt, "MMM dd, h:mm a")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">with {mentor.name}</div>
                     </div>
-                    <div className="text-xs text-muted-foreground">with {booking.session.mentor.name}</div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="text-center py-4">
@@ -93,13 +102,11 @@ export default function CalendarView() {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span>Sessions This Month</span>
-              <span className="font-medium">{bookedSessions.length}</span>
+              <span className="font-medium">{sessionsThisMonth}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span>Total Spent</span>
-              <span className="font-medium">
-                ${bookedSessions.reduce((acc, booking) => acc + booking.session.price, 0)}
-              </span>
+              <span className="font-medium">${totalSpent}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span>Avg Rating Given</span>

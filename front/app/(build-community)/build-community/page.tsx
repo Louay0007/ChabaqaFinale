@@ -9,7 +9,7 @@ export default async function BuildCommunityPage() {
   // Si l'utilisateur n'est pas authentifié, rediriger vers la page de connexion
   // avec un paramètre redirect pour revenir à cette page après connexion
   if (!user) {
-    redirect("/signin?redirect=/build-community")
+    redirect("/signin")
   }
 
   return <BuildCommunityClient />

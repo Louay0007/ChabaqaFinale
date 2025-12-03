@@ -27,64 +27,80 @@ export default function EventsPage() {
     try {
       setLoading(true);
       setError(null);
-      console.log('🎉 Fetching events for community:', slug);
+      console.log('🎉 [EVENTS] Fetching events for community:', slug);
 
       // Fetch community data first
       const communityResponse = await getCommunityBySlug(slug || '');
       if (!communityResponse.success || !communityResponse.data) {
         throw new Error('Community not found');
       }
-      
+
       const communityData = {
         id: communityResponse.data._id || communityResponse.data.id,
         name: communityResponse.data.name,
         slug: communityResponse.data.slug,
       };
       setCommunity(communityData);
-      
+
       // Fetch events for this community
+      console.log('🎉 [EVENTS] Fetching events for community ID:', communityData.id);
       const eventsResponse = await getEventsByCommunity(communityData.id, {
         page: 1,
         limit: 50,
         isActive: true
       });
-      
+
+      console.log('📦 [EVENTS] Response:', {
+        total: eventsResponse.total,
+        count: eventsResponse.events?.length,
+        page: eventsResponse.page,
+        limit: eventsResponse.limit
+      });
+
       // Transform backend events to match frontend interface
-      const transformedEvents = eventsResponse.events.map((event: BackendEvent) => ({
-        id: event._id,
-        title: event.title,
-        description: event.description,
-        shortDescription: event.short_description || event.description,
-        image: event.thumbnail || event.cover_image || 'https://via.placeholder.com/400x300',
-        communityId: communityData.id,
-        creatorId: event.created_by._id,
-        creator: event.created_by,
-        startDate: new Date(event.start_date),
-        endDate: event.end_date ? new Date(event.end_date) : undefined,
-        startTime: event.start_time,
-        endTime: event.end_time,
-        location: event.location,
-        type: event.type,
-        isActive: event.is_active,
-        isPublished: event.is_published,
-        maxAttendees: event.max_attendees,
-        attendeesCount: event.attendees_count,
-        tickets: event.tickets || [],
-        sessions: event.sessions || [],
-        speakers: event.speakers || [],
-        tags: event.tags || [],
-        category: event.category,
-        venue: event.venue,
-        createdAt: new Date(event.created_at),
-        updatedAt: new Date(event.updated_at),
-      }));
-      
+      console.log('🔄 [EVENTS] Transforming', eventsResponse.events.length, 'events');
+      const transformedEvents = (eventsResponse.events || []).map((event: BackendEvent) => {
+        console.log('   → Event:', event.title);
+        return {
+          id: event._id,
+          title: event.title,
+          description: event.description,
+          shortDescription: event.short_description || event.description,
+          image: event.thumbnail || event.cover_image || 'https://via.placeholder.com/400x300',
+          communityId: communityData.id,
+          creatorId: event.created_by?._id || event.created_by,
+          creator: event.created_by,
+          startDate: new Date(event.start_date),
+          endDate: event.end_date ? new Date(event.end_date) : undefined,
+          startTime: event.start_time,
+          endTime: event.end_time,
+          location: event.location,
+          type: event.type,
+          isActive: event.is_active,
+          isPublished: event.is_published,
+          maxAttendees: event.max_attendees,
+          attendeesCount: event.attendees_count,
+          tickets: event.tickets || [],
+          sessions: event.sessions || [],
+          speakers: event.speakers || [],
+          tags: event.tags || [],
+          category: event.category,
+          venue: event.venue,
+          createdAt: new Date(event.created_at),
+          updatedAt: new Date(event.updated_at),
+        };
+      });
+
+      console.log('✅ [EVENTS] Transformed events:', transformedEvents.length);
       setAvailableEvents(transformedEvents);
-      
+
       // Fetch user's registered events
+      console.log('📊 [EVENTS] Fetching user registrations');
       try {
         const registeredEvents = await getMyRegisteredEvents();
-        const transformedTickets = registeredEvents.map(event => ({
+        console.log('📊 [EVENTS] User registrations response:', registeredEvents?.length || 0);
+
+        const transformedTickets = (registeredEvents || []).map(event => ({
           id: Date.now().toString() + Math.random(),
           eventId: event._id,
           event: {
@@ -114,19 +130,21 @@ export default function EventsPage() {
           registeredAt: new Date(),
           updatedAt: new Date()
         }));
+
+        console.log('✅ [EVENTS] Transformed tickets:', transformedTickets.length);
         setMyTickets(transformedTickets);
-      } catch (registrationError) {
-        console.warn('⚠️ Could not fetch user registrations:', registrationError);
+      } catch (registrationError: any) {
+        console.warn('⚠️ Could not fetch user registrations:', registrationError.message);
         setMyTickets([]);
       }
-      
-      console.log('✅ Events loaded:', transformedEvents.length);
+
+      console.log('✅ [EVENTS] Events loaded:', transformedEvents.length);
     } catch (err: any) {
-      console.error('❌ Error fetching events:', err);
+      console.error('❌ [EVENTS] Error fetching events:', err);
       setError(err.message || 'Failed to load events');
-      
+
       // Fallback to mock data
-      console.log('⚠️ Falling back to mock data');
+      console.log('⚠️ [EVENTS] Falling back to mock data');
       setAvailableEvents(mockEvents);
       setMyTickets(mockTickets);
     } finally {
@@ -158,7 +176,7 @@ export default function EventsPage() {
 
   return (
     <ThemedView style={styles.container}>
-      <EventsPageContent 
+      <EventsPageContent
         availableEvents={availableEvents}
         myTickets={myTickets}
       />

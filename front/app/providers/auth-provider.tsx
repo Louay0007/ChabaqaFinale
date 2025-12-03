@@ -3,6 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
 import { api, type User } from "@/lib/api"
+import { getProfile } from "@/lib/auth"
+import { logoutAction } from "@/app/(auth)/signin/actions"
+import { tokenManager } from "@/lib/token-manager"
+import { secureStorage } from "@/lib/secure-storage"
 
 interface AuthContextValue {
   user: User | null
@@ -10,11 +14,10 @@ interface AuthContextValue {
   error: string | null
   isAuthenticated: boolean
   register: (payload: { name: string; email: string; password: string; numtel?: string; date_naissance?: string }) => Promise<void>
-  login: (payload: { email: string; password: string }) => Promise<{ requires2FA?: boolean } | void>
-  verify2FA: (payload: { email: string; code: string }) => Promise<void>
+  login: (payload: { email: string; password: string }) => Promise<void>
   logout: () => Promise<void>
-  refresh: () => Promise<void>
-  fetchMe: () => Promise<void>
+  fetchMe: () => Promise<User | null>
+  fetchMeWithRetry: () => Promise<User | null>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -29,70 +32,103 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchMe = useCallback(async () => {
     try {
       setError(null)
-      const res = await api.auth.me()
-      setUser(res.data)
+      const user = await getProfile();
+      setUser(user);
+      return user;
     } catch (e: any) {
       setUser(null)
+      // Only set error if it's not an authentication error (401)
+      if (e?.statusCode !== 401) {
+        setError(e?.message || 'Failed to fetch user profile')
+      }
+      // Don't throw error for 401 - this is expected for unauthenticated users
+      return null;
     }
   }, [])
 
-  const refresh = useCallback(async () => {
+  const fetchMeWithRetry = useCallback(async () => {
     try {
-      await api.auth.refresh()
-    } catch (e) {
-      // ignore
+      setError(null)
+      const user = await getProfile();
+      setUser(user);
+      return user;
+    } catch (e: any) {
+      // If it's a 401 error, try once more
+      if (e?.statusCode === 401) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        try {
+          const user = await getProfile();
+          setUser(user);
+          return user;
+        } catch (retryError: any) {
+          setUser(null)
+          return null
+        }
+      } else {
+        setUser(null)
+        setError(e?.message || 'Failed to fetch user profile')
+        return null
+      }
     }
   }, [])
 
   const register = useCallback(async (payload: { name: string; email: string; password: string; numtel?: string; date_naissance?: string }) => {
-    setError(null)
-    const res = await api.auth.register(payload)
-    if (res?.data?.user) {
-      setUser(res.data.user)
+    try {
+      setError(null)
+      await api.auth.register(payload)
+      await fetchMe()
+    } catch (e: any) {
+      setError(e?.message || 'Registration failed')
+      throw e
     }
-  }, [])
-
-  const login = useCallback(async (payload: { email: string; password: string }) => {
-    setError(null)
-    const res = await api.auth.login(payload)
-    const requires2FA = (res as any)?.data?.requires2FA
-    if (requires2FA) {
-      return { requires2FA: true }
-    }
-    await fetchMe()
   }, [fetchMe])
 
-  const verify2FA = useCallback(async (payload: { email: string; code: string }) => {
-    setError(null)
-    if ((api as any)?.auth?.verify2FA) {
-      await (api as any).auth.verify2FA(payload.email, payload.code)
+  const login = useCallback(async (payload: { email: string; password: string }) => {
+    try {
+      setError(null)
+      await api.auth.login(payload)
       await fetchMe()
+    } catch (e: any) {
+      setError(e?.message || 'Login failed')
+      throw e
     }
   }, [fetchMe])
 
   const logout = useCallback(async () => {
     try {
-      await api.auth.logout()
+      // Call server action to logout and clear cookies
+      await logoutAction();
+    } catch (error) {
+      console.error('Logout error:', error);
     } finally {
-      setUser(null)
+      // Clear local state
+      setUser(null);
+
+      // Clear token manager
+      tokenManager.clearTokens();
+
+      // Clear secure storage
+      secureStorage.clear();
+
+      // Redirect to home page
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      }
     }
   }, [])
 
   useEffect(() => {
     let mounted = true
-    ;(async () => {
-      try {
-        await refresh()
-      } finally {
-        if (!mounted) return
-        await fetchMe()
-        setLoading(false)
-      }
-    })()
+      ; (async () => {
+        await fetchMeWithRetry()
+        if (mounted) {
+          setLoading(false)
+        }
+      })()
     return () => {
       mounted = false
     }
-  }, [fetchMe, refresh])
+  }, [fetchMeWithRetry])
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
@@ -101,11 +137,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated,
     register,
     login,
-    verify2FA,
     logout,
-    refresh,
     fetchMe,
-  }), [user, loading, error, isAuthenticated, register, login, verify2FA, logout, refresh, fetchMe])
+    fetchMeWithRetry,
+  }), [user, loading, error, isAuthenticated, register, login, logout, fetchMe])
 
   return (
     <AuthContext.Provider value={value}>

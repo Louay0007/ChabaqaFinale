@@ -62,9 +62,9 @@ export function FreeJoinForm({ community }: FreeJoinFormProps) {
       }
 
       setSuccess(true)
-      // Redirect to community after 2 seconds and mark as joined
+      // Redirect to community home after 2 seconds and mark as joined
       setTimeout(() => {
-        router.push(`/community/${community.slug}?joined=1`)
+        router.push(`/community/${community.slug}/home?joined=1`)
       }, 2000)
 
     } catch (err: any) {
@@ -89,7 +89,7 @@ export function FreeJoinForm({ community }: FreeJoinFormProps) {
         <div className="lg:col-span-2 flex flex-col gap-6">
           {/* Back Button */}
           <Link 
-            href={`/community/${community.slug}`}
+            href={`/community/${community.slug}/home`}
             className="inline-flex items-center text-sm text-gray-600 hover:text-chabaqa-primary transition-colors w-fit"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -224,7 +224,7 @@ export function FreeJoinForm({ community }: FreeJoinFormProps) {
                 )}
               </Button>
               
-              <Link href={`/community/${community.slug}`}>
+              <Link href={`/community/${community.slug}/home`}>
                 <Button
                   variant="secondary"
                   className="w-full bg-gray-200 text-gray-900 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors"

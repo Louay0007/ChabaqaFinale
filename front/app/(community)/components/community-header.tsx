@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -22,7 +22,7 @@ import {
   ChevronDown,
   Settings,
   LogOut,
-  User,
+  User as UserIcon,
   Home,
   Search,
   Menu,
@@ -37,12 +37,14 @@ import {
   Sparkles
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { getUserCommunities, mockUsers } from "@/lib/mock-data"
-import { communitiesData } from "@/lib/data-communities"
+import { communitiesApi } from "@/lib/api/communities.api"
+import { useAuthContext } from "@/app/providers/auth-provider"
+import type { Community, User as UserType } from "@/lib/api/types"
 
 
 interface CommunityHeaderProps {
   currentCommunity: string
+  creatorSlug: string
 }
 
 const navigationItems = [
@@ -56,14 +58,70 @@ const navigationItems = [
   { label: "Achievements", href: "/achievements", icon: Trophy },
 ]
 
-export function CommunityHeader({ currentCommunity }: CommunityHeaderProps) {
+export function CommunityHeader({ currentCommunity, creatorSlug }: CommunityHeaderProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userCommunities, setUserCommunities] = useState<Community[]>([])
+  const [currentCommunityData, setCurrentCommunityData] = useState<Community | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const userCommunities = getUserCommunities("2")
-  const community = communitiesData.communities.find((c) => c.slug === currentCommunity)
-  const currentUser = mockUsers[1] // Member user
+  const { user: currentUser, isAuthenticated } = useAuthContext()
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        console.log('Fetching header data for community:', currentCommunity)
+
+        const [userCommunitiesRes, currentCommunityRes] = await Promise.all([
+          isAuthenticated ? communitiesApi.getMyJoined().catch((err) => {
+            console.error('Error fetching user communities:', err)
+            return null
+          }) : Promise.resolve(null),
+          communitiesApi.getBySlug(currentCommunity).catch((err) => {
+            console.error('Error fetching current community:', err)
+            return null
+          }),
+        ])
+
+        if (userCommunitiesRes) {
+          setUserCommunities(userCommunitiesRes.data)
+        }
+
+        if (currentCommunityRes) {
+          setCurrentCommunityData(currentCommunityRes.data)
+        }
+      } catch (error) {
+        console.error('Error fetching header data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [currentCommunity, isAuthenticated])
+
+  if (loading) {
+    return (
+      <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b shadow-sm">
+        <div className="container mx-auto px-4">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="relative h-8 w-8 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="h-8 w-8 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      </header>
+    )
+  }
+
+  const community = currentCommunityData
+
+  // Use /community/[slug] route structure for all navigation
 
   const notifications = [
     {
@@ -128,14 +186,16 @@ return (
                     <>
                       <div
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-semibold"
-                        style={{ backgroundColor: community.settings.primaryColor }}
+                        style={{ backgroundColor: (community as any).settings?.primaryColor || '#3b82f6' }}
                       >
                         {community.name.charAt(0)}
                       </div>
                       <div className="text-left">
                         <div className="font-medium text-sm">{community.name}</div>
                         <div className="text-xs text-muted-foreground">
-                          {community.members.toLocaleString()} members
+                          {typeof (community as any).members === 'number'
+                            ? (community as any).members.toLocaleString()
+                            : (community as any).members?.length || (community as any).membersCount || 0} members
                         </div>
                       </div>
                       <ChevronDown className="h-4 w-4" />
@@ -150,19 +210,24 @@ return (
                   {userCommunities.map((comm) => (
                     <DropdownMenuItem key={comm.id} asChild>
                       <Link
-                        href={`/community/${comm.slug}/home`}
-                        className="flex items-center space-x-3 px-2 py-2"
+                        href={`/${creatorSlug}/${comm.slug}/home`}
+                        className={cn(
+                          "flex items-center space-x-3 px-2 py-2",
+                          comm.slug === currentCommunity && "bg-accent"
+                        )}
                       >
                         <div
                           className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-sm font-semibold"
-                          style={{ backgroundColor: comm.settings.primaryColor }}
+                          style={{ backgroundColor: (comm as any).settings?.primaryColor || '#3b82f6' }}
                         >
                           {comm.name.charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">{comm.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {comm.members.toLocaleString()} members
+                            {typeof (comm as any).members === 'number'
+                              ? (comm as any).members.toLocaleString()
+                              : (comm as any).members?.length || (comm as any).membersCount || 0} members
                           </div>
                         </div>
                         {comm.slug === currentCommunity && (
@@ -265,18 +330,20 @@ return (
           <SheetContent side="right" className="p-0">
             <div className="h-full overflow-y-auto p-6 space-y-6">
               {/* Profile */}
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={currentUser.avatar || "/placeholder.svg"} />
-                  <AvatarFallback>
-                    {currentUser.name.split(" ").map((n) => n[0]).join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{currentUser.name}</div>
-                  <div className="text-sm text-muted-foreground">{currentUser.email}</div>
+              <Link href="/profile">
+                <div className="flex items-center space-x-3 cursor-pointer">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={currentUser?.avatar || "/placeholder.svg"} />
+                    <AvatarFallback>
+                      {currentUser?.firstName?.[0] || ''}{currentUser?.lastName?.[0] || ''}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-medium">{currentUser?.firstName} {currentUser?.lastName}</div>
+                    <div className="text-sm text-muted-foreground">{currentUser?.email || ""}</div>
+                  </div>
                 </div>
-              </div>
+              </Link>
 
               {/* Community Switcher */}
               <DropdownMenu>
@@ -292,19 +359,22 @@ return (
                       key={comm.id}
                       asChild
                       onClick={() => setMobileMenuOpen(false)} // ✅ closes menu
+                      className={comm.slug === currentCommunity ? "bg-accent" : ""}
                     >
-                      <Link href={`/community/${comm.slug}/home`}>
+                      <Link href={`/${creatorSlug}/${comm.slug}/home`}>
                         <div className="flex items-center space-x-3">
                           <div
                             className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-semibold"
-                            style={{ backgroundColor: comm.settings.primaryColor }}
+                            style={{ backgroundColor: (comm as any).settings?.primaryColor || '#3b82f6' }}
                           >
                             {comm.name.charAt(0)}
                           </div>
                           <div className="flex-1">
                             <div className="font-medium">{comm.name}</div>
                             <div className="text-xs text-muted-foreground">
-                              {comm.members.toLocaleString()} members
+                              {typeof (comm as any).members === 'number'
+                                ? (comm as any).members.toLocaleString()
+                                : (comm as any).members?.length || (comm as any).membersCount || 0} members
                             </div>
                           </div>
                           {comm.slug === currentCommunity && (
@@ -329,9 +399,7 @@ return (
                     asChild
                     onClick={() => setMobileMenuOpen(false)} // ✅ closes menu
                   >
-                    <Link href={`${community?.creator
-            .toLowerCase()
-            .replace(/\s+/g, "-")}/${currentCommunity}${item.href}`}>
+                    <Link href={`/${creatorSlug}/${currentCommunity}${item.href}`}>
                       <item.icon className="mr-2 h-4 w-4" />
                       {item.label}
                     </Link>
@@ -359,7 +427,7 @@ return (
                   onClick={() => setMobileMenuOpen(false)} // ✅ closes menu
                 >
                   <Link href="/profile">
-                    <User className="mr-2 h-4 w-4" />
+                    <UserIcon className="mr-2 h-4 w-4" />
                     Profile
                   </Link>
                 </Button>
@@ -391,20 +459,22 @@ return (
           {/* User Menu (Desktop Only) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="hidden sm:flex items-center space-x-2 px-3 rounded-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={currentUser.avatar || "/placeholder.svg"} />
-                  <AvatarFallback>
-                    {currentUser.name.split(" ").map((n) => n[0]).join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <ChevronDown className="h-4 w-4" />
-              </Button>
+              <Link href="/profile">
+                <Button variant="ghost" className="hidden sm:flex items-center space-x-2 px-3 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={currentUser?.avatar || "/placeholder.svg"} />
+                    <AvatarFallback>
+                      {currentUser?.firstName?.[0] || ''}{currentUser?.lastName?.[0] || ''}
+                    </AvatarFallback>
+                  </Avatar>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </Link>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <div className="px-2 py-1.5">
-                <div className="font-medium">{currentUser.name}</div>
-                <div className="text-sm text-muted-foreground">{currentUser.email}</div>
+                <div className="font-medium">{currentUser?.firstName} {currentUser?.lastName}</div>
+                <div className="text-sm text-muted-foreground">{currentUser?.email || ""}</div>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
@@ -415,7 +485,7 @@ return (
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/profile">
-                  <User className="mr-2 h-4 w-4" />
+                  <UserIcon className="mr-2 h-4 w-4" />
                   Profile
                 </Link>
               </DropdownMenuItem>              
@@ -440,9 +510,7 @@ return (
       <div className="hidden sm:block border-t bg-white/50">
         <div className="flex items-center space-x-1 py-2 overflow-x-auto">
           {navigationItems.map((item) => {
-            const href = `/${community?.creator
-    .toLowerCase()
-    .replace(/\s+/g, "-")}/${currentCommunity}${item.href}`
+            const href = `/${creatorSlug}/${currentCommunity}${item.href}`
             const isActive = pathname === href
 
             return (
@@ -468,7 +536,3 @@ return (
 )
 
 }
-
-
-
-

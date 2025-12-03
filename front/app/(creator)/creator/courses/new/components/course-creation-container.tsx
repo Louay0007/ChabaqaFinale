@@ -66,10 +66,10 @@ export function CourseCreationContainer() {
   const handleArrayChange = (field: string, index: number, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: Array.isArray(prev[field as keyof typeof prev]) 
-        ? (prev[field as keyof typeof prev] as string[]).map((item: string, i: number) => 
-            i === index ? value : item
-          )
+      [field]: Array.isArray(prev[field as keyof typeof prev])
+        ? (prev[field as keyof typeof prev] as string[]).map((item: string, i: number) =>
+          i === index ? value : item
+        )
         : prev[field as keyof typeof prev],
     }))
   }
@@ -84,7 +84,7 @@ export function CourseCreationContainer() {
   const removeArrayItem = (field: string, index: number) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: Array.isArray(prev[field as keyof typeof prev]) 
+      [field]: Array.isArray(prev[field as keyof typeof prev])
         ? (prev[field as keyof typeof prev] as any[]).filter((_: any, i: number) => i !== index)
         : prev[field as keyof typeof prev],
     }))
@@ -144,11 +144,11 @@ export function CourseCreationContainer() {
       sections: prev.sections.map((section) =>
         section.id === sectionId
           ? {
-              ...section,
-              chapters: section.chapters.map((chapter) =>
-                chapter.id === chapterId ? { ...chapter, [field]: value } : chapter,
-              ),
-            }
+            ...section,
+            chapters: section.chapters.map((chapter) =>
+              chapter.id === chapterId ? { ...chapter, [field]: value } : chapter,
+            ),
+          }
           : section,
       ),
     }))
@@ -175,7 +175,7 @@ export function CourseCreationContainer() {
         const myComms = await api.communities.getByCreator(user._id || user.id).catch(() => null as any)
         const first = (myComms?.data || [])[0]
         if (first?.slug) setFormData(prev => ({ ...prev, communitySlug: first.slug }))
-      } catch {}
+      } catch { }
     }
     loadCommunity()
   }, [])
@@ -186,11 +186,11 @@ export function CourseCreationContainer() {
       const prixNum = Number(formData.price || 0)
       const isPaid = prixNum > 0
       const sections = (formData.sections || []).map((s, idx) => ({
-        titre: s.title || `Section ${idx+1}`,
+        titre: s.title || `Section ${idx + 1}`,
         description: s.description || "",
         ordre: s.order || (idx + 1),
         chapitres: (s.chapters || []).map((c, jdx) => ({
-          titre: c.title || `Chapitre ${jdx+1}`,
+          titre: c.title || `Chapitre ${jdx + 1}`,
           description: c.content || "",
           videoUrl: c.videoUrl || undefined,
           isPaid: Boolean(isPaid),
@@ -239,7 +239,7 @@ export function CourseCreationContainer() {
     <div className="max-w-6xl mx-auto space-y-8 p-5">
       <PageHeader />
       <CourseCreationProgress currentStep={currentStep} setCurrentStep={setCurrentStep} />
-      
+
       {currentStep === 1 && (
         <BasicInfoStep formData={formData} handleInputChange={handleInputChange} />
       )}

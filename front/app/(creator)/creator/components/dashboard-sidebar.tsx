@@ -1,7 +1,8 @@
 
-import { useState } from "react"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -25,7 +26,7 @@ import {
   LogOut,
   User,
   Building,
-  ChartSpline 
+  ChartSpline
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -35,7 +36,10 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select";
+} from "@/components/ui/select"
+import { communitiesApi } from "@/lib/api/communities.api"
+import type { Community } from "@/lib/api/types"
+
 interface DashboardSidebarProps {
   user: any
   onLogout: () => void
@@ -44,6 +48,57 @@ interface DashboardSidebarProps {
 
 export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const [communities, setCommunities] = useState<Community[]>([])
+  const [isLoadingCommunities, setIsLoadingCommunities] = useState(true)
+  const [communitiesError, setCommunitiesError] = useState<string | null>(null)
+  const [selectedCommunityId, setSelectedCommunityId] = useState<string>('')
+
+  // Fetch creator's communities on mount
+  useEffect(() => {
+    async function fetchCommunities() {
+      try {
+        setIsLoadingCommunities(true)
+        setCommunitiesError(null)
+        const response = await communitiesApi.getByCreator(user?.id || "")
+        const communitiesData = response.data || []
+        setCommunities(communitiesData)
+
+        // Auto-select first community or previously selected one
+        if (communitiesData.length > 0) {
+          const savedId = typeof window !== 'undefined' ? localStorage.getItem('creator_selected_community_id') : null
+          const communityToSelect = savedId
+            ? communitiesData.find(c => c.id === savedId) || communitiesData[0]
+            : communitiesData[0]
+          setSelectedCommunityId(communityToSelect.id)
+          // Save to localStorage
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('creator_selected_community_id', communityToSelect.id)
+          }
+        }
+      } catch (error: any) {
+        console.error("Failed to fetch communities:", error)
+        setCommunitiesError(error?.message || "Failed to load communities")
+      } finally {
+        setIsLoadingCommunities(false)
+      }
+    }
+
+    if (user?.id) {
+      fetchCommunities()
+    }
+  }, [user?.id])
+
+  const handleCommunityChange = (communityId: string) => {
+    setSelectedCommunityId(communityId)
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('creator_selected_community_id', communityId)
+    }
+    // Reload the page to fetch new community data
+    window.location.reload()
+  }
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => (prev.includes(section) ? prev.filter((s) => s !== section) : [...prev, section]))
@@ -66,9 +121,10 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
         { title: "Create New", href: "/creator/communities/create", badge: null },
       ],
     },
-    { title: "Analytics", 
-      href: "/creator/analytics", 
-      icon: ChartSpline ,
+    {
+      title: "Analytics",
+      href: "/creator/analytics",
+      icon: ChartSpline,
       badge: null
     },
 
@@ -126,34 +182,10 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
       badge: null,
     },
   ]
-  const communities = [
-    {
-      id: "1",
-      name: "Web Development Mastery",
-      slug: "web-dev-mastery",
-      members: 1250,
-      color: "#8e78fb",
-      revenue: "$12,450",
-      growth: "+18%",
-    },
-    {
-      id: "2",
-      name: "Design Thinking Hub",
-      slug: "design-thinking-hub",
-      members: 890,
-      color: "#47c7ea",
-      revenue: "$8,920",
-      growth: "+12%",
-    },
-  ]
-  const [selectedCommunityId, setSelectedCommunityId] = useState(communities[0]?.id);
-  const handleCommunityChange = (id: string) => {
-    setSelectedCommunityId(id);
-    // do something else like API call or navigation
-  };
+
   const getInitialExpandedSections = () => {
     const activeSections: string[] = []
-  
+
     for (const item of menuItems) {
       if (item.expandable && item.items) {
         for (const subItem of item.items) {
@@ -164,7 +196,7 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
         }
       }
     }
-  
+
     return activeSections.length ? activeSections : [""] // default
   }
   const [expandedSections, setExpandedSections] = useState<string[]>(getInitialExpandedSections)
@@ -178,7 +210,6 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200 text-xs">
-      {/* Header */}
       {/* Header with Community Selector */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center space-x-2">
@@ -186,49 +217,72 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
             <span className="text-white font-bold text-sm">C</span>
           </div>
           <div className="flex-1">
-            <Select onValueChange={handleCommunityChange} defaultValue={selectedCommunityId}>
-              <SelectTrigger className="w-full h-8 text-xs">
-                <SelectValue placeholder="Select Community" />
-              </SelectTrigger>
-              <SelectContent className="text-xs">
-                {communities.map((community) => (
-                  <SelectItem key={community.id} value={community.id}>
-                    {community.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isLoadingCommunities ? (
+              <div className="h-8 bg-gray-100 animate-pulse rounded"></div>
+            ) : communities.length > 0 ? (
+              <Select
+                onValueChange={handleCommunityChange}
+                value={selectedCommunityId || undefined}
+              >
+                <SelectTrigger className="w-full h-8 text-xs">
+                  <SelectValue placeholder="Select Community" />
+                </SelectTrigger>
+                <SelectContent className="text-xs">
+                  {communities.map((community) => (
+                    <SelectItem key={community.id} value={community.id}>
+                      {community.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="text-xs text-gray-500">No communities</p>
+            )}
           </div>
         </div>
       </div>
 
-  
+
       {/* User Profile */}
       <div className="p-3 border-b border-gray-200">
         <div className="flex items-center space-x-2">
           <Avatar className="w-8 h-8">
-            <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+            <AvatarImage src={user?.avatar || "/placeholder.svg"} alt={user?.name || "User"} />
+            <AvatarFallback>{user?.name?.charAt(0) || "U"}</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-900 truncate">{user.name}</p>
-            <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
+            <p className="text-xs font-medium text-gray-900 truncate">{user?.name}</p>
+            <p className="text-[11px] text-gray-500 truncate">{user?.email}</p>
           </div>
-          {user.verified && <Badge className="bg-blue-100 text-blue-800 text-[10px]">Pro</Badge>}
+          {user?.verified && <Badge className="bg-blue-100 text-blue-800 text-[10px]">Pro</Badge>}
         </div>
       </div>
-  
-      {/* Quick Actions */}
+
+      {/* Create Community Button */}
       <div className="p-3 border-b border-gray-200">
-        <Button
-          className="w-full bg-gradient-to-r from-chabaqa-primary to-chabaqa-secondary1 text-white hover:from-chabaqa-primary/90 hover:to-chabaqa-secondary1/90 text-xs h-8"
-          size="sm"
-        >
-          <Plus className="w-3.5 h-3.5 mr-1.5" />
-          Create Community
-        </Button>
+        {!isLoadingCommunities && communities.length === 0 ? (
+          <Link href="/build-community" className="block">
+            <Button
+              className="w-full bg-gradient-to-r from-chabaqa-primary to-chabaqa-secondary1 text-white hover:from-chabaqa-primary/90 hover:to-chabaqa-secondary1/90 text-xs h-10"
+              size="sm"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Build Your First Community
+            </Button>
+          </Link>
+        ) : (
+          <Link href="/build-community" className="block">
+            <Button
+              className="w-full bg-gradient-to-r from-chabaqa-primary to-chabaqa-secondary1 text-white hover:from-chabaqa-primary/90 hover:to-chabaqa-secondary1/90 text-xs h-8"
+              size="sm"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              Create Community
+            </Button>
+          </Link>
+        )}
       </div>
-  
+
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
         {menuItems.map((item) => (
@@ -265,7 +319,7 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
                         className={cn(
                           "w-full justify-start text-left font-normal h-8 pl-8 text-xs",
                           isActive(subItem.href) &&
-                            "bg-chabaqa-primary/10 text-chabaqa-primary border-r-2 border-chabaqa-primary",
+                          "bg-chabaqa-primary/10 text-chabaqa-primary border-r-2 border-chabaqa-primary",
                         )}
                       >
                         {subItem.title}
@@ -286,7 +340,7 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
                   className={cn(
                     "w-full justify-start text-left font-normal h-9 text-xs",
                     isActive(item.href!) &&
-                      "bg-chabaqa-primary/10 text-chabaqa-primary border-r-2 border-chabaqa-primary",
+                    "bg-chabaqa-primary/10 text-chabaqa-primary border-r-2 border-chabaqa-primary",
                   )}
                 >
                   <item.icon className="w-3.5 h-3.5 mr-2 text-gray-500" />
@@ -302,7 +356,7 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
           </div>
         ))}
       </nav>
-  
+
       {/* Footer */}
       <div className="p-3 border-t border-gray-200">
         <div className="flex items-center justify-between space-x-2">
@@ -329,5 +383,5 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
 
     </div>
   );
-  
+
 }

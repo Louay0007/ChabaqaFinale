@@ -10,9 +10,16 @@ import CalendarView from "@/app/(community)/[creator]/[feature]/(loggedUser)/ses
 interface SessionsTabsProps {
   activeTab: string
   setActiveTab: (tab: string) => void
+  sessions: any[]
+  userBookings: any[]
 }
 
-export default function SessionsTabs({ activeTab, setActiveTab }: SessionsTabsProps) {
+export default function SessionsTabs({ 
+  activeTab, 
+  setActiveTab, 
+  sessions, 
+  userBookings 
+}: SessionsTabsProps) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
       <div className="flex items-center justify-between">
@@ -28,15 +35,15 @@ export default function SessionsTabs({ activeTab, setActiveTab }: SessionsTabsPr
       </div>
 
       <TabsContent value="available" className="space-y-6">
-        <AvailableSessions />
+        <AvailableSessions sessions={sessions} />
       </TabsContent>
 
       <TabsContent value="booked" className="space-y-6">
-        <BookedSessions setActiveTab={setActiveTab} />
+        <BookedSessions setActiveTab={setActiveTab} userBookings={userBookings} />
       </TabsContent>
 
       <TabsContent value="calendar" className="space-y-6">
-        <CalendarView />
+        <CalendarView sessions={sessions} userBookings={userBookings} />
       </TabsContent>
     </Tabs>
   )

@@ -2,60 +2,32 @@
 
 import { useState } from "react"
 import SessionCard from "@/app/(community)/[creator]/[feature]/(loggedUser)/sessions/components/SessionCard"
+import { Card, CardContent } from "@/components/ui/card"
+import { CalendarIcon } from "lucide-react"
 
-const availableSessions = [
-  {
-    id: "1",
-    title: "1-on-1 Code Review Session",
-    description: "Get personalized feedback on your code and projects",
-    duration: 60,
-    price: 150,
-    mentor: {
-      name: "Sarah Johnson",
-      avatar: "/placeholder.svg?height=40&width=40",
-      role: "Senior Developer",
-      rating: 4.9,
-      reviews: 124,
-    },
-    category: "Code Review",
-    tags: ["JavaScript", "React", "Best Practices"],
-  },
-  {
-    id: "2",
-    title: "Career Mentorship Session",
-    description: "Get guidance on your web development career path",
-    duration: 45,
-    price: 120,
-    mentor: {
-      name: "Sarah Johnson",
-      avatar: "/placeholder.svg?height=40&width=40",
-      role: "Senior Developer",
-      rating: 4.9,
-      reviews: 124,
-    },
-    category: "Career",
-    tags: ["Career", "Interview Prep", "Portfolio"],
-  },
-  {
-    id: "3",
-    title: "Project Planning & Architecture",
-    description: "Plan your next project with proper architecture",
-    duration: 90,
-    price: 200,
-    mentor: {
-      name: "Sarah Johnson",
-      avatar: "/placeholder.svg?height=40&width=40",
-      role: "Senior Developer",
-      rating: 4.9,
-      reviews: 124,
-    },
-    category: "Architecture",
-    tags: ["Planning", "Architecture", "Best Practices"],
-  },
-]
+interface AvailableSessionsProps {
+  sessions: any[]
+}
 
-export default function AvailableSessions() {
+export default function AvailableSessions({ sessions }: AvailableSessionsProps) {
   const [selectedSession, setSelectedSession] = useState("")
+
+  // Filter only active sessions
+  const availableSessions = sessions?.filter(s => s.isActive) || []
+
+  if (availableSessions.length === 0) {
+    return (
+      <Card className="border-0 shadow-sm">
+        <CardContent className="text-center py-12">
+          <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No Sessions Available</h3>
+          <p className="text-muted-foreground">
+            Check back later for new 1-on-1 mentorship sessions
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">

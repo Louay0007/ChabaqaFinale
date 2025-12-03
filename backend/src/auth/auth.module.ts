@@ -25,7 +25,7 @@ import { UserLoginActivityModule } from '../user-login-activity/user-login-activ
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET || 'your-secret-key',
-      signOptions: { expiresIn: '15m' },
+      signOptions: { expiresIn: '2h' },
     }),
     UserLoginActivityModule,
   ],

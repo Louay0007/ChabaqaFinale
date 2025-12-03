@@ -58,24 +58,24 @@ export default function SessionCard({ session, selectedSession, setSelectedSessi
         {/* Mentor Info - Mobile optimized */}
         <div className="flex items-center space-x-3">
           <Avatar className="h-10 w-10 shrink-0">
-            <AvatarImage src={session.mentor.avatar || "/placeholder.svg"} />
+            <AvatarImage src={session.mentor?.avatar || "/placeholder.svg"} />
             <AvatarFallback>
-              {session.mentor.name
+              {(session.mentor?.name || 'Mentor')
                 .split(" ")
                 .map((n:any) => n[0])
                 .join("")}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <div className="font-medium text-sm truncate">{session.mentor.name}</div>
-            <div className="text-xs text-muted-foreground truncate">{session.mentor.role}</div>
+            <div className="font-medium text-sm truncate">{session.mentor?.name || 'Mentor'}</div>
+            <div className="text-xs text-muted-foreground truncate">{session.mentor?.role || 'Mentor'}</div>
           </div>
           <div className="text-right shrink-0">
             <div className="flex items-center text-sm">
               <Star className="h-3 w-3 mr-1 text-yellow-500 fill-current" />
-              {session.mentor.rating}
+              {session.mentor?.rating || 4.9}
             </div>
-            <div className="text-xs text-muted-foreground whitespace-nowrap">{session.mentor.reviews} reviews</div>
+            <div className="text-xs text-muted-foreground whitespace-nowrap">{session.mentor?.reviews || 0} reviews</div>
           </div>
         </div>
 
@@ -92,6 +92,7 @@ export default function SessionCard({ session, selectedSession, setSelectedSessi
         </div>
 
         {/* Tags - Responsive wrapping */}
+        {session.tags && session.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {session.tags.map((tag:any) => (
             <Badge key={tag} variant="outline" className="text-xs py-0.5 px-2">
@@ -99,6 +100,7 @@ export default function SessionCard({ session, selectedSession, setSelectedSessi
             </Badge>
           ))}
         </div>
+        )}
 
         {/* Price and Book Button - Stack on mobile */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t">
@@ -117,7 +119,7 @@ export default function SessionCard({ session, selectedSession, setSelectedSessi
               <DialogHeader className="text-left">
                 <DialogTitle className="text-lg sm:text-xl">{session.title}</DialogTitle>
                 <DialogDescription className="text-sm">
-                  Schedule your session with {session.mentor.name}
+                  Schedule your session with {session.mentor?.name || 'your mentor'}
                 </DialogDescription>
               </DialogHeader>
               

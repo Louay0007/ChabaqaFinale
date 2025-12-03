@@ -16,6 +16,7 @@ import {
 import Link from "next/link"
 
 interface VideoPlayerProps {
+  creatorSlug: string
   currentChapter: any
   isChapterAccessible: (chapterId: string) => boolean
   enrollment: any
@@ -27,6 +28,7 @@ interface VideoPlayerProps {
 }
 
 export default function VideoPlayer({ 
+  creatorSlug,
   currentChapter, 
   isChapterAccessible, 
   enrollment, 
@@ -104,7 +106,7 @@ export default function VideoPlayer({
                   <p className="text-lg font-semibold">Preview Available</p>
                   <p className="text-sm text-gray-300 mt-2">Enroll to unlock full course content</p>
                   <Button asChild className="mt-4">
-                    <Link href={`/community/${slug}/courses`}>Enroll Now</Link>
+                    <Link href={`/${creatorSlug}/${slug}/courses`}>Enroll Now</Link>
                   </Button>
                 </>
               ) : (
@@ -113,7 +115,7 @@ export default function VideoPlayer({
                   <p className="text-lg font-semibold">Chapter Locked</p>
                   <p className="text-sm text-gray-300 mt-2">Enroll in the course to access this content</p>
                   <Button asChild className="mt-4">
-                    <Link href={`/community/${slug}/courses`}>View Course</Link>
+                    <Link href={`/${creatorSlug}/${slug}/courses`}>View Course</Link>
                   </Button>
                 </>
               )}

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-    User,
-    logout as authLogout,
-    revokeAllTokens as authRevokeAllTokens,
-    isAuthenticated as checkAuth,
-    getAccessToken,
-    getCachedUser,
-    getProfile,
-    getRefreshToken
+  User,
+  logout as authLogout,
+  revokeAllTokens as authRevokeAllTokens,
+  isAuthenticated as checkAuth,
+  getAccessToken,
+  getCachedUser,
+  getProfile,
+  getRefreshToken
 } from '../lib/auth';
 import AuthMigration from '../lib/auth-migration';
 
@@ -27,15 +27,15 @@ export const useAuth = () => {
   const loadUser = useCallback(async () => {
     try {
       setIsLoading(true);
-      
+
       // D'abord, récupérer l'utilisateur en cache et vérifier les tokens
       const cachedUser = await getCachedUser();
       const hasTokens = (await getAccessToken()) || (await getRefreshToken());
-      
+
       if (cachedUser && hasTokens) {
         setUser(cachedUser);
         setIsAuthenticated(true);
-        
+
         // Vérifier en arrière-plan si l'authentification est toujours valide
         // mais ne pas bloquer l'UI pour cela
         checkAuth()
@@ -58,7 +58,7 @@ export const useAuth = () => {
               console.log('Background auth check failed (using cached data)');
             }
           });
-        
+
         setIsLoading(false);
         return;
       }
@@ -138,13 +138,13 @@ export const useAuth = () => {
         // Vérification rapide des tokens pour éviter le flash
         const hasTokens = await checkTokensExist();
         const cachedUser = await getCachedUser();
-        
+
         if (hasTokens && cachedUser) {
           // Définir immédiatement l'état comme authentifié pour éviter le flash
           setUser(cachedUser);
           setIsAuthenticated(true);
           setIsLoading(false);
-          
+
           // Puis vérifier en arrière-plan
           loadUser();
         } else {
@@ -157,9 +157,25 @@ export const useAuth = () => {
         loadUser();
       }
     };
-    
+
     initializeAuth();
   }, [loadUser, checkTokensExist]);
+
+  // Watch for token changes (e.g., when refresh fails and clears tokens)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const checkTokenInterval = setInterval(async () => {
+      const hasTokens = await checkTokensExist();
+      if (!hasTokens && isAuthenticated) {
+        console.log('🚪 [USE-AUTH] Tokens cleared - logging out');
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    }, 2000); // Check every 2 seconds
+
+    return () => clearInterval(checkTokenInterval);
+  }, [isAuthenticated, checkTokensExist]);
 
   return {
     user,

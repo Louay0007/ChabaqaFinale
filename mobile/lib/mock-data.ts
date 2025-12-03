@@ -466,7 +466,7 @@ export const mockUsers: User[] = [
 export const communities: Community[] = [
   {
     id: "1",
-    slug: "digital-marketing-mastery", 
+    slug: "digital-marketing-mastery",
     name: "digital-marketing-mastery",
     creator: "Mohamed Mostafa",
     creatorId: "1",
@@ -557,7 +557,7 @@ export const communities: Community[] = [
   {
     id: "2",
     slug: "creative-design-hub",
-    name: "Branding Community", 
+    name: "Branding Community",
     creator: "Sarah Johnson",
     creatorId: "1",
     creatorAvatar: "https://images.unsplash.com/photo-1494790108755-2616b612b550?w=150&h=150&fit=crop&crop=face",
@@ -1112,7 +1112,7 @@ export const mockProducts: Product[] = [
     description: "Complete dashboard UI kit with React components and charts",
     images: ["https://picsum.photos/400/300?random=3", "https://picsum.photos/400/300?random=4"],
     communityId: "1",
-    creatorId: "1", 
+    creatorId: "1",
     creator: mockUsers[0],
     price: 0,
     currency: "USD",
@@ -1407,6 +1407,59 @@ export const isPurchased = (productId: string, userPurchases: Purchase[]): boole
     (purchase) => purchase.productId === productId
   );
 };
+
+// Mock active members for fallback
+export const mockActiveMembers = [
+  {
+    id: '1',
+    name: 'Sarah Johnson',
+    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b550?w=150&h=150&fit=crop&crop=face',
+    isOnline: true,
+  },
+  {
+    id: '2',
+    name: 'Mike Chen',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+    isOnline: true,
+  },
+  {
+    id: '3',
+    name: 'Emily Rodriguez',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+    isOnline: false,
+  },
+  {
+    id: '4',
+    name: 'David Kim',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
+    isOnline: true,
+  },
+  {
+    id: '5',
+    name: 'Alex Thompson',
+    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&h=150&fit=crop&crop=face',
+    isOnline: false,
+  },
+  {
+    id: '6',
+    name: 'Jessica Park',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
+    isOnline: true,
+  },
+  {
+    id: '7',
+    name: 'James Wilson',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face',
+    isOnline: false,
+  },
+  {
+    id: '8',
+    name: 'Maria Garcia',
+    avatar: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=150&h=150&fit=crop&crop=face',
+    isOnline: true,
+  },
+];
+
 
 // Mock event speakers
 export const mockEventSpeakers: EventSpeaker[] = [

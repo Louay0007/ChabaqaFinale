@@ -2,18 +2,21 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Community, Product, Purchase } from "@/lib/models"
+import { Community } from "@/lib/models"
+import { ProductWithDetails, ProductPurchase } from "@/lib/api/products-community.api"
 import HeaderSection from "./header-section"
 import ProductsTabs from "./products-tabs"
 
 interface ProductsPageContentProps {
+  creatorSlug: string
   slug: string
   community: Community
-  allProducts: Product[]
-  userPurchases: Purchase[]
+  allProducts: ProductWithDetails[]
+  userPurchases: ProductPurchase[]
 }
 
 export default function ProductsPageContent({
+  creatorSlug,
   slug,
   community,
   allProducts,
@@ -24,12 +27,17 @@ export default function ProductsPageContent({
   const [activeTab, setActiveTab] = useState("all")
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
 
-  const filteredProducts = allProducts.filter((product) => {
+  const filteredProducts = (allProducts || []).filter((product) => {
     const matchesSearch =
-      product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchQuery.toLowerCase())
+      product.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchQuery.toLowerCase())
 
-    const isPurchased = userPurchases.some((p) => p.productId === product.id)
+    const isPurchased = (userPurchases || []).some((p) => p.productId === product.id)
+
+    // Filter by published status
+    if (!product.isPublished) {
+      return false
+    }
 
     if (activeTab === "purchased") {
       return matchesSearch && isPurchased
@@ -47,10 +55,10 @@ export default function ProductsPageContent({
       return matchesSearch && product.category === "Assets"
     }
     if (activeTab === "free") {
-      return matchesSearch && product.price === 0
+      return matchesSearch && (product.price || 0) === 0
     }
     if (activeTab === "paid") {
-      return matchesSearch && product.price > 0
+      return matchesSearch && (product.price || 0) > 0
     }
     return matchesSearch
   })
@@ -61,6 +69,7 @@ export default function ProductsPageContent({
         <HeaderSection allProducts={allProducts} userPurchases={userPurchases} />
         
         <ProductsTabs
+          creatorSlug={creatorSlug}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           searchQuery={searchQuery}

@@ -37,168 +37,168 @@ export class CommunityAffCreaJoinController {
   constructor(
     private readonly communityService: CommunityAffCreaJoinService,
     private readonly uploadService: UploadService,
-  ) {}
+  ) { }
 
-/**
- * Créer une nouvelle communauté
- * Route: POST /community-aff-crea-join/create
- * Authentification: JWT obligatoire
- */
-@Post('create')
-@UseGuards(JwtAuthGuard)
-@HttpCode(HttpStatus.CREATED)
-@UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-@UseInterceptors(FileInterceptor('logo'))
-@ApiConsumes('multipart/form-data')
-@ApiOperation({
-  summary: 'Créer une nouvelle communauté',
-  description: 'Permet à un utilisateur authentifié de créer une nouvelle communauté. L\'utilisateur devient automatiquement le créateur, membre et administrateur de la communauté.'
-})
-@ApiConsumes('multipart/form-data') // Ajout pour indiquer le support des fichiers
-@ApiBody({
-  type: CreateCommunityDto,
-  description: 'Données de la communauté à créer (avec possibilité d\'upload de logo)'
-})
-@ApiResponse({
-  status: HttpStatus.CREATED,
-  description: 'Communauté créée avec succès',
-  schema: {
-    example: {
-      success: true,
-      message: 'Communauté créée avec succès',
-      data: {
-        _id: '507f1f77bcf86cd799439011',
-        name: 'Développeurs JavaScript',
-        logo: 'https://example.com/logo.png',
-        photo_de_couverture: 'https://example.com/cover.jpg',
-        short_description: 'Une communauté pour partager des connaissances sur JavaScript',
-        createur: {
-          _id: '507f1f77bcf86cd799439012',
-          name: 'John Doe',
-          email: 'john@example.com'
-        },
-        members: [
-          {
+  /**
+   * Créer une nouvelle communauté
+   * Route: POST /community-aff-crea-join/create
+   * Authentification: JWT obligatoire
+   */
+  @Post('create')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  @UseInterceptors(FileInterceptor('logo'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Créer une nouvelle communauté',
+    description: 'Permet à un utilisateur authentifié de créer une nouvelle communauté. L\'utilisateur devient automatiquement le créateur, membre et administrateur de la communauté.'
+  })
+  @ApiConsumes('multipart/form-data') // Ajout pour indiquer le support des fichiers
+  @ApiBody({
+    type: CreateCommunityDto,
+    description: 'Données de la communauté à créer (avec possibilité d\'upload de logo)'
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Communauté créée avec succès',
+    schema: {
+      example: {
+        success: true,
+        message: 'Communauté créée avec succès',
+        data: {
+          _id: '507f1f77bcf86cd799439011',
+          name: 'Développeurs JavaScript',
+          logo: 'https://example.com/logo.png',
+          photo_de_couverture: 'https://example.com/cover.jpg',
+          short_description: 'Une communauté pour partager des connaissances sur JavaScript',
+          createur: {
             _id: '507f1f77bcf86cd799439012',
             name: 'John Doe',
             email: 'john@example.com'
-          }
-        ],
-        admins: [
-          {
-            _id: '507f1f77bcf86cd799439012',
-            name: 'John Doe',
-            email: 'john@example.com'
-          }
-        ],
-        rank: 'bronze',
-        fees_of_join: 0,
-        isPrivate: false,
-        isActive: true,
-        isVerified: false,
-        membersCount: 1,
-        createdAt: '2023-12-01T00:00:00.000Z',
-        updatedAt: '2023-12-01T00:00:00.000Z'
+          },
+          members: [
+            {
+              _id: '507f1f77bcf86cd799439012',
+              name: 'John Doe',
+              email: 'john@example.com'
+            }
+          ],
+          admins: [
+            {
+              _id: '507f1f77bcf86cd799439012',
+              name: 'John Doe',
+              email: 'john@example.com'
+            }
+          ],
+          rank: 'bronze',
+          fees_of_join: 0,
+          isPrivate: false,
+          isActive: true,
+          isVerified: false,
+          membersCount: 1,
+          createdAt: '2023-12-01T00:00:00.000Z',
+          updatedAt: '2023-12-01T00:00:00.000Z'
+        }
       }
     }
-  }
-})
-@ApiResponse({
-  status: HttpStatus.BAD_REQUEST,
-  description: 'Données invalides',
-  schema: {
-    example: {
-      success: false,
-      message: 'Données invalides',
-      error: {
-        statusCode: 400,
-        message: ['Le nom doit contenir au moins 2 caractères', 'Le logo doit être une URL valide'],
-        error: 'Bad Request'
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Données invalides',
+    schema: {
+      example: {
+        success: false,
+        message: 'Données invalides',
+        error: {
+          statusCode: 400,
+          message: ['Le nom doit contenir au moins 2 caractères', 'Le logo doit être une URL valide'],
+          error: 'Bad Request'
+        }
       }
     }
-  }
-})
-@ApiResponse({
-  status: HttpStatus.UNAUTHORIZED,
-  description: 'Token JWT manquant ou invalide',
-  schema: {
-    example: {
-      success: false,
-      message: 'Non autorisé',
-      error: {
-        statusCode: 401,
-        message: 'Unauthorized'
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Token JWT manquant ou invalide',
+    schema: {
+      example: {
+        success: false,
+        message: 'Non autorisé',
+        error: {
+          statusCode: 401,
+          message: 'Unauthorized'
+        }
       }
     }
-  }
-})
-@ApiResponse({
-  status: HttpStatus.CONFLICT,
-  description: 'Une communauté avec ce nom existe déjà',
-  schema: {
-    example: {
-      success: false,
-      message: 'Une communauté avec ce nom existe déjà',
-      error: {
-        statusCode: 409,
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Une communauté avec ce nom existe déjà',
+    schema: {
+      example: {
+        success: false,
         message: 'Une communauté avec ce nom existe déjà',
-        error: 'Conflict'
+        error: {
+          statusCode: 409,
+          message: 'Une communauté avec ce nom existe déjà',
+          error: 'Conflict'
+        }
       }
     }
-  }
-})
-async createCommunity(
-  @Body() createCommunityDto: CreateCommunityDto,
-  @UploadedFile() file: Express.Multer.File,
-  @Request() req: any
-) {
-  try {
-    console.log('🔍 [CREATE COMMUNITY] Request received')
-    console.log('🔍 [CREATE COMMUNITY] DTO:', JSON.stringify(createCommunityDto, null, 2))
-    console.log('🔍 [CREATE COMMUNITY] User:', req.user?._id)
-    
-    const userId = req.user._id;
-    const uploadedFiles: { logo?: string } = {};
+  })
+  async createCommunity(
+    @Body() createCommunityDto: CreateCommunityDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: any
+  ) {
+    try {
+      console.log('🔍 [CREATE COMMUNITY] Request received')
+      console.log('🔍 [CREATE COMMUNITY] DTO:', JSON.stringify(createCommunityDto, null, 2))
+      console.log('🔍 [CREATE COMMUNITY] User:', req.user?._id)
 
-    if (file) {
-      // ✅ Utiliser UploadService pour valider et générer une URL
-      const fileType = this.uploadService.validateFile(file);
-      const filename = this.uploadService.generateFilename(file.originalname);
-      const destinationPath = this.uploadService.getDestinationPath(fileType);
+      const userId = req.user._id;
+      const uploadedFiles: { logo?: string } = {};
 
-      // Déplacer le fichier (Multer l'a mis dans un tmp, mais on garde la logique)
-      const fs = require('fs');
-      const finalPath = `${destinationPath}/${filename}`;
-      fs.renameSync(file.path, finalPath);
+      if (file) {
+        // ✅ Utiliser UploadService pour valider et générer une URL
+        const fileType = this.uploadService.validateFile(file);
+        const filename = this.uploadService.generateFilename(file.originalname);
+        const destinationPath = this.uploadService.getDestinationPath(fileType);
 
-      // Générer l’URL publique
-      const result = await this.uploadService.processUploadedFile(
-        { ...file, path: finalPath }, 
-        filename
+        // Déplacer le fichier (Multer l'a mis dans un tmp, mais on garde la logique)
+        const fs = require('fs');
+        const finalPath = `${destinationPath}/${filename}`;
+        fs.renameSync(file.path, finalPath);
+
+        // Générer l’URL publique
+        const result = await this.uploadService.processUploadedFile(
+          { ...file, path: finalPath },
+          filename
+        );
+
+        uploadedFiles.logo = result.url; // ⚡ Ici on garde uniquement l’URL publique
+        console.log('📸 Logo final enregistré:', uploadedFiles.logo);
+      }
+
+      const community = await this.communityService.createCommunity(
+        createCommunityDto,
+        uploadedFiles,
+        userId
       );
 
-      uploadedFiles.logo = result.url; // ⚡ Ici on garde uniquement l’URL publique
-      console.log('📸 Logo final enregistré:', uploadedFiles.logo);
+      return {
+        success: true,
+        message: 'Communauté créée avec succès',
+        data: community
+      };
+    } catch (error) {
+      console.error('❌ [CREATE COMMUNITY] Error:', error);
+      console.error('❌ [CREATE COMMUNITY] Error message:', error.message);
+      console.error('❌ [CREATE COMMUNITY] Error stack:', error.stack);
+      throw error;
     }
-
-    const community = await this.communityService.createCommunity(
-      createCommunityDto,
-      uploadedFiles,
-      userId
-    );
-
-    return {
-      success: true,
-      message: 'Communauté créée avec succès',
-      data: community
-    };
-  } catch (error) {
-    console.error('❌ [CREATE COMMUNITY] Error:', error);
-    console.error('❌ [CREATE COMMUNITY] Error message:', error.message);
-    console.error('❌ [CREATE COMMUNITY] Error stack:', error.stack);
-    throw error;
   }
-}
 
 
   /**
@@ -210,12 +210,12 @@ async createCommunity(
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Obtenir mes communautés créées',
     description: 'Récupère toutes les communautés créées par l\'utilisateur authentifié'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Liste des communautés créées',
     schema: {
       example: {
@@ -239,10 +239,10 @@ async createCommunity(
       if (!userId) {
         throw new Error('User ID not found in request');
       }
-      
+
       console.log('🔍 Getting created communities for user:', userId);
       const communities = await this.communityService.getUserCreatedCommunities(userId);
-      
+
       return {
         success: true,
         message: 'Communautés récupérées avec succès',
@@ -263,19 +263,19 @@ async createCommunity(
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Obtenir mes communautés rejointes',
     description: 'Récupère toutes les communautés dont l\'utilisateur authentifié est membre'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Liste des communautés rejointes'
   })
   async getMyJoinedCommunities(@Request() req: any) {
     try {
       const userId = req.user._id;
       const communities = await this.communityService.getUserJoinedCommunities(userId);
-      
+
       return {
         success: true,
         message: 'Communautés rejointes récupérées avec succès',
@@ -293,18 +293,18 @@ async createCommunity(
    */
   @Get('public/all')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Obtenir toutes les communautés publiques',
     description: 'Récupère toutes les communautés publiques et actives'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Liste des communautés publiques'
   })
   async getPublicCommunities() {
     try {
       const communities = await this.communityService.getPublicCommunities();
-      
+
       return {
         success: true,
         message: 'Communautés publiques récupérées avec succès',
@@ -320,66 +320,66 @@ async createCommunity(
     * Route: GET /community-aff-crea-join/all-communities
     * Authentification: Optionnelle (public)
     */
-   @Get('all-communities')
-   @HttpCode(HttpStatus.OK)
-   @ApiOperation({
-     summary: 'Obtenir toutes les communautés',
-     description: 'Récupère toutes les communautés actives avec leurs informations complètes'
-   })
-   @ApiResponse({
-     status: HttpStatus.OK,
-     description: 'Liste des communautés récupérée avec succès',
-     schema: {
-       example: {
-         success: true,
-         message: 'Communautés récupérées avec succès',
-         data: [
-           {
-             _id: '507f1f77bcf86cd799439011',
-             name: 'Développeurs JavaScript',
-             logo: 'https://example.com/logo.png',
-             photo_de_couverture: 'https://example.com/cover.jpg',
-             short_description: 'Une communauté pour partager des connaissances sur JavaScript',
-             createur: {
-               _id: '507f1f77bcf86cd799439012',
-               name: 'John Doe',
-               email: 'john@example.com'
-             },
-             members: [
-               {
-                 _id: '507f1f77bcf86cd799439012',
-                 name: 'John Doe',
-                 email: 'john@example.com'
-               }
-             ],
-             admins: [
-               {
-                 _id: '507f1f77bcf86cd799439012',
-                 name: 'John Doe',
-                 email: 'john@example.com'
-               }
-             ],
-             rank: 1,
-             fees_of_join: 0,
-             isPrivate: false,
-             isActive: true,
-             isVerified: false,
-             membersCount: 1,
-             createdAt: '2023-12-01T00:00:00.000Z',
-             updatedAt: '2023-12-01T00:00:00.000Z'
-           }
-         ]
-       }
-     }
-   })
-   @ApiResponse({
-     status: HttpStatus.INTERNAL_SERVER_ERROR,
-     description: 'Erreur interne du serveur'
-   })
-   async getAllCommunities(@Request() req?: any) {
+  @Get('all-communities')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Obtenir toutes les communautés',
+    description: 'Récupère toutes les communautés actives avec leurs informations complètes'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Liste des communautés récupérée avec succès',
+    schema: {
+      example: {
+        success: true,
+        message: 'Communautés récupérées avec succès',
+        data: [
+          {
+            _id: '507f1f77bcf86cd799439011',
+            name: 'Développeurs JavaScript',
+            logo: 'https://example.com/logo.png',
+            photo_de_couverture: 'https://example.com/cover.jpg',
+            short_description: 'Une communauté pour partager des connaissances sur JavaScript',
+            createur: {
+              _id: '507f1f77bcf86cd799439012',
+              name: 'John Doe',
+              email: 'john@example.com'
+            },
+            members: [
+              {
+                _id: '507f1f77bcf86cd799439012',
+                name: 'John Doe',
+                email: 'john@example.com'
+              }
+            ],
+            admins: [
+              {
+                _id: '507f1f77bcf86cd799439012',
+                name: 'John Doe',
+                email: 'john@example.com'
+              }
+            ],
+            rank: 1,
+            fees_of_join: 0,
+            isPrivate: false,
+            isActive: true,
+            isVerified: false,
+            membersCount: 1,
+            createdAt: '2023-12-01T00:00:00.000Z',
+            updatedAt: '2023-12-01T00:00:00.000Z'
+          }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Erreur interne du serveur'
+  })
+  async getAllCommunities(@Request() req?: any) {
     try {
       const communities = await this.communityService.getAllCommunities();
-      
+
       return {
         success: true,
         message: 'Communautés récupérées avec succès',
@@ -398,12 +398,12 @@ async createCommunity(
    */
   @Get('ranking')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Obtenir le classement des communautés',
     description: 'Récupère le classement des communautés basé sur le nombre de membres (rang 1 = plus de membres)'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Classement des communautés',
     schema: {
       example: {
@@ -443,7 +443,7 @@ async createCommunity(
   async getCommunityRanking() {
     try {
       const communities = await this.communityService.getCommunityRanking();
-      
+
       return {
         success: true,
         message: 'Classement récupéré avec succès',
@@ -461,18 +461,18 @@ async createCommunity(
    */
   @Post('update-ranks')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Mettre à jour les rangs des communautés',
     description: 'Force la mise à jour des rangs de toutes les communautés basé sur le nombre de membres'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Rangs mis à jour avec succès'
   })
   async updateCommunityRanks() {
     try {
       await this.communityService.updateCommunityRanks();
-      
+
       return {
         success: true,
         message: 'Rangs mis à jour avec succès'
@@ -492,16 +492,16 @@ async createCommunity(
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Rejoindre une communauté',
     description: 'Permet à un utilisateur de rejoindre une communauté publique en utilisant son ID'
   })
-  @ApiBody({ 
+  @ApiBody({
     type: JoinCommunityDto,
     description: 'Données pour rejoindre la communauté'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Communauté rejointe avec succès',
     schema: {
       example: {
@@ -522,20 +522,20 @@ async createCommunity(
       }
     }
   })
-  @ApiResponse({ 
-    status: HttpStatus.BAD_REQUEST, 
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
     description: 'Données invalides'
   })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
     description: 'Communauté non trouvée'
   })
-  @ApiResponse({ 
-    status: HttpStatus.CONFLICT, 
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
     description: 'Vous êtes déjà membre de cette communauté'
   })
-  @ApiResponse({ 
-    status: HttpStatus.FORBIDDEN, 
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
     description: 'Communauté privée ou inactive'
   })
   async joinCommunity(
@@ -545,7 +545,7 @@ async createCommunity(
     try {
       const userId = req.user._id;
       const community = await this.communityService.joinCommunity(joinCommunityDto, userId);
-      
+
       return {
         success: true,
         message: 'Vous avez rejoint la communauté avec succès',
@@ -564,32 +564,32 @@ async createCommunity(
   @Post('join-by-invite')
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Rejoindre une communauté via invitation',
     description: 'Permet à un utilisateur de rejoindre une communauté (publique ou privée) en utilisant un code d\'invitation'
   })
-  @ApiBody({ 
+  @ApiBody({
     type: JoinByInviteDto,
     description: 'Données pour rejoindre par invitation'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Communauté rejointe avec succès via invitation'
   })
-  @ApiResponse({ 
-    status: HttpStatus.BAD_REQUEST, 
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
     description: 'Données invalides'
   })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
     description: 'Code d\'invitation invalide ou expiré'
   })
-  @ApiResponse({ 
-    status: HttpStatus.CONFLICT, 
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
     description: 'Vous êtes déjà membre de cette communauté'
   })
-  @ApiResponse({ 
-    status: HttpStatus.FORBIDDEN, 
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
     description: 'Communauté inactive'
   })
   async joinByInvite(
@@ -599,7 +599,7 @@ async createCommunity(
     try {
       const userId = req.user._id;
       const community = await this.communityService.joinByInvite(joinByInviteDto, userId);
-      
+
       return {
         success: true,
         message: 'Vous avez rejoint la communauté avec succès via invitation',
@@ -618,16 +618,16 @@ async createCommunity(
   @Post('generate-invite')
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Générer un lien d\'invitation',
     description: 'Permet aux créateurs et administrateurs de générer un lien d\'invitation pour leur communauté'
   })
-  @ApiBody({ 
+  @ApiBody({
     type: GenerateInviteDto,
     description: 'Données pour générer le lien'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Lien d\'invitation généré avec succès',
     schema: {
       example: {
@@ -640,16 +640,16 @@ async createCommunity(
       }
     }
   })
-  @ApiResponse({ 
-    status: HttpStatus.BAD_REQUEST, 
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
     description: 'Données invalides'
   })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
     description: 'Communauté non trouvée'
   })
-  @ApiResponse({ 
-    status: HttpStatus.FORBIDDEN, 
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
     description: 'Seuls les créateurs et administrateurs peuvent générer des liens'
   })
   async generateInviteLink(
@@ -660,7 +660,7 @@ async createCommunity(
       const userId = req.user._id;
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       const inviteData = await this.communityService.generateInviteLink(generateInviteDto, userId, baseUrl);
-      
+
       return {
         success: true,
         message: 'Lien d\'invitation généré avec succès',
@@ -678,17 +678,17 @@ async createCommunity(
    */
   @Post('leave/:communityId')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Quitter une communauté',
     description: 'Permet à un utilisateur de quitter une communauté dont il est membre'
   })
-  @ApiParam({ 
-    name: 'communityId', 
+  @ApiParam({
+    name: 'communityId',
     description: 'ID de la communauté à quitter',
     example: '507f1f77bcf86cd799439011'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Communauté quittée avec succès',
     schema: {
       example: {
@@ -697,16 +697,16 @@ async createCommunity(
       }
     }
   })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
     description: 'Communauté non trouvée'
   })
-  @ApiResponse({ 
-    status: HttpStatus.BAD_REQUEST, 
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
     description: 'Vous n\'êtes pas membre de cette communauté'
   })
-  @ApiResponse({ 
-    status: HttpStatus.FORBIDDEN, 
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
     description: 'Le créateur ne peut pas quitter sa propre communauté'
   })
   async leaveCommunity(
@@ -716,7 +716,7 @@ async createCommunity(
     try {
       const userId = req.user._id;
       const result = await this.communityService.leaveCommunity(communityId, userId);
-      
+
       return {
         success: true,
         message: result.message
@@ -733,29 +733,29 @@ async createCommunity(
    */
   @Get('join-by-invite/:inviteCode')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Accéder à une invitation via lien direct',
     description: 'Permet à un utilisateur de rejoindre une communauté directement via un lien d\'invitation'
   })
-  @ApiParam({ 
-    name: 'inviteCode', 
+  @ApiParam({
+    name: 'inviteCode',
     description: 'Code d\'invitation unique',
     example: 'abc123DEF456'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Communauté rejointe avec succès via lien direct'
   })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
     description: 'Code d\'invitation invalide ou expiré'
   })
-  @ApiResponse({ 
-    status: HttpStatus.CONFLICT, 
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
     description: 'Vous êtes déjà membre de cette communauté'
   })
-  @ApiResponse({ 
-    status: HttpStatus.FORBIDDEN, 
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
     description: 'Communauté inactive'
   })
   async joinByInviteLink(
@@ -766,7 +766,7 @@ async createCommunity(
       const userId = req.user._id;
       const joinByInviteDto: JoinByInviteDto = { inviteCode };
       const community = await this.communityService.joinByInvite(joinByInviteDto, userId);
-      
+
       return {
         success: true,
         message: 'Vous avez rejoint la communauté avec succès via le lien d\'invitation',
@@ -787,12 +787,12 @@ async createCommunity(
    */
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Obtenir une communauté par ID ou slug',
     description: 'Récupère les détails d\'une communauté spécifique via son ID MongoDB ou son slug'
   })
-  @ApiParam({ 
-    name: 'id', 
+  @ApiParam({
+    name: 'id',
     description: 'ID MongoDB ou slug de la communauté',
     examples: {
       id: {
@@ -805,18 +805,18 @@ async createCommunity(
       }
     }
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Détails de la communauté'
   })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
     description: 'Communauté non trouvée'
   })
   async getCommunityById(@Param('id') communityId: string) {
     try {
       const community = await this.communityService.getCommunityById(communityId);
-      
+
       return {
         success: true,
         message: 'Communauté récupérée avec succès',
@@ -868,5 +868,52 @@ async createCommunity(
   async removeAdmin(@Param('id') communityId: string, @Param('userId') userId: string, @Request() req: any) {
     const result = await this.communityService.removeAdmin(communityId, userId, req.user._id);
     return { success: true, ...result };
+  }
+
+  /**
+   * Get active/online members of a community
+   * Route: GET /community-aff-crea-join/:slug/active-members
+   * Returns members with their online status
+   */
+  @Get(':slug/active-members')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Récupérer les membres actifs d\'une communauté' })
+  @ApiParam({ name: 'slug', description: 'Slug de la communauté' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Nombre maximum de membres à retourner (défaut: 20)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Membres actifs récupérés avec succès',
+    schema: {
+      example: {
+        success: true,
+        message: 'Active members retrieved successfully',
+        data: {
+          members: [
+            {
+              id: '507f1f77bcf86cd799439011',
+              name: 'John Doe',
+              email: 'john@example.com',
+              avatar: 'https://example.com/avatar.jpg',
+              bio: 'Developer and tech enthusiast',
+              isOnline: true,
+              lastActive: '2024-01-15T10:30:00Z'
+            }
+          ],
+          total: 15,
+          online: 8
+        }
+      }
+    }
+  })
+  async getActiveMembers(
+    @Param('slug') slug: string,
+    @Query('limit') limit?: number
+  ) {
+    const result = await this.communityService.getActiveMembers(slug, limit || 20);
+    return {
+      success: true,
+      message: 'Active members retrieved successfully',
+      data: result
+    };
   }
 }
