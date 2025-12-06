@@ -17,6 +17,8 @@ Database: mongodb+srv://admin:admin@chabaqa.bmmujoq.mongodb.net/?appName=chabaqa
 | 692efc34 | James Anderson | james.anderson@example.com | creator | 12/2/2025 |
 | 692efc34 | Sophia Rodriguez | sophia.rodriguez@example.com | creator | 12/2/2025 |
 
+ALL PASSWORDS: Password123!
+
 
 # 🏘️ Communities
 
