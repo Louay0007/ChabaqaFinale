@@ -47,7 +47,7 @@ type ContentProgressRecord = {
 
 interface ContentDetails {
   id: string;
-  title: string;
+  title?: string;
   description?: string;
   thumbnail?: string;
   communityId?: string;

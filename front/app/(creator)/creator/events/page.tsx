@@ -5,16 +5,22 @@ import { EventsHeader } from "./components/events-header"
 import { EventsStats } from "./components/events-stats"
 import { EventsActionBar } from "./components/events-action-bar"
 import { EventsList } from "./components/events-list"
-import { api } from "@/lib/api"
+import { api, apiClient } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { useCreatorCommunity } from "@/app/(creator)/creator/context/creator-community-context"
 
 export default function EventsPage() {
   const { toast } = useToast()
+  const { selectedCommunity, selectedCommunityId, isLoading: communityLoading } = useCreatorCommunity()
+
   const [events, setEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [revenue, setRevenue] = useState<number | null>(null)
 
+  // Reload when community changes
   useEffect(() => {
+    if (communityLoading || !selectedCommunityId) return
+
     const load = async () => {
       setLoading(true)
       try {
@@ -22,8 +28,16 @@ export default function EventsPage() {
         const user = me?.data || (me as any)?.user || null
         if (!user) { setEvents([]); return }
 
-        // Fetch creator events
-        const eventsRes = await api.events.getByCreator(user._id || user.id, { limit: 50 }).catch(() => null as any)
+        // Use selected community ID to fetch events
+        const communityId = selectedCommunityId
+
+        // Fetch events - filter by community if selected
+        // Note: Backend /events endpoint supports communityId but not creatorId in findAll
+        const eventsRes = selectedCommunityId
+          ? await apiClient.get<any>(`/events?communityId=${selectedCommunityId}&limit=50`).catch(() => null as any)
+          : await apiClient.get<any>(`/events?limit=50`).catch(() => null as any)
+
+        // Backend returns { success: true, data: { events, pagination } }
         const rawEvents = eventsRes?.data?.events || eventsRes?.events || eventsRes?.data?.items || eventsRes?.items || []
         const normalized = (Array.isArray(rawEvents) ? rawEvents : []).map((e: any) => ({
           id: e.id || e._id,
@@ -44,7 +58,7 @@ export default function EventsPage() {
         // Fetch analytics revenue (last 30 days)
         const now = new Date()
         const to = now.toISOString()
-        const from = new Date(now.getTime() - 30*24*3600*1000).toISOString()
+        const from = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString()
         const evtAgg = await api.creatorAnalytics.getEvents({ from, to }).catch(() => null as any)
         const byEvent = evtAgg?.data?.byEvent || evtAgg?.byEvent || evtAgg?.data?.items || evtAgg?.items || []
         const totalRevenue = (Array.isArray(byEvent) ? byEvent : []).reduce((sum: number, x: any) => sum + Number(x.revenue ?? 0), 0)
@@ -56,7 +70,7 @@ export default function EventsPage() {
       }
     }
     load()
-  }, [])
+  }, [selectedCommunityId, selectedCommunity, communityLoading, toast])
 
   const now = new Date()
   const upcomingEvents = useMemo(() => events.filter(e => new Date(e.startDate) > now), [events])
@@ -71,18 +85,18 @@ export default function EventsPage() {
   return (
     <div className="space-y-8 p-5">
       <EventsHeader />
-      <EventsStats 
+      <EventsStats
         totalEvents={totalEvents}
         totalAttendees={totalAttendees}
         totalRevenue={revenue ?? revenueFallback}
         totalUpcoming={totalUpcoming}
       />
-      <EventsActionBar 
+      <EventsActionBar
         activeTab="upcoming"
         totalUpcoming={totalUpcoming}
         totalPast={totalPast}
       />
-      <EventsList 
+      <EventsList
         upcomingEvents={upcomingEvents}
         pastEvents={pastEvents}
       />

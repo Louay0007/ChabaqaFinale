@@ -2,9 +2,9 @@ import { redirect } from "next/navigation"
 import { api } from "@/lib/api"
 
 interface CreatorPageProps {
-  params: {
+  params: Promise<{
     creator: string
-  }
+  }>
 }
 
 export default async function CreatorPage({ params }: CreatorPageProps) {
@@ -14,7 +14,7 @@ export default async function CreatorPage({ params }: CreatorPageProps) {
     try {
       // Try to get the current user to check if they're authenticated
       const meResponse = await api.auth.me().catch(() => null)
-      
+
       if (meResponse?.data) {
         // User is authenticated, redirect to creator dashboard
         redirect("/creator/dashboard")

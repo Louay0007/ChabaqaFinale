@@ -1,18 +1,44 @@
 import { apiClient, ApiSuccessResponse, PaginatedResponse, PaginationParams } from './client';
 import type { Product, ProductVariant, ProductFile } from './types';
 
-export interface CreateProductData {
+export interface CreateProductVariantData {
   name: string;
-  slug: string;
-  description: string;
-  communityId: string;
-  thumbnail?: string;
   price: number;
-  type: 'digital' | 'physical';
+  description?: string;
+  inventory?: number;
+}
+
+export interface CreateProductFileData {
+  name: string;
+  url: string;
+  type: string;
+  size?: string;
+  description?: string;
+  order?: number;
+  isActive?: boolean;
+}
+
+export interface CreateProductData {
+  title: string;
+  description: string;
+  price: number;
+  currency?: 'USD' | 'EUR' | 'TND';
+  communityId: string;
+  category: string;
+  type?: 'digital' | 'physical';
+  inventory?: number;
+  images?: string[];
+  variants?: CreateProductVariantData[];
+  files?: CreateProductFileData[];
+  licenseTerms?: string;
+  isRecurring?: boolean;
+  recurringInterval?: 'month' | 'year' | 'week';
+  features?: string[];
 }
 
 export interface UpdateProductData extends Partial<CreateProductData> {
   isPublished?: boolean;
+  isActive?: boolean;
 }
 
 export interface CreateVariantData {

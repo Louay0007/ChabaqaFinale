@@ -18,9 +18,13 @@ export function CreatorCoursesTabs({ allCourses }: CreatorCoursesTabsProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
   const filteredCourses = allCourses.filter((course) => {
+    const courseTitle = course.titre || course.title || ''
+    const courseDescription = course.description || ''
+    const coursePrice = course.prix || course.price || 0
+
     const matchesSearch =
-      course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.description.toLowerCase().includes(searchQuery.toLowerCase())
+      courseTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      courseDescription.toLowerCase().includes(searchQuery.toLowerCase())
 
     if (activeTab === "published") {
       return matchesSearch && course.isPublished
@@ -29,10 +33,10 @@ export function CreatorCoursesTabs({ allCourses }: CreatorCoursesTabsProps) {
       return matchesSearch && !course.isPublished
     }
     if (activeTab === "free") {
-      return matchesSearch && course.price === 0
+      return matchesSearch && coursePrice === 0
     }
     if (activeTab === "paid") {
-      return matchesSearch && course.price > 0
+      return matchesSearch && coursePrice > 0
     }
     return matchesSearch
   })
@@ -43,8 +47,8 @@ export function CreatorCoursesTabs({ allCourses }: CreatorCoursesTabsProps) {
         <TabsTrigger value="all">All Courses ({allCourses.length})</TabsTrigger>
         <TabsTrigger value="published">Published ({allCourses.filter((c) => c.isPublished).length})</TabsTrigger>
         <TabsTrigger value="draft">Draft ({allCourses.filter((c) => !c.isPublished).length})</TabsTrigger>
-        <TabsTrigger value="free">Free ({allCourses.filter((c) => c.price === 0).length})</TabsTrigger>
-        <TabsTrigger value="paid">Paid ({allCourses.filter((c) => c.price > 0).length})</TabsTrigger>
+        <TabsTrigger value="free">Free ({allCourses.filter((c) => (c.prix || c.price || 0) === 0).length})</TabsTrigger>
+        <TabsTrigger value="paid">Paid ({allCourses.filter((c) => (c.prix || c.price || 0) > 0).length})</TabsTrigger>
       </TabsList>
 
       <TabsContent value={activeTab} className="mt-6">

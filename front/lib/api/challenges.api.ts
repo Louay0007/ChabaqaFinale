@@ -1,16 +1,73 @@
 import { apiClient, ApiSuccessResponse, PaginatedResponse, PaginationParams } from './client';
 import type { Challenge, ChallengeTask, ChallengeParticipant } from './types';
 
+export interface CreateChallengeResourceData {
+  title: string;
+  type: 'video' | 'article' | 'code' | 'tool' | 'pdf' | 'link';
+  url: string;
+  description: string;
+  order: number;
+}
+
+export interface CreateChallengeTaskResourceData {
+  title: string;
+  type: 'video' | 'article' | 'code' | 'tool';
+  url: string;
+  description: string;
+}
+
+export interface CreateChallengeTaskData {
+  id?: string;
+  day: number;
+  title: string;
+  description: string;
+  deliverable: string;
+  points: number;
+  instructions: string;
+  notes?: string;
+  resources: CreateChallengeTaskResourceData[];
+}
+
 export interface CreateChallengeData {
   title: string;
-  slug: string;
   description: string;
-  communityId: string;
-  thumbnail?: string;
+  communitySlug: string;
   startDate: string;
   endDate: string;
-  prize?: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  depositAmount?: number;
+  maxParticipants?: number;
+  completionReward?: number;
+  topPerformerBonus?: number;
+  streakBonus?: number;
+  category?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  duration?: string;
+  thumbnail?: string;
+  notes?: string;
+  isActive?: boolean;
+  resources: CreateChallengeResourceData[];
+  tasks: CreateChallengeTaskData[];
+  participationFee?: number;
+  currency?: 'USD' | 'EUR' | 'TND';
+  depositRequired?: boolean;
+  isPremium?: boolean;
+  premiumFeatures?: {
+    personalMentoring?: boolean;
+    exclusiveResources?: boolean;
+    priorityFeedback?: boolean;
+    certificate?: boolean;
+    liveSessions?: boolean;
+    communityAccess?: boolean;
+  };
+  paymentOptions?: {
+    allowInstallments?: boolean;
+    installmentCount?: number;
+    earlyBirdDiscount?: number;
+    groupDiscount?: number;
+    memberDiscount?: number;
+  };
+  freeTrialDays?: number;
+  trialFeatures?: string[];
 }
 
 export interface UpdateChallengeData extends Partial<CreateChallengeData> {
@@ -70,7 +127,7 @@ export const challengesApi = {
   
   // Get user participations
   getMyParticipations: async (params?: { communitySlug?: string; status?: string }): Promise<any> => {
-    return apiClient.get('/challenges/my-participations', params);
+    return apiClient.get('/challenges/user/my-participations', params);
   },
 
   // Join challenge

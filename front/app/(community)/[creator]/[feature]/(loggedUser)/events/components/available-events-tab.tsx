@@ -1,33 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { Event } from "@/lib/models";
+import { EventWithTickets } from "@/lib/api/events-community.api";
 import EventCard from "@/app/(community)/[creator]/[feature]/(loggedUser)/events/components/event-card";
 import { TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
 
 interface AvailableEventsTabProps {
-  availableEvents: Event[];
+  availableEvents: EventWithTickets[];
 }
 
 export default function AvailableEventsTab({ availableEvents }: AvailableEventsTabProps) {
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<EventWithTickets | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
   const [notes, setNotes] = useState("");
 
   // Filter only published and upcoming events
-  const upcomingEvents = availableEvents?.filter(e => 
-    e.isPublished && new Date(e.startDate) >= new Date()
+  const upcomingEvents = availableEvents?.filter(e =>
+    e.isActive && new Date(e.startDate) >= new Date()
   ) || []
 
   const handleRegister = () => {
-    console.log("Registering:", { 
-      event: selectedEvent?.id, 
-      ticket: selectedTicket, 
-      quantity, 
-      notes 
+    console.log("Registering:", {
+      event: selectedEvent?.id,
+      ticket: selectedTicket,
+      quantity,
+      notes
     });
   };
 

@@ -162,7 +162,7 @@ export function CommunityHero({
               
               <div className="bg-white p-4 rounded-xl border border-gray-200 hover:border-purple-300 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg">
+                  <div className="p-2.5 bg-gradient-to-br from-purp le-50 to-purple-100 rounded-lg">
                     <Tag className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>

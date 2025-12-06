@@ -57,11 +57,11 @@ export class PostResponseDto {
   })
   id: string;
 
-  @ApiProperty({
-    description: 'Titre du post',
+  @ApiPropertyOptional({
+    description: 'Titre du post (optionnel)',
     example: 'Getting Started with React Hooks'
   })
-  title: string;
+  title?: string;
 
   @ApiProperty({
     description: 'Contenu principal du post',

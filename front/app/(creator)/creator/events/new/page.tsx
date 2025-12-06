@@ -8,8 +8,9 @@ import { ReviewPublishStep } from "./components/review-publish-step"
 import { CreateEventNavigation } from "./components/create-event-navigation"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { api, apiClient } from "@/lib/api"
+import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { eventsApi, type CreateEventData } from "@/lib/api/events.api"
 
 interface Step {
   id: number
@@ -158,7 +159,7 @@ export default function CreateEventPage() {
         const me = await api.auth.me().catch(() => null as any)
         const user = me?.data || (me as any)?.user || null
         if (!user) return
-        const myComms = await api.communities.getByCreator(user._id || user.id).catch(() => null as any)
+        const myComms = await api.communities.getMyCreated().catch(() => null as any)
         const first = (myComms?.data || [])[0]
         if (first?.id || first?._id) setCommunityId(first.id || first._id)
       } catch {}
@@ -176,8 +177,8 @@ export default function CreateEventPage() {
         toast({ title: 'Missing community', description: 'No community found for this creator.', variant: 'destructive' as any })
         return
       }
-      // Map UI form to CreateEventDto
-      const payload = {
+      // Map UI form to CreateEventDto / CreateEventData
+      const payload: CreateEventData = {
         communityId,
         title: formData.title,
         description: formData.description,
@@ -190,10 +191,12 @@ export default function CreateEventPage() {
         onlineUrl: formData.onlineUrl || undefined,
         category: formData.category,
         type: formData.type as 'In-person' | 'Online' | 'Hybrid',
+        notes: undefined,
         image: formData.image || undefined,
         tags: formData.tags || [],
-        isActive: true,
-        isPublished: Boolean(formData.isPublished),
+        // Always create as draft; creators need an active subscription to publish
+        isActive: false,
+        isPublished: false,
         speakers: (formData.speakers || []).map((s: any) => ({
           name: s.name,
           title: s.title,
@@ -205,15 +208,14 @@ export default function CreateEventPage() {
           name: t.name,
           price: Number(t.price || 0),
           description: t.description,
-          quantity: t.quantity ? Number(t.quantity) : undefined,
-          sold: 0,
+          quantity: t.quantity ? Number(t.quantity) : 0,
         })),
         sessions: [],
-      } as any
+      }
 
-      const res = await apiClient.post<any>('/events', payload)
-      const created = res?.data || res
-      toast({ title: 'Event created', description: payload.title })
+      const res = await eventsApi.create(payload)
+      const created = (res as any)?.data || res
+      toast({ title: 'Event created as draft', description: `${payload.title} - Publish it from the event page once you have an active subscription.` })
       const id = created?.id || created?._id || created?.event?.id || created?.event?._id
       if (id) router.push(`/creator/events`)
       else router.push('/creator/events')
@@ -273,7 +275,6 @@ export default function CreateEventPage() {
         steps={steps}
         setCurrentStep={setCurrentStep}
         handleSubmit={handleSubmit}
-        formData={formData}
       />
     </div>
   )

@@ -2,10 +2,11 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { api } from "@/lib/api"
 import {
   Sidebar,
   SidebarContent,
@@ -42,6 +43,7 @@ import {
   Plus,
   LogOut,
   User,
+  Loader2,
 } from "lucide-react"
 
 const menuItems = [
@@ -95,26 +97,104 @@ const menuItems = [
   },
 ]
 
-const communities = [
-  {
-    id: "1",
-    name: "Web Development Mastery",
-    slug: "web-dev-mastery",
-    members: 1250,
-    color: "#8e78fb",
-  },
-  {
-    id: "2",
-    name: "Design Thinking Hub",
-    slug: "design-thinking-hub",
-    members: 890,
-    color: "#47c7ea",
-  },
+// Color palette for communities
+const COMMUNITY_COLORS = [
+  "#8e78fb",
+  "#47c7ea",
+  "#f65887",
+  "#ffa500",
+  "#52c41a",
+  "#1890ff",
+  "#eb2f96",
+  "#faad14",
 ]
+
+function getColorForCommunity(index: number): string {
+  return COMMUNITY_COLORS[index % COMMUNITY_COLORS.length]
+}
 
 export function CreatorSidebar() {
   const pathname = usePathname()
-  const [selectedCommunity, setSelectedCommunity] = useState(communities[0])
+  const [selectedCommunity, setSelectedCommunity] = useState<any>(null)
+  const [communities, setCommunities] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch communities on mount
+  useEffect(() => {
+    const fetchCommunities = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        // Fetch creator's communities (created by authenticated user)
+        const response = await api.communities.getMyCreated()
+        const communitiesData = response.data || []
+
+        setCommunities(communitiesData)
+        
+        // Set first community as default, or try to restore from localStorage
+        if (communitiesData.length > 0) {
+          const savedCommunityId = localStorage.getItem('creator_selected_community_id')
+          const defaultCommunity = savedCommunityId
+            ? communitiesData.find((c: any) => c._id === savedCommunityId) || communitiesData[0]
+            : communitiesData[0]
+          
+          setSelectedCommunity(defaultCommunity)
+        }
+      } catch (err) {
+        console.error('Failed to fetch communities:', err)
+        setError('Failed to load communities')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCommunities()
+  }, [])
+
+  // Handle community selection and save to localStorage
+  const handleSelectCommunity = (community: any) => {
+    setSelectedCommunity(community)
+    localStorage.setItem('creator_selected_community_id', community._id || community.id)
+    
+    // Optionally redirect to community dashboard
+    // router.push(`/creator/community/${community._id || community.id}/dashboard`)
+  }
+
+  // Show loading state
+  if (loading) {
+    return (
+      <Sidebar className="border-r">
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" disabled>
+                <Loader2 className="size-4 animate-spin" />
+                <span className="text-sm">Loading...</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+      </Sidebar>
+    )
+  }
+
+  // Show error state
+  if (error && communities.length === 0) {
+    return (
+      <Sidebar className="border-r">
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" disabled>
+                <span className="text-sm text-destructive">{error}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+      </Sidebar>
+    )
+  }
 
   return (
     <Sidebar className="border-r">
@@ -127,15 +207,31 @@ export function CreatorSidebar() {
                   size="lg"
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <span className="text-sm font-semibold">{selectedCommunity.name.charAt(0)}</span>
-                  </div>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{selectedCommunity.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {selectedCommunity.members.toLocaleString()} members
-                    </span>
-                  </div>
+                  {selectedCommunity ? (
+                    <>
+                      <div
+                        className="flex aspect-square size-8 items-center justify-center rounded-lg text-primary-foreground font-semibold"
+                        style={{
+                          backgroundColor:
+                            selectedCommunity.color ||
+                            getColorForCommunity(communities.indexOf(selectedCommunity)),
+                        }}
+                      >
+                        <span className="text-sm">{selectedCommunity.name?.charAt(0) || 'C'}</span>
+                      </div>
+                      <div className="grid flex-1 text-left text-sm leading-tight">
+                        <span className="truncate font-semibold">{selectedCommunity.name}</span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {selectedCommunity.members?.toLocaleString?.() ||
+                            selectedCommunity.memberCount ||
+                            0}{' '}
+                          members
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-sm">Select Community</span>
+                  )}
                   <ChevronDown className="ml-auto size-4" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -149,24 +245,41 @@ export function CreatorSidebar() {
                   <div className="flex size-6 items-center justify-center rounded-sm border">
                     <Plus className="size-4" />
                   </div>
-                  <div className="font-medium text-muted-foreground">Add Community</div>
+                  <div className="font-medium text-muted-foreground">Create Community</div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {communities.map((community) => (
-                  <DropdownMenuItem
-                    key={community.id}
-                    className="gap-2 p-2"
-                    onClick={() => setSelectedCommunity(community)}
-                  >
-                    <div
-                      className="flex size-6 items-center justify-center rounded-sm"
-                      style={{ backgroundColor: community.color }}
+                {communities.length > 0 ? (
+                  communities.map((community, index) => (
+                    <DropdownMenuItem
+                      key={community._id || community.id}
+                      className="gap-2 p-2 cursor-pointer"
+                      onClick={() => handleSelectCommunity(community)}
                     >
-                      <span className="text-xs font-semibold text-white">{community.name.charAt(0)}</span>
-                    </div>
-                    <div className="font-medium">{community.name}</div>
-                  </DropdownMenuItem>
-                ))}
+                      <div
+                        className="flex size-6 items-center justify-center rounded-sm font-semibold text-white"
+                        style={{
+                          backgroundColor: community.color || getColorForCommunity(index),
+                        }}
+                      >
+                        <span className="text-xs">{community.name?.charAt(0)}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{community.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {community.members?.toLocaleString?.() || community.memberCount || 0} members
+                        </div>
+                      </div>
+                      {selectedCommunity?._id === community._id ||
+                      selectedCommunity?.id === community.id ? (
+                        <div className="h-2 w-2 rounded-full bg-primary" />
+                      ) : null}
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <div className="p-2 text-sm text-muted-foreground text-center">
+                    No communities yet
+                  </div>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>

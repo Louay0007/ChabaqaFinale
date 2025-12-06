@@ -32,7 +32,7 @@ export default function CommunitiesPage() {
         if (!userId) { setCommunities([]); return }
 
         // My created communities
-        const myComms = await api.communities.getByCreator(userId).catch(() => null as any)
+        const myComms = await api.communities.getMyCreated().catch(() => null as any)
         const base = myComms?.data || []
 
         // Fetch per-community stats (members/engagement)

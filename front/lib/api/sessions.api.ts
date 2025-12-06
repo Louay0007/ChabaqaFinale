@@ -1,13 +1,26 @@
 import { apiClient, ApiSuccessResponse, PaginatedResponse, PaginationParams } from './client';
 import type { Session, SessionBooking } from './types';
 
+export interface CreateSessionResourceData {
+  title: string;
+  type: 'video' | 'article' | 'code' | 'tool' | 'pdf' | 'link';
+  url: string;
+  description: string;
+  order: number;
+}
+
 export interface CreateSessionData {
   title: string;
   description: string;
-  communityId: string;
   duration: number;
   price: number;
-  availableSlots: number;
+  currency: 'USD' | 'EUR' | 'TND';
+  communitySlug: string;
+  category?: string;
+  maxBookingsPerWeek?: number;
+  notes?: string;
+  isActive?: boolean;
+  resources: CreateSessionResourceData[];
 }
 
 export interface UpdateSessionData extends Partial<CreateSessionData> {

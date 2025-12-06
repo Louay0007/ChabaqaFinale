@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 import { Upload } from "lucide-react"
 import { Course } from "@/lib/models"
+import { ThumbnailUpload } from "@/app/(creator)/creator/courses/new/components/thumbnail-upload"
 
 interface DetailsTabProps {
   formData: any
@@ -37,6 +38,11 @@ export function DetailsTab({
   previewChapters,
   totalRevenue,
 }: DetailsTabProps) {
+
+  const handleThumbnailChange = (url: string) => {
+    onInputChange("thumbnail", url)
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-6">
@@ -159,7 +165,7 @@ export function DetailsTab({
               <div className="flex items-center justify-between">
                 <Label>Requirements</Label>
                 <Button type="button" variant="outline" size="sm" onClick={() => onAddArrayItem("requirements")}>
-                  <Plus className="h-4 w-4 mr-1" />
+                  <Plus className="h-4 w-4 mr-2" />
                   Add Requirement
                 </Button>
               </div>
@@ -204,28 +210,10 @@ export function DetailsTab({
             <CardTitle>Course Thumbnail</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                {course.thumbnail ? (
-                  <Image
-                    src={course.thumbnail}
-                    alt={course.title}
-                    width={300}
-                    height={200}
-                    className="w-full h-full object-cover rounded-lg"
-                  />
-                ) : (
-                  <div className="text-center">
-                    <Upload className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-600">Upload thumbnail</p>
-                  </div>
-                )}
-              </div>
-              <Button variant="outline" className="w-full bg-transparent">
-                <Upload className="h-4 w-4 mr-2" />
-                Change Thumbnail
-              </Button>
-            </div>
+            <ThumbnailUpload
+              value={course.thumbnail || ""}
+              onChange={handleThumbnailChange}
+            />
           </CardContent>
         </EnhancedCard>
 
@@ -236,7 +224,7 @@ export function DetailsTab({
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Sections</span>
-              <span className="font-semibold">{course.sections.length}</span>
+              <span className="font-semibold">{course.sections?.length || 0}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Chapters</span>
@@ -248,7 +236,7 @@ export function DetailsTab({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Enrollments</span>
-              <span className="font-semibold">{course.enrollments.length}</span>
+              <span className="font-semibold">{course.enrollments?.length || 0}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Revenue</span>

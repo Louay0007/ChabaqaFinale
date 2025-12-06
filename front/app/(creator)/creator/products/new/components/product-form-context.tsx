@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { api, apiClient } from "@/lib/api"
+import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { productsApi, type CreateProductData } from "@/lib/api/products.api"
 
 interface ProductVariantForm {
   id: string
@@ -70,7 +71,7 @@ export function ProductFormProvider({ children }: { children: React.ReactNode })
         const me = await api.auth.me().catch(() => null as any)
         const user = me?.data || (me as any)?.user || null
         if (!user) return
-        const myComms = await api.communities.getByCreator(user._id || user.id).catch(() => null as any)
+        const myComms = await api.communities.getMyCreated().catch(() => null as any)
         const first = (myComms?.data || [])[0]
         if (first?.id || first?._id) setCommunityId(first.id || first._id)
       } catch {}
@@ -193,42 +194,53 @@ const handleArrayChange = (field: string, index: number, value: string) => {
         return
       }
 
-      // Map UI form to CreateProductDto
-      const payload = {
-        title: formData.title,
-        description: formData.description,
+      // Map UI form to CreateProductDto / CreateProductData
+      const payload: CreateProductData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
         price: Number(formData.price || 0),
-        currency: formData.currency || 'USD',
+        currency: (formData.currency || 'USD') as CreateProductData['currency'],
         communityId,
         category: formData.category || 'General',
         type: formData.type as 'digital' | 'physical',
-        images: formData.thumbnail ? [formData.thumbnail] : undefined,
-        variants: (formData.variants || []).map((v: any) => ({
-          name: v.name,
-          price: Number(v.price || 0),
-          description: v.description || undefined,
-        })),
-        files: (formData.files || []).map((f: any, idx: number) => ({
-          name: f.name || `File ${idx+1}`,
-          url: f.url,
-          type: f.type || 'OTHER',
-          size: f.size || undefined,
-          order: idx,
-          isActive: true,
-        })),
-        licenseTerms: formData.licenseTerms || undefined,
-        isRecurring: Boolean(formData.isRecurring),
-        recurringInterval: formData.isRecurring ? formData.recurringInterval : undefined,
-        features: Array.isArray(formData.features) ? formData.features.filter(Boolean) : undefined,
-      } as any
+        ...(formData.thumbnail && { images: [formData.thumbnail] }),
+        ...(formData.variants && formData.variants.length > 0 && {
+          variants: formData.variants.map((v: any) => ({
+            name: v.name.trim(),
+            price: Number(v.price || 0),
+            ...(v.description && { description: v.description.trim() }),
+            ...(v.inventory !== undefined && v.inventory !== null && { inventory: Number(v.inventory) }),
+          }))
+        }),
+        ...(formData.files && formData.files.length > 0 && {
+          files: formData.files.map((f: any, idx: number) => ({
+            name: (f.name || `File ${idx+1}`).trim(),
+            url: f.url,
+            type: f.type || 'OTHER',
+            ...(f.size && { size: f.size }),
+            ...(f.description && { description: f.description.trim() }),
+            order: idx,
+            isActive: true,
+          }))
+        }),
+        ...(formData.licenseTerms && { licenseTerms: formData.licenseTerms.trim() }),
+        ...(formData.isRecurring && { isRecurring: true }),
+        ...(formData.isRecurring && formData.recurringInterval && { recurringInterval: formData.recurringInterval as CreateProductData['recurringInterval'] }),
+        ...(Array.isArray(formData.features) && formData.features.filter(Boolean).length > 0 && {
+          features: formData.features.filter(Boolean).map((f: string) => f.trim())
+        }),
+      }
 
-      const res = await apiClient.post<any>('/products', payload)
-      const created = res?.data || res
+      console.log('📦 Creating product with payload:', { ...payload, communityId })
+      const res = await productsApi.create(payload)
+      const created = (res as any)?.data || res
+      console.log('✅ Product created:', created)
       toast({ title: 'Product created', description: payload.title })
       const id = created?.id || created?._id || created?.product?.id || created?.product?._id
       if (id) router.push(`/creator/products/${id}`)
       else router.push('/creator/products')
     } catch (e: any) {
+      console.error('❌ Product creation error:', e)
       toast({ title: 'Failed to create product', description: e?.message || 'Please review required fields.', variant: 'destructive' as any })
     }
   }

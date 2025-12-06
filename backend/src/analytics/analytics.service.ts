@@ -567,6 +567,157 @@ export class AnalyticsService {
       topContents: full.topContents,
     };
   }
+
+  async getCourseAnalytics(creatorId: string, courseId: string, from: Date, to: Date) {
+    const key = this.cacheKey(creatorId, `${courseId}:${from.toISOString()}`, to.toISOString(), 'course');
+    const cached = this.getCache<any>(key);
+    if (cached) return cached;
+
+    // Get course basic info
+    const course = await this.dbConnection.db?.collection('cours').findOne({ id: courseId });
+    if (!course) {
+      return {
+        error: 'Course not found'
+      };
+    }
+
+    // Get enrollment stats
+    const enrollments = await this.dbConnection.db?.collection('courseenrollments').find({
+      courseId: new Types.ObjectId(course._id)
+    }).toArray() || [];
+
+    // Get tracking data for this specific course
+    const tracking = this.dbConnection.collection('trackingactions');
+    const courseTracking = await tracking.aggregate([
+      { 
+        $match: { 
+          timestamp: { $gte: from, $lte: to },
+          contentType: 'course',
+          contentId: courseId
+        }
+      },
+      {
+        $group: {
+          _id: '$actionType',
+          count: { $sum: 1 },
+          users: { $addToSet: '$userId' }
+        }
+      }
+    ]).toArray();
+
+    // Calculate completion rates
+    const progress = await this.dbConnection.db?.collection('courseenrollments').aggregate([
+      { 
+        $match: { 
+          courseId: new Types.ObjectId(course._id)
+        }
+      },
+      {
+        $unwind: '$progression'
+      },
+      {
+        $group: {
+          _id: null,
+          totalProgressItems: { $sum: 1 },
+          completedItems: { $sum: { $cond: [{ $eq: ['$progression.isCompleted', true] }, 1, 0] } }
+        }
+      }
+    ]).toArray();
+
+    const progressStats = progress?.[0] || { totalProgressItems: 0, completedItems: 0 };
+    const completionRate = progressStats.totalProgressItems > 0 
+      ? (progressStats.completedItems / progressStats.totalProgressItems) * 100 
+      : 0;
+
+    // Get revenue data
+    const revenueStats = enrollments.reduce((total, enrollment) => {
+      return total + (course.prix || 0);
+    }, 0);
+
+    // Get daily trend for this course
+    const dailyTrend = await this.dailyModel.aggregate([
+      {
+        $match: {
+          creatorId: new Types.ObjectId(creatorId),
+          contentType: 'course',
+          contentId: courseId,
+          date: { $gte: from, $lte: to }
+        }
+      },
+      {
+        $project: {
+          date: 1,
+          views: 1,
+          starts: 1,
+          completes: 1,
+          watchTime: 1
+        }
+      },
+      { $sort: { date: 1 } }
+    ]);
+
+    // Get chapter completion data
+    const chapterStats = await this.dbConnection.db?.collection('courseenrollments').aggregate([
+      { 
+        $match: { 
+          courseId: new Types.ObjectId(course._id)
+        }
+      },
+      { $unwind: '$progression' },
+      {
+        $group: {
+          _id: '$progression.chapterId',
+          totalStarts: { $sum: 1 },
+          completedCount: { $sum: { $cond: [{ $eq: ['$progression.isCompleted', true] }, 1, 0] } }
+        }
+      },
+      {
+        $lookup: {
+          from: 'cours',
+          localField: '_id',
+          foreignField: 'sections.chapitres.id',
+          as: 'chapter'
+        }
+      },
+      {
+        $project: {
+          chapterId: '$_id',
+          totalStarts: 1,
+          completedCount: 1,
+          completionRate: {
+            $cond: [
+              { $gt: ['$totalStarts', 0] },
+              { $multiply: [{ $divide: ['$completedCount', '$totalStarts'] }, 100] },
+              0
+            ]
+          }
+        }
+      },
+      { $sort: { totalStarts: -1 } }
+    ]).toArray() || [];
+
+    const analytics = {
+      courseId: courseId,
+      courseTitle: course.titre,
+      enrollmentCount: enrollments.length,
+      totalRevenue: revenueStats,
+      views: courseTracking.find(t => t._id === 'view')?.count || 0,
+      starts: courseTracking.find(t => t._id === 'start')?.count || 0,
+      completes: courseTracking.find(t => t._id === 'complete')?.count || 0,
+      completionRate: Math.round(completionRate * 100) / 100,
+      dailyTrend: dailyTrend,
+      chapterStats: chapterStats.map(stat => ({
+        chapterId: stat.chapterId,
+        totalStarts: stat.totalStarts,
+        completedCount: stat.completedCount,
+        completionRate: Math.round(stat.completionRate * 100) / 100
+      })),
+      averageWatchTime: dailyTrend.length > 0 
+        ? dailyTrend.reduce((sum, day) => sum + (day.watchTime || 0), 0) / dailyTrend.length 
+        : 0
+    };
+
+    this.setCache(key, analytics);
+    return analytics;
+  }
 }
-
-

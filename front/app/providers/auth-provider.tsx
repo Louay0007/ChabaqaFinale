@@ -2,22 +2,25 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
-import { api, type User } from "@/lib/api"
-import { getProfile } from "@/lib/auth"
-import { logoutAction } from "@/app/(auth)/signin/actions"
-import { tokenManager } from "@/lib/token-manager"
-import { secureStorage } from "@/lib/secure-storage"
+import { useRouter } from "next/navigation"
+
+export interface User {
+  _id: string
+  name: string
+  email: string
+  role: string
+  [key: string]: any
+}
 
 interface AuthContextValue {
   user: User | null
   loading: boolean
   error: string | null
   isAuthenticated: boolean
-  register: (payload: { name: string; email: string; password: string; numtel?: string; date_naissance?: string }) => Promise<void>
+  register: (payload: any) => Promise<void>
   login: (payload: { email: string; password: string }) => Promise<void>
   logout: () => Promise<void>
   fetchMe: () => Promise<User | null>
-  fetchMeWithRetry: () => Promise<User | null>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -26,109 +29,127 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   const isAuthenticated = !!user
 
   const fetchMe = useCallback(async () => {
     try {
-      setError(null)
-      const user = await getProfile();
-      setUser(user);
-      return user;
-    } catch (e: any) {
-      setUser(null)
-      // Only set error if it's not an authentication error (401)
-      if (e?.statusCode !== 401) {
-        setError(e?.message || 'Failed to fetch user profile')
-      }
-      // Don't throw error for 401 - this is expected for unauthenticated users
-      return null;
-    }
-  }, [])
-
-  const fetchMeWithRetry = useCallback(async () => {
-    try {
-      setError(null)
-      const user = await getProfile();
-      setUser(user);
-      return user;
-    } catch (e: any) {
-      // If it's a 401 error, try once more
-      if (e?.statusCode === 401) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        try {
-          const user = await getProfile();
-          setUser(user);
-          return user;
-        } catch (retryError: any) {
-          setUser(null)
-          return null
-        }
-      } else {
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
         setUser(null)
-        setError(e?.message || 'Failed to fetch user profile')
+        setLoading(false)
         return null
       }
+
+      // We can just use the stored user if we want to be super simple, 
+      // or verify token with backend. For now, let's verify.
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
+      const res = await fetch(`${apiBase}/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        const userData = data.data || data
+        setUser(userData)
+        return userData
+      } else {
+        // Token invalid
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('user')
+        setUser(null)
+        return null
+      }
+    } catch (e) {
+      setUser(null)
+      return null
+    } finally {
+      setLoading(false)
     }
   }, [])
-
-  const register = useCallback(async (payload: { name: string; email: string; password: string; numtel?: string; date_naissance?: string }) => {
-    try {
-      setError(null)
-      await api.auth.register(payload)
-      await fetchMe()
-    } catch (e: any) {
-      setError(e?.message || 'Registration failed')
-      throw e
-    }
-  }, [fetchMe])
 
   const login = useCallback(async (payload: { email: string; password: string }) => {
     try {
       setError(null)
-      await api.auth.login(payload)
-      await fetchMe()
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
+      const res = await fetch(`${apiBase}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Login failed')
+      }
+
+      const { accessToken, user } = data
+      localStorage.setItem('accessToken', accessToken)
+      localStorage.setItem('user', JSON.stringify(user))
+      setUser(user)
+
+      // Redirect based on role
+      const role = user.role?.toLowerCase()
+      if (role === 'creator') {
+        router.push('/creator/dashboard')
+      } else if (role === 'admin') {
+        router.push('/admin')
+      } else {
+        router.push('/explore')
+      }
+
     } catch (e: any) {
       setError(e?.message || 'Login failed')
       throw e
     }
-  }, [fetchMe])
+  }, [router])
+
+  const register = useCallback(async (payload: any) => {
+    try {
+      setError(null)
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
+      const res = await fetch(`${apiBase}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Registration failed')
+      }
+
+      // Auto login after register? Or just redirect to login.
+      // For simplicity, let's just return and let the component handle it (usually redirect to login)
+      // Or if the backend returns a token, we can auto-login.
+      if (data.user && data.accessToken) {
+        localStorage.setItem('accessToken', data.accessToken)
+        localStorage.setItem('user', JSON.stringify(data.user))
+        setUser(data.user)
+        router.push('/explore')
+      }
+
+    } catch (e: any) {
+      setError(e?.message || 'Registration failed')
+      throw e
+    }
+  }, [router])
 
   const logout = useCallback(async () => {
-    try {
-      // Call server action to logout and clear cookies
-      await logoutAction();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear local state
-      setUser(null);
-
-      // Clear token manager
-      tokenManager.clearTokens();
-
-      // Clear secure storage
-      secureStorage.clear();
-
-      // Redirect to home page
-      if (typeof window !== 'undefined') {
-        window.location.href = '/';
-      }
-    }
-  }, [])
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('user')
+    setUser(null)
+    router.push('/signin')
+  }, [router])
 
   useEffect(() => {
-    let mounted = true
-      ; (async () => {
-        await fetchMeWithRetry()
-        if (mounted) {
-          setLoading(false)
-        }
-      })()
-    return () => {
-      mounted = false
-    }
-  }, [fetchMeWithRetry])
+    fetchMe()
+  }, [fetchMe])
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
@@ -139,7 +160,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     fetchMe,
-    fetchMeWithRetry,
   }), [user, loading, error, isAuthenticated, register, login, logout, fetchMe])
 
   return (

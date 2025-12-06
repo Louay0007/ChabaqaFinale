@@ -140,6 +140,7 @@ export interface Challenge {
   difficulty: 'easy' | 'medium' | 'hard';
   isActive: boolean;
   participantCount: number;
+  participants?: ChallengeParticipant[];
   createdAt: string;
 }
 
@@ -172,10 +173,12 @@ export interface Session {
   creatorId: string;
   duration: number; // in minutes
   price: number;
+  currency: string;
   availableSlots: number;
   bookedSlots: number;
   isActive: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface SessionBooking {
@@ -187,6 +190,7 @@ export interface SessionBooking {
   meetingLink?: string;
   notes?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // Event types
@@ -214,6 +218,9 @@ export interface Event {
   tags?: string[];
   onlineUrl?: string;
   isPublished: boolean;
+  isActive: boolean;
+  timezone: string;
+  attendees: any[];
   createdAt: string;
   updatedAt?: string;
 }

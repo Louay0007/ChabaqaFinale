@@ -55,6 +55,17 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
 
     if (!response.ok) {
+      if (response.status === 409) {
+        return NextResponse.json(
+          {
+            success: true,
+            message: data.message || 'Already a member of this community',
+            data: data.data ?? null,
+          },
+          { status: 200 }
+        )
+      }
+
       return NextResponse.json(
         { success: false, message: data.message || 'Failed to join community' },
         { status: response.status }

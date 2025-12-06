@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { communitiesApi } from "@/lib/api"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -8,6 +8,15 @@ interface JoinCommunityPageProps {
   params: {
     slug: string
   }
+}
+
+type CommunityPricingFields = {
+  fees_of_join?: number | null
+  price?: number | null
+  priceType?: string | null
+  pricing?: {
+    price?: number | null
+  } | null
 }
 
 export default async function JoinCommunityPage({ params }: JoinCommunityPageProps) {
@@ -25,6 +34,24 @@ export default async function JoinCommunityPage({ params }: JoinCommunityPagePro
 
   if (!community) {
     notFound()
+  }
+
+  // Determine if this community requires payment before joining
+  const pricing = community as CommunityPricingFields
+
+  const feesOfJoin = typeof pricing.fees_of_join === "number" ? pricing.fees_of_join : 0
+  const directPrice = typeof pricing.price === "number" ? pricing.price : 0
+  const priceType = typeof pricing.priceType === "string" ? pricing.priceType.toLowerCase() : "free"
+  const pricingPrice = typeof pricing.pricing?.price === "number" ? pricing.pricing.price : 0
+
+  const isPaidCommunity =
+    feesOfJoin > 0 ||
+    directPrice > 0 ||
+    priceType !== "free" ||
+    pricingPrice > 0
+
+  if (isPaidCommunity) {
+    redirect(`/community/${slug}/checkout`)
   }
 
   // Type-safe way to handle the community data

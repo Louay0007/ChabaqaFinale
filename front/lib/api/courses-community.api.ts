@@ -48,7 +48,7 @@ function transformCourse(backendCourse: any): any {
   }));
 
   const enrollmentCount = backendCourse.inscriptions?.length || backendCourse.enrollmentCount || 0;
-  
+
   // Transform creator data
   const creator = backendCourse.creator || (backendCourse.creatorId ? {
     id: String(backendCourse.creatorId._id || backendCourse.creatorId.id || ''),
@@ -59,7 +59,7 @@ function transformCourse(backendCourse: any): any {
     name: 'Unknown',
     avatar: undefined,
   });
-  
+
   return {
     id: String(backendCourse._id || backendCourse.id || ''),
     title: backendCourse.titre || backendCourse.title || '',
@@ -88,9 +88,9 @@ function transformCourse(backendCourse: any): any {
  */
 function transformEnrollment(backendEnrollment: any, course?: any): CourseEnrollment {
   const courseId = String(backendEnrollment.courseId?._id || backendEnrollment.courseId || backendEnrollment._id || '');
-  
+
   // Calculate progress - backend uses sections.chapitres structure
-  const totalChapters = course?.sections?.reduce((acc: number, section: any) => 
+  const totalChapters = course?.sections?.reduce((acc: number, section: any) =>
     acc + (section.chapters?.length || section.chapitres?.length || 0), 0) || 0;
   const completedChapters = backendEnrollment.progression?.filter((p: any) => p.isCompleted).length || 0;
   const progress = totalChapters > 0 ? Math.round((completedChapters / totalChapters) * 100) : 0;
@@ -133,9 +133,9 @@ export const coursesCommunityApi = {
       let courses: Course[] = [];
       if (coursesResponse.status === 'fulfilled') {
         const coursesData = coursesResponse.value;
-        // Backend returns { cours: [...], total, page, limit, totalPages }
-        const coursesList = coursesData?.cours || coursesData?.data || coursesData || [];
-        courses = Array.isArray(coursesList) 
+        // Backend returns { success: true, data: { courses: [...], pagination: {...} } }
+        const coursesList = coursesData?.data?.courses || coursesData?.cours || coursesData?.data || coursesData || [];
+        courses = Array.isArray(coursesList)
           ? coursesList.map(transformCourse)
           : [];
       }
@@ -146,17 +146,17 @@ export const coursesCommunityApi = {
         const progressData = userProgressResponse.value;
         // Backend returns { progress: [...], pagination: {...} }
         const progressList = progressData?.data?.progress || progressData?.progress || progressData || [];
-        
+
         // Get full course data for each enrollment to calculate progress
         const enrollmentPromises = progressList.map(async (progressItem: any) => {
           try {
             // Backend progress item structure: { courseId, progress, chaptersCompleted, totalChapters, enrollment: {...} }
             const courseId = String(progressItem.courseId || progressItem._id || '');
             const courseData = courses.find(c => c.id === courseId);
-            
+
             // If enrollment data is nested
             const enrollment = progressItem.enrollment || progressItem;
-            
+
             return {
               id: String(enrollment._id || enrollment.id || ''),
               userId: String(enrollment.userId?._id || enrollment.userId || ''),
@@ -171,35 +171,35 @@ export const coursesCommunityApi = {
             return null;
           }
         });
-        
+
         userEnrollments = (await Promise.all(enrollmentPromises)).filter(Boolean) as CourseEnrollment[];
       }
 
       // Transform current user
       const user = currentUser.status === 'fulfilled' && currentUser.value
         ? {
-            id: String(currentUser.value._id || currentUser.value.id || ''),
-            email: currentUser.value.email || '',
-            username: currentUser.value.username || currentUser.value.name || '',
-            firstName: currentUser.value.firstName || currentUser.value.name?.split(' ')[0] || undefined,
-            lastName: currentUser.value.lastName || currentUser.value.name?.split(' ').slice(1).join(' ') || undefined,
-            avatar: currentUser.value.avatar || currentUser.value.profile_picture || undefined,
-            bio: currentUser.value.bio || undefined,
-            role: currentUser.value.role || 'member',
-            verified: currentUser.value.verified || false,
-            createdAt: currentUser.value.createdAt || new Date().toISOString(),
-            updatedAt: currentUser.value.updatedAt || new Date().toISOString(),
-          }
+          id: String(currentUser.value._id || currentUser.value.id || ''),
+          email: currentUser.value.email || '',
+          username: currentUser.value.username || currentUser.value.name || '',
+          firstName: currentUser.value.firstName || currentUser.value.name?.split(' ')[0] || undefined,
+          lastName: currentUser.value.lastName || currentUser.value.name?.split(' ').slice(1).join(' ') || undefined,
+          avatar: currentUser.value.avatar || currentUser.value.profile_picture || undefined,
+          bio: currentUser.value.bio || undefined,
+          role: currentUser.value.role || 'member',
+          verified: currentUser.value.verified || false,
+          createdAt: currentUser.value.createdAt || new Date().toISOString(),
+          updatedAt: currentUser.value.updatedAt || new Date().toISOString(),
+        }
         : null;
 
       // Merge courses with enrollment data
       const coursesWithProgress: CourseWithProgress[] = courses.map(course => {
         const enrollment = userEnrollments.find(e => e.courseId === course.id);
-        
+
         // Calculate total chapters from sections
-        const totalChapters = (course as any).sections?.reduce((acc: number, section: any) => 
+        const totalChapters = (course as any).sections?.reduce((acc: number, section: any) =>
           acc + (section.chapters?.length || 0), 0) || 0;
-        
+
         return {
           ...course,
           isEnrolled: !!enrollment,

@@ -1051,6 +1051,7 @@ export const mockEvents: Event[] = [
     category: 'Technology',
     type: 'Hybrid',
     isActive: true,
+    price: 299,
     notes: 'Keynote speaker needs green room with bottled water and vegan meal option',
     attendees: [],
     sessions: [],
@@ -1099,9 +1100,10 @@ export const mockEvents: Event[] = [
     category: 'Marketing',
     type: 'In-person',
     isActive: true,
+    price: 149,
+    notes: "Networking session included.",
     attendees: [],
     sessions: [],
-    notes: 'Ensure all speakers have AV equipment ready 30 minutes before their sessions',
     tickets: [
       {
         id: 'ticket4',
@@ -1137,6 +1139,7 @@ export const mockEvents: Event[] = [
     category: 'Business',
     type: 'Online',
     isActive: true,
+    price: 49,
     attendees: [],
     sessions: [],
     tickets: [
@@ -1165,7 +1168,8 @@ export const mockEvents: Event[] = [
     category: 'Health',
     type: 'In-person',
     isActive: false,
-    notes: 'Need to send follow-up survey to attendees',
+    price: 199,
+    notes: "Lunch and refreshments will be provided.",
     attendees: [],
     sessions: [],
     tickets: [
@@ -1394,7 +1398,7 @@ export function getUserPurchases(userId: string): Purchase[] {
 export async function updateProduct(productId: string, data: Partial<Product>): Promise<boolean> {
   const index = mockProducts.findIndex(p => p.id === productId)
   if (index === -1) return false
-  
+
   mockProducts[index] = { ...mockProducts[index], ...data }
   return true
 }
@@ -1415,6 +1419,7 @@ export const availableEvents: Event[] = [
     category: "Tech Conference",
     type: "Hybrid",
     isActive: true,
+    price: 150,
     image: "/placeholder.svg?height=300&width=600",
     notes: "Bring your laptop for workshops.",
     attendees: [],
@@ -1440,6 +1445,7 @@ export const availableEvents: Event[] = [
     category: "AI & ML",
     type: "In-person",
     isActive: true,
+    price: 80,
     image: "/placeholder.svg?height=300&width=600",
     attendees: [],
     tickets: [
@@ -1463,6 +1469,7 @@ export const availableEvents: Event[] = [
     category: "Entrepreneurship",
     type: "In-person",
     isActive: true,
+    price: 0,
     image: "/placeholder.svg?height=300&width=600",
     attendees: [],
     tickets: [
@@ -1484,7 +1491,8 @@ export const availableEvents: Event[] = [
     category: "Workplace",
     type: "Online",
     isActive: true,
-    image: "/placeholder.svg?height=300&width=600",
+    price: 49,
+    notes: "Please join 5 minutes early to check your audio/video setup.",
     attendees: [],
     tickets: [
       { id: "t6", type: "regular", name: "Free Ticket", price: 0, description: "Online access", sold: 500 },

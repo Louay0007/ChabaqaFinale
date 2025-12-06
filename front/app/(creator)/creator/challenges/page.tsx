@@ -8,29 +8,40 @@ import ChallengesTabs from "./components/ChallengesTabs"
 import ChallengePerformanceOverview from "./components/ChallengePerformanceOverview"
 import { api, apiClient } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { useCreatorCommunity } from "@/app/(creator)/creator/context/creator-community-context"
 
 export default function CreatorChallengesPage() {
   const { toast } = useToast()
+  const { selectedCommunity, selectedCommunityId, isLoading: communityLoading } = useCreatorCommunity()
+
   const [challenges, setChallenges] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedCommunitySlug, setSelectedCommunitySlug] = useState<string>("")
   const [search, setSearch] = useState("")
   const [revenue, setRevenue] = useState<number | null>(null)
 
+  // Reload when community changes
   useEffect(() => {
+    if (communityLoading || !selectedCommunityId) return
+
     const load = async () => {
       setLoading(true)
       try {
         const me = await api.auth.me().catch(() => null as any)
         const user = me?.data || (me as any)?.user || null
         if (!user) { setChallenges([]); return }
-        // pick first creator community
-        const myComms = await api.communities.getByCreator(user._id || user.id).catch(() => null as any)
-        const first = (myComms?.data || [])[0]
-        const slug = first?.slug || ""
-        setSelectedCommunitySlug(slug)
-        const listRes = await apiClient.get<any>(`/challenges`, slug ? { communitySlug: slug, limit: 50 } : { limit: 50 }).catch(() => null as any)
-        const raw = listRes?.data?.challenges || listRes?.challenges || listRes?.data?.items || listRes?.items || []
+
+        const slug = selectedCommunity?.slug || ""
+
+        // Challenges list
+        let listRes: any = null
+        if (slug) {
+          listRes = await apiClient.get<any>(`/challenges`, { communitySlug: slug, limit: 50 }).catch(() => null as any)
+        } else {
+          listRes = await apiClient.get<any>(`/challenges/by-user/${user._id || user.id}`, { type: 'created', limit: 50 }).catch(() => null as any)
+        }
+
+        // Backend returns { challenges } for list, or { success: true, data: { challenges } } for by-user
+        const raw = listRes?.challenges || listRes?.data?.challenges || listRes?.data?.items || listRes?.items || []
         const normalized = (Array.isArray(raw) ? raw : []).map((c: any) => ({
           id: c.id || c._id,
           title: c.title,
@@ -49,7 +60,7 @@ export default function CreatorChallengesPage() {
         // Fetch analytics to compute revenue (last 30 days)
         const now = new Date()
         const to = now.toISOString()
-        const from = new Date(now.getTime() - 30*24*3600*1000).toISOString()
+        const from = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString()
         const challAgg = await api.creatorAnalytics.getChallenges({ from, to }).catch(() => null as any)
         const byChallenge = challAgg?.data?.byChallenge || challAgg?.byChallenge || challAgg?.data?.items || challAgg?.items || []
         const totalRevenue = (Array.isArray(byChallenge) ? byChallenge : []).reduce((sum: number, x: any) => sum + Number(x.revenue ?? x.deposits ?? 0), 0)
@@ -61,7 +72,7 @@ export default function CreatorChallengesPage() {
       }
     }
     load()
-  }, [])
+  }, [selectedCommunityId, selectedCommunity, communityLoading, toast])
 
   const filtered = useMemo(() => {
     if (!search) return challenges

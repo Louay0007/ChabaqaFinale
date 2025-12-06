@@ -25,7 +25,6 @@ interface ReviewPublishStepProps {
     whatYoullGet: string[]
     requirements: string
     preparationMaterials: string
-    isActive: boolean
   }
   handleInputChange: (field: string, value: any) => void
 }
@@ -158,13 +157,10 @@ export function ReviewPublishStep({ formData, handleInputChange }: ReviewPublish
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="publish"
-                checked={formData.isActive}
-                onCheckedChange={(checked) => handleInputChange("isActive", checked)}
-              />
-              <Label htmlFor="publish">Make available for booking immediately</Label>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900">
+                <strong>Note:</strong> Sessions are created as drafts. You can publish them from the sessions page once you have an active subscription.
+              </p>
             </div>
           </div>
         </div>

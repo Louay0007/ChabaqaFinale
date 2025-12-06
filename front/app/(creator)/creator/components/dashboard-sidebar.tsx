@@ -1,5 +1,6 @@
 
 
+
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -37,7 +38,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select"
-import { communitiesApi } from "@/lib/api/communities.api"
+import { useCreatorCommunity } from "@/app/(creator)/creator/context/creator-community-context"
 import type { Community } from "@/lib/api/types"
 
 interface DashboardSidebarProps {
@@ -45,64 +46,40 @@ interface DashboardSidebarProps {
   onLogout: () => void
 }
 
+const getCommunityId = (community: any): string => {
+  const rawId = community?.id ?? community?._id
+  if (typeof rawId === 'string') return rawId
+  if (rawId && typeof rawId.toString === 'function') return rawId.toString()
+  return ''
+}
 
 export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
-  const [communities, setCommunities] = useState<Community[]>([])
-  const [isLoadingCommunities, setIsLoadingCommunities] = useState(true)
-  const [communitiesError, setCommunitiesError] = useState<string | null>(null)
-  const [selectedCommunityId, setSelectedCommunityId] = useState<string>('')
-
-  // Fetch creator's communities on mount
-  useEffect(() => {
-    async function fetchCommunities() {
-      try {
-        setIsLoadingCommunities(true)
-        setCommunitiesError(null)
-        const response = await communitiesApi.getByCreator(user?.id || "")
-        const communitiesData = response.data || []
-        setCommunities(communitiesData)
-
-        // Auto-select first community or previously selected one
-        if (communitiesData.length > 0) {
-          const savedId = typeof window !== 'undefined' ? localStorage.getItem('creator_selected_community_id') : null
-          const communityToSelect = savedId
-            ? communitiesData.find(c => c.id === savedId) || communitiesData[0]
-            : communitiesData[0]
-          setSelectedCommunityId(communityToSelect.id)
-          // Save to localStorage
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('creator_selected_community_id', communityToSelect.id)
-          }
-        }
-      } catch (error: any) {
-        console.error("Failed to fetch communities:", error)
-        setCommunitiesError(error?.message || "Failed to load communities")
-      } finally {
-        setIsLoadingCommunities(false)
-      }
-    }
-
-    if (user?.id) {
-      fetchCommunities()
-    }
-  }, [user?.id])
+  // Use shared context instead of local state
+  const {
+    communities,
+    selectedCommunityId,
+    isLoading: isLoadingCommunities,
+    error: communitiesError,
+    setSelectedCommunityId,
+  } = useCreatorCommunity()
 
   const handleCommunityChange = (communityId: string) => {
     setSelectedCommunityId(communityId)
-    // Save to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('creator_selected_community_id', communityId)
-    }
-    // Reload the page to fetch new community data
-    window.location.reload()
+    // No page reload needed - context updates all consumers automatically
   }
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => (prev.includes(section) ? prev.filter((s) => s !== section) : [...prev, section]))
   }
+
+  // Get the selected community to build dynamic links
+  const selectedCommunity = communities.find(c => getCommunityId(c) === selectedCommunityId)
+  const communityFeedUrl = selectedCommunity 
+    ? `/${encodeURIComponent(selectedCommunity.creator?.name || 'creator')}/${selectedCommunity.slug}/home`
+    : '/creator/posts'
 
   const menuItems = [
     {
@@ -139,7 +116,7 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
         { title: "Session", href: "/creator/sessions", badge: null },
         { title: "Events", href: "/creator/events", badge: null },
         { title: "Products", href: "/creator/products", badge: null },
-        { title: "Post", href: "/creator/posts", badge: null },
+        { title: "Post", href: communityFeedUrl, badge: null },
       ],
     },
     // {
@@ -219,6 +196,8 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
           <div className="flex-1">
             {isLoadingCommunities ? (
               <div className="h-8 bg-gray-100 animate-pulse rounded"></div>
+            ) : communitiesError ? (
+              <p className="text-xs text-red-500 truncate">{communitiesError}</p>
             ) : communities.length > 0 ? (
               <Select
                 onValueChange={handleCommunityChange}
@@ -228,11 +207,15 @@ export function DashboardSidebar({ user, onLogout }: DashboardSidebarProps) {
                   <SelectValue placeholder="Select Community" />
                 </SelectTrigger>
                 <SelectContent className="text-xs">
-                  {communities.map((community) => (
-                    <SelectItem key={community.id} value={community.id}>
-                      {community.name}
-                    </SelectItem>
-                  ))}
+                  {communities.map((community) => {
+                    const id = getCommunityId(community)
+                    if (!id) return null
+                    return (
+                      <SelectItem key={id} value={id}>
+                        {community.name}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             ) : (

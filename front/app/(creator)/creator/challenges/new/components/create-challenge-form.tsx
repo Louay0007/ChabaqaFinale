@@ -9,7 +9,8 @@ import { TimelinePricingStep } from "./timeline-pricing-step"
 import { ChallengeStepsStep } from "./challenge-steps-step"
 import { ReviewPublishStep } from "./review-publish-step"
 import { ChallengeNavigation } from "./challenge-navigation"
-import { api, apiClient } from "@/lib/api"
+import { api } from "@/lib/api"
+import { challengesApi, type CreateChallengeData } from "@/lib/api/challenges.api"
 import { useToast } from "@/hooks/use-toast"
 
 export function CreateChallengeForm() {
@@ -34,7 +35,7 @@ export function CreateChallengeForm() {
         const me = await api.auth.me().catch(() => null as any)
         const user = me?.data || (me as any)?.user || null
         if (!user) return
-        const myComms = await api.communities.getByCreator(user._id || user.id).catch(() => null as any)
+        const myComms = await api.communities.getMyCreated().catch(() => null as any)
         const first = (myComms?.data || [])[0]
         if (first?.slug) setCommunitySlug(first.slug)
       } catch {}
@@ -52,8 +53,13 @@ export function CreateChallengeForm() {
         toast({ title: 'Missing community', description: 'No community found for this creator.', variant: 'destructive' as any })
         return
       }
+      if (!formData.steps || formData.steps.length === 0) {
+        toast({ title: 'No steps defined', description: 'Please add at least one challenge step.', variant: 'destructive' as any })
+        return
+      }
       // Map UI form to CreateChallengeDto
-      const tasks = (formData.steps || []).map((s) => ({
+      const tasks = (formData.steps || []).map((s, index) => ({
+        id: s.id || `task-${Date.now()}-${index}`,
         day: s.day,
         title: s.title,
         description: s.description,
@@ -69,7 +75,7 @@ export function CreateChallengeForm() {
         }))
       }))
 
-      const payload = {
+      const payload: CreateChallengeData = {
         title: formData.title,
         description: formData.description,
         communitySlug,
@@ -81,19 +87,21 @@ export function CreateChallengeForm() {
         topPerformerBonus: formData.rewards?.topPerformerBonus ? Number(formData.rewards.topPerformerBonus) : undefined,
         streakBonus: formData.rewards?.streakBonus ? Number(formData.rewards.streakBonus) : undefined,
         category: formData.category || undefined,
-        difficulty: (formData.difficulty || '').toLowerCase().replace('all levels','beginner'),
+        difficulty: (formData.difficulty || '').toLowerCase().replace('all levels','beginner') as any,
         duration: formData.duration || undefined,
         thumbnail: formData.thumbnail || undefined,
-        isActive: Boolean(formData.isPublished),
+        // Always create as inactive (draft) - users need active subscription to publish
+        // They can publish later from the challenge management page once they have a subscription
+        isActive: false,
         resources: [],
         tasks,
         // Optional pricing fields left out unless you extend UI:
         // participationFee, currency, depositRequired, isPremium, premiumFeatures, paymentOptions, freeTrialDays, trialFeatures
-      } as any
+      }
 
-      const res = await apiClient.post<any>('/challenges', payload)
-      const created = res?.data || res
-      toast({ title: 'Challenge created', description: payload.title })
+      const res = await challengesApi.create(payload)
+      const created = (res as any)?.data || res
+      toast({ title: 'Challenge created as draft', description: `${payload.title} - Publish it from the management page once you have an active subscription.` })
       const id = created?.id || created?._id || created?.challenge?.id || created?.challenge?._id
       if (id) router.push(`/creator/challenges/${id}/manage`)
       else router.push('/creator/challenges')
@@ -174,6 +182,7 @@ const initialFormData = {
     streakBonus: "",
   },
   steps: [] as Array<{
+    id?: string
     day: number
     title: string
     description: string

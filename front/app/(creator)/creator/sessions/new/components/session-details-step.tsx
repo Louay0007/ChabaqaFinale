@@ -23,7 +23,6 @@ interface SessionDetailsStepProps {
     sessionFormat: string
     whatYoullGet: string[]
     preparationMaterials: string
-    isActive: boolean
   }
   handleInputChange: (field: string, value: any) => void
   handleArrayChange: (field: string, index: number, value: string) => void
@@ -107,13 +106,8 @@ export function SessionDetailsStep({
           />
         </div>
 
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="isActive"
-            checked={formData.isActive}
-            onCheckedChange={(checked) => handleInputChange("isActive", checked)}
-          />
-          <Label htmlFor="isActive">Make session available for booking immediately</Label>
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+          <strong>Note:</strong> Sessions are created as drafts. You can publish them from the sessions page once you have an active subscription.
         </div>
       </CardContent>
     </EnhancedCard>

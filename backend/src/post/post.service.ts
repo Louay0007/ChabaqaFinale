@@ -58,18 +58,25 @@ export class PostService {
       throw new NotFoundException('Communauté non trouvée');
     }
 
-    // Vérifier que l'utilisateur est membre de la communauté
+    // Vérifier que l'utilisateur est membre de la communauté ou est le créateur
+    const normalizedUserId = typeof userId === 'object' ? (userId as any).toString() : String(userId);
     const isMember = community.members.some(
-      (member) => member.toString() === userId,
+      (member) => member.toString() === normalizedUserId,
     );
-    // TODO: Temporarily disabled membership check for testing - re-enable in production
-    // if (!isMember) {
-    //   throw new ForbiddenException(
-    //     'Vous devez être membre de cette communauté pour publier un post',
-    //   );
-    // }
+    const isCreator = community.createur.toString() === normalizedUserId;
+    
+    if (!isMember && !isCreator) {
+      throw new ForbiddenException(
+        'Vous devez être membre de cette communauté pour publier un post',
+      );
+    }
 
     // Créer le post
+    // Normalize userId to ObjectId if it's a string
+    const authorObjectId = typeof userId === 'string' 
+      ? new Types.ObjectId(userId)
+      : userId;
+    
     const post = new this.postModel({
       id: new Types.ObjectId().toString(), // Generate unique ID for posts
       title: createPostDto.title,
@@ -77,7 +84,7 @@ export class PostService {
       excerpt: createPostDto.excerpt,
       thumbnail: createPostDto.thumbnail,
       communityId: createPostDto.communityId,
-      authorId: new Types.ObjectId(userId),
+      authorId: authorObjectId,
       isPublished: true, // Toujours publié directement
       likes: 0,
       comments: [],
@@ -86,17 +93,19 @@ export class PostService {
     });
 
     const savedPost = await post.save();
-
+    console.log(' [POST-SERVICE] Post saved with ID:', savedPost._id);
+    
     // Récupérer les informations complètes avec populated author
     const populatedPost = await this.postModel
       .findById(savedPost._id)
       .populate('authorId', 'name email profile_picture')
       .exec();
 
-    console.log('✅ [POST-SERVICE] Post created with author data:', {
+    console.log(' [POST-SERVICE] Post created with author data:', {
       postId: populatedPost!.id,
       authorId: populatedPost!.authorId,
-      authorName: (populatedPost!.authorId as any)?.name
+      authorName: (populatedPost!.authorId as any)?.name,
+      authorEmail: (populatedPost!.authorId as any)?.email
     });
 
     return await this.transformToResponseDto(populatedPost!, community);
@@ -727,7 +736,24 @@ export class PostService {
         authorName = (post.authorId as any).name;
       }
 
-      console.log('👤 [POST-SERVICE] Final author name for post:', post.id, '->', authorName);
+      // Determine author role based on community relationship
+      let authorRole = 'member';
+      const authorIdForRole = typeof post.authorId === 'object' 
+        ? (post.authorId as any)._id?.toString() || (post.authorId as any).toString()
+        : String(post.authorId);
+      
+      if (community) {
+        const communityCreatorId = community.createur?.toString();
+        if (communityCreatorId === authorIdForRole) {
+          authorRole = 'creator';
+        } else if (community.admins?.some((admin: any) => admin.toString() === authorIdForRole)) {
+          authorRole = 'admin';
+        } else if (community.members?.some((member: any) => member.toString() === authorIdForRole)) {
+          authorRole = 'member';
+        }
+      }
+
+      console.log('👤 [POST-SERVICE] Final author name for post:', post.id, '->', authorName, 'Role:', authorRole);
 
       // Helper function to safely get author ID as string
       const getAuthorIdString = (): string => {
@@ -769,6 +795,7 @@ export class PostService {
           name: authorName,
           email: author?.email || '',
           profile_picture: author?.profile_picture || '',
+          role: authorRole,
         },
         isPublished: post.isPublished,
         likes: post.likes || 0,

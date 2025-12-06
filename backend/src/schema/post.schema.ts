@@ -75,15 +75,15 @@ export class Post {
   id: string;
 
   /**
-   * Titre du post
+   * Titre du post (optionnel)
    */
   @Prop({
-    required: true,
+    required: false,
     trim: true,
     minlength: 2,
     maxlength: 200
   })
-  title: string;
+  title?: string;
 
   /**
    * Contenu principal du post
@@ -275,7 +275,7 @@ export class Post {
 export interface PostDocument extends Document {
   _id: Types.ObjectId;
   id: string;
-  title: string;
+  title?: string;
   content: string;
   excerpt?: string;
   thumbnail?: string;

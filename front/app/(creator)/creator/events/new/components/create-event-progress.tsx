@@ -26,37 +26,38 @@ export function CreateEventProgress({ steps, currentStep, setCurrentStep }: Crea
         </div>
         <Progress value={progress} className="mb-4" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {steps.map((step) => (
-            <div
-              key={step.id}
-              className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                currentStep === step.id
-                  ? "border-events-500 bg-events-50"
-                  : currentStep > step.id
-                    ? "border-green-500 bg-green-50"
-                    : "border-gray-200 bg-gray-50"
-              }`}
-              onClick={() => setCurrentStep(step.id)}
-            >
-              <div className="flex items-center space-x-2">
-                <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-                    currentStep === step.id
-                      ? "bg-events-500 text-white"
-                      : currentStep > step.id
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-300 text-gray-600"
+          {steps.map((step) => {
+            const stepNum = typeof step.id === 'number' ? step.id : parseInt(step.id as string, 10);
+            return (
+              <div
+                key={step.id}
+                className={`p-3 rounded-lg border cursor-pointer transition-colors ${currentStep === stepNum
+                    ? "border-events-500 bg-events-50"
+                    : currentStep > stepNum
+                      ? "border-green-500 bg-green-50"
+                      : "border-gray-200 bg-gray-50"
                   }`}
-                >
-                  {step.id}
-                </div>
-                <div>
-                  <div className="font-medium text-sm">{step.title}</div>
-                  <div className="text-xs text-muted-foreground">{step.description}</div>
+                onClick={() => setCurrentStep(stepNum)}
+              >
+                <div className="flex items-center space-x-2">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${currentStep === stepNum
+                        ? "bg-events-500 text-white"
+                        : currentStep > stepNum
+                          ? "bg-green-500 text-white"
+                          : "bg-gray-300 text-gray-600"
+                      }`}
+                  >
+                    {step.id}
+                  </div>
+                  <div>
+                    <div className="font-medium text-sm">{step.title}</div>
+                    <div className="text-xs text-muted-foreground">{step.description}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </CardContent>
     </EnhancedCard>

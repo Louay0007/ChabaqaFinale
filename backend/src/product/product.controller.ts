@@ -38,7 +38,8 @@ export class ProductController {
   @ApiResponse({ status: 403, description: 'Pas créateur de communauté' })
   @ApiResponse({ status: 404, description: 'Communauté non trouvée' })
   async create(@Body() createProductDto: CreateProductDto, @Request() req): Promise<{ success: boolean; data: ProductResponseDto }> {
-    const product = await this.productService.create(createProductDto, req.user.userId);
+    const userId = req.user._id || req.user.userId;
+    const product = await this.productService.create(createProductDto, userId);
     return { success: true, data: product };
   }
 

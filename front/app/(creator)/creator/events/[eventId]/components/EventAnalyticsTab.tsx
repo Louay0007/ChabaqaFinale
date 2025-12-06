@@ -12,7 +12,7 @@ interface EventAnalyticsTabProps {
 export default function EventAnalyticsTab({ event }: EventAnalyticsTabProps) {
   const totalAttendees = event.attendees.length
   const totalRevenue = event.tickets.reduce((acc, ticket) => acc + (ticket.price * ticket.sold), 0)
-  const averageAttendance = event.sessions.reduce((acc, s) => acc + s.attendance, 0) / event.sessions.length || 0
+  const averageAttendance = event.sessions.reduce((acc, s) => acc + (s.attendance || 0), 0) / event.sessions.length || 0
 
   return (
     <div className="space-y-6">

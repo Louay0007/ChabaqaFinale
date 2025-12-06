@@ -14,10 +14,17 @@ export interface SessionWithMentor extends Session {
   };
   tags?: string[];
   category?: string;
+  bookingsCount?: number;
+  bookingsThisWeek?: number;
+  canBookMore?: boolean;
+  bookings?: any[];
+  notes?: string;
+  resources?: any[];
 }
 
 export interface BookingWithSession extends SessionBooking {
   session?: SessionWithMentor;
+  meetingUrl?: string;
 }
 
 export interface SessionsPageData {
@@ -75,6 +82,8 @@ function transformSession(backendSession: any): SessionWithMentor {
     communityId: String(backendSession.communityId || ''),
     creatorId: String(backendSession.creatorId?._id || backendSession.creatorId?.id || backendSession.creatorId || ''),
     isActive: backendSession.isActive !== false,
+    availableSlots: backendSession.availableSlots || 0,
+    bookedSlots: backendSession.bookedSlots || 0,
     createdAt: backendSession.createdAt || new Date().toISOString(),
     updatedAt: backendSession.updatedAt || new Date().toISOString(),
     // Additional fields for component compatibility
@@ -99,6 +108,7 @@ function transformBooking(backendBooking: any, session?: any): BookingWithSessio
   return {
     id: String(backendBooking._id || backendBooking.id || ''),
     userId: String(backendBooking.userId?._id || backendBooking.userId || ''),
+    sessionId: String(backendBooking.sessionId?._id || backendBooking.sessionId || ''),
     scheduledAt: backendBooking.scheduledAt || new Date().toISOString(),
     status: backendBooking.status || 'pending',
     meetingUrl: backendBooking.meetingUrl || undefined,
@@ -147,46 +157,46 @@ export const sessionsCommunityApi = {
       // Handle user bookings
       let userBookings: BookingWithSession[] = [];
       if (userBookingsResponse.status === 'fulfilled') {
-        const bookingsData = userBookingsResponse.value;
+        const bookingsData = userBookingsResponse.value as any;
         const bookingsList = bookingsData?.data?.bookings || bookingsData?.bookings || [];
-        
+
         // Transform bookings with session data
         userBookings = Array.isArray(bookingsList)
           ? bookingsList.map((booking: any) => {
-              // The backend returns bookings with session info embedded
-              const sessionInfo = booking.sessionId ? {
-                id: booking.sessionId,
-                title: booking.sessionTitle || '',
-                description: '',
-                duration: 60,
-                price: 0,
-                creatorId: booking.creatorId || '',
-                creatorName: booking.creatorName || '',
-                creatorAvatar: booking.creatorAvatar || undefined,
-                isActive: true,
-                category: '',
-              } : undefined;
-              
-              return transformBooking(booking, sessionInfo);
-            })
+            // The backend returns bookings with session info embedded
+            const sessionInfo = booking.sessionId ? {
+              id: booking.sessionId,
+              title: booking.sessionTitle || '',
+              description: '',
+              duration: 60,
+              price: 0,
+              creatorId: booking.creatorId || '',
+              creatorName: booking.creatorName || '',
+              creatorAvatar: booking.creatorAvatar || undefined,
+              isActive: true,
+              category: '',
+            } : undefined;
+
+            return transformBooking(booking, sessionInfo);
+          })
           : [];
       }
 
       // Transform current user
       const user = currentUser.status === 'fulfilled' && currentUser.value
         ? {
-            id: String(currentUser.value._id || currentUser.value.id || ''),
-            email: currentUser.value.email || '',
-            username: currentUser.value.username || currentUser.value.name || '',
-            firstName: currentUser.value.firstName || currentUser.value.name?.split(' ')[0] || undefined,
-            lastName: currentUser.value.lastName || currentUser.value.name?.split(' ').slice(1).join(' ') || undefined,
-            avatar: currentUser.value.avatar || currentUser.value.profile_picture || undefined,
-            bio: currentUser.value.bio || undefined,
-            role: currentUser.value.role || 'member',
-            verified: currentUser.value.verified || false,
-            createdAt: currentUser.value.createdAt || new Date().toISOString(),
-            updatedAt: currentUser.value.updatedAt || new Date().toISOString(),
-          }
+          id: String(currentUser.value._id || currentUser.value.id || ''),
+          email: currentUser.value.email || '',
+          username: currentUser.value.username || currentUser.value.name || '',
+          firstName: currentUser.value.firstName || currentUser.value.name?.split(' ')[0] || undefined,
+          lastName: currentUser.value.lastName || currentUser.value.name?.split(' ').slice(1).join(' ') || undefined,
+          avatar: currentUser.value.avatar || currentUser.value.profile_picture || undefined,
+          bio: currentUser.value.bio || undefined,
+          role: currentUser.value.role || 'member',
+          verified: currentUser.value.verified || false,
+          createdAt: currentUser.value.createdAt || new Date().toISOString(),
+          updatedAt: currentUser.value.updatedAt || new Date().toISOString(),
+        }
         : null;
 
       return {

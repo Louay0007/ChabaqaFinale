@@ -20,17 +20,17 @@ export class CreatePostCommentDto {
  * DTO pour créer un post
  */
 export class CreatePostDto {
-  @ApiProperty({
-    description: 'Titre du post',
+  @ApiPropertyOptional({
+    description: 'Titre du post (optionnel)',
     example: 'Getting Started with React Hooks',
     minLength: 2,
     maxLength: 200
   })
   @IsString()
-  @IsNotEmpty()
-  @MinLength(2, { message: 'Le titre doit contenir au moins 2 caractères' })
+  @IsOptional()
+  @MinLength(2, { message: 'Le titre doit contenir au moins 2 caractères', always: false })
   @MaxLength(200, { message: 'Le titre ne peut pas dépasser 200 caractères' })
-  title: string;
+  title?: string;
 
   @ApiProperty({
     description: 'Contenu principal du post',

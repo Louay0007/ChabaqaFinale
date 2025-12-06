@@ -51,14 +51,14 @@ export class PostController {
     @Body() createPostDto: CreatePostDto,
     @Request() req,
   ): Promise<{ success: boolean; data: PostResponseDto }> {
+    const userId = req.user._id || req.user.userId;
     console.log('📝 [POST-CONTROLLER] Create post request received:', {
       body: createPostDto,
-      userId: req.user?.userId,
-      userSub: req.user?.sub,
+      userId,
       user: req.user
     });
     
-    const post = await this.postService.create(createPostDto, req.user.userId);
+    const post = await this.postService.create(createPostDto, userId);
     return { success: true, data: post };
   }
 

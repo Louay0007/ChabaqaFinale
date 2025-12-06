@@ -4,28 +4,32 @@ import { useEffect, useState } from "react"
 import ClientSessionsView from "./components/client-sessions-view"
 import { api, apiClient } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { useCreatorCommunity } from "@/app/(creator)/creator/context/creator-community-context"
 
 export default function CreatorSessionsPage() {
   const { toast } = useToast()
+  const { selectedCommunity, selectedCommunityId, isLoading: communityLoading } = useCreatorCommunity()
+
   const [sessions, setSessions] = useState<any[]>([])
   const [bookings, setBookings] = useState<any[]>([])
   const [revenue, setRevenue] = useState<number | null>(null)
 
+  // Reload when community changes
   useEffect(() => {
+    if (communityLoading || !selectedCommunityId) return
+
     const load = async () => {
       try {
         const me = await api.auth.me().catch(() => null as any)
         const user = me?.data || (me as any)?.user || null
         if (!user) { setSessions([]); setBookings([]); return }
 
-        // Choose first creator community (slug) for scoping
-        const myComms = await api.communities.getByCreator(user._id || user.id).catch(() => null as any)
-        const first = (myComms?.data || [])[0]
-        const slug = first?.slug || ""
+        const slug = selectedCommunity?.slug || ""
 
-        // Sessions list
-        const sessRes = await apiClient.get<any>(`/sessions`, slug ? { communitySlug: slug, limit: 50 } : { limit: 50 }).catch(() => null as any)
-        const rawSessions = sessRes?.data?.sessions || sessRes?.sessions || sessRes?.data?.items || sessRes?.items || []
+        // Sessions list - filtered by community or creator
+        const sessRes = await apiClient.get<any>(`/sessions`, slug ? { communitySlug: slug, limit: 50 } : { creatorId: user._id || user.id, limit: 50 }).catch(() => null as any)
+        // Backend returns { sessions, total, page, limit, totalPages } directly
+        const rawSessions = sessRes?.sessions || sessRes?.data?.sessions || sessRes?.data?.items || sessRes?.items || []
         const normSessions = (Array.isArray(rawSessions) ? rawSessions : []).map((s: any) => ({
           id: s.id || s._id,
           title: s.title,
@@ -60,7 +64,7 @@ export default function CreatorSessionsPage() {
         // Analytics revenue (last 30 days)
         const now = new Date()
         const to = now.toISOString()
-        const from = new Date(now.getTime() - 30*24*3600*1000).toISOString()
+        const from = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString()
         const sessAgg = await api.creatorAnalytics.getSessions({ from, to }).catch(() => null as any)
         const bySession = sessAgg?.data?.bySession || sessAgg?.bySession || sessAgg?.data?.items || sessAgg?.items || []
         const totalRevenue = (Array.isArray(bySession) ? bySession : []).reduce((sum: number, x: any) => sum + Number(x.revenue ?? 0), 0)
@@ -70,10 +74,9 @@ export default function CreatorSessionsPage() {
       }
     }
     load()
-  }, [])
+  }, [selectedCommunityId, selectedCommunity, communityLoading, toast])
 
   return (
     <ClientSessionsView allSessions={sessions} allBookings={bookings} revenue={revenue ?? undefined} />
   )
 }
-

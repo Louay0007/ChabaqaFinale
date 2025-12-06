@@ -1,21 +1,26 @@
-import { redirect } from "next/navigation"
-import { getProfileServer } from "@/lib/auth.server"
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import SignInForm from "../components/signin-form"
+import { useAuthContext } from "@/app/providers/auth-provider"
 
-export default async function SignInPage() {
-  const user = await getProfileServer()
+export default function SignInPage() {
+  const { user, isAuthenticated } = useAuthContext()
+  const router = useRouter()
 
-  if (user) {
-    // Role-based redirection
-    const role = user.role?.toLowerCase()
-
-    if (role === 'creator') {
-      redirect('/creator/dashboard')
-    } else {
-      redirect('/explore')
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const role = user.role?.toLowerCase()
+      if (role === 'creator') {
+        router.push('/creator/dashboard')
+      } else {
+        router.push('/explore')
+      }
     }
-  }
+  }, [isAuthenticated, user, router])
+
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -30,11 +35,11 @@ export default async function SignInPage() {
           {/* Logo */}
           <div className="text-center mb-8 animate-fade-in">
             <div className="flex justify-center">
-              <Image 
-                src="/logo_chabaqa.png" 
-                alt="Chabaqa Logo" 
-                width={280} 
-                height={112} 
+              <Image
+                src="/logo_chabaqa.png"
+                alt="Chabaqa Logo"
+                width={280}
+                height={112}
                 className="drop-shadow-lg"
                 priority
               />

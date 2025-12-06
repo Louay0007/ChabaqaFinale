@@ -1,18 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Event } from "@/lib/models";
+import { EventWithTickets } from "@/lib/api/events-community.api";
 import EventsHeader from "@/app/(community)/[creator]/[feature]/(loggedUser)/events/components/events-header";
 import EventsTabs from "@/app/(community)/[creator]/[feature]/(loggedUser)/events/components/events-tabs";
 
 interface EventsPageContentProps {
-  availableEvents: Event[];
+  availableEvents: EventWithTickets[];
   myTickets: any[];
 }
 
-export default function EventsPageContent({ 
-  availableEvents, 
-  myTickets 
+export default function EventsPageContent({
+  availableEvents,
+  myTickets
 }: EventsPageContentProps) {
   const [activeTab, setActiveTab] = useState("available");
 

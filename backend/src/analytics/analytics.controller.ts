@@ -163,6 +163,23 @@ export class AnalyticsController {
     const num = Math.max(1, Math.min(365, Number(days) || 90));
     return this.analyticsService.backfillForCreator(creatorId, num);
   }
+
+  @Get('course/:courseId')
+  @ApiOperation({ summary: 'Get specific course analytics' })
+  @ApiQuery({ name: 'from', required: false })
+  @ApiQuery({ name: 'to', required: false })
+  async getCourseAnalytics(
+    @Req() req, 
+    @Query('from') from?: string, 
+    @Query('to') to?: string
+  ) {
+    const user = req.user;
+    const creatorId = user.sub || user._id || user.userId;
+    const courseId = req.params.courseId;
+    
+    const toDate = to ? new Date(to) : new Date();
+    const fromDate = from ? new Date(from) : new Date(toDate.getTime() - 30 * 24 * 3600 * 1000);
+    
+    return this.analyticsService.getCourseAnalytics(creatorId, courseId, fromDate, toDate);
+  }
 }
-
-

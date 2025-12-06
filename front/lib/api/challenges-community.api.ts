@@ -7,10 +7,16 @@ import type { Challenge, ChallengeParticipant } from './types';
 export interface ChallengeWithProgress extends Challenge {
   progress?: number;
   isParticipating?: boolean;
-  participantCount?: number;
+  // participantCount is inherited from Challenge
   completedTasks?: number;
   totalTasks?: number;
   joinedAt?: string;
+  depositAmount?: number;
+  completionReward?: number;
+  tasks?: any[];
+  category?: string;
+  duration?: string;
+  creator?: any;
 }
 
 export interface ChallengesPageData {
@@ -120,7 +126,7 @@ export const challengesCommunityApi = {
         communitiesApi.getBySlug(slug),
         challengesApi.getByCommunity(slug),
         // Get user participations - backend endpoint: GET /challenges/my-participations?communitySlug=...
-        apiClient.get('/challenges/my-participations', { communitySlug: slug }).catch(() => ({ data: { participations: [] } })),
+        apiClient.get('/challenges/my-participations', { communitySlug: slug }).catch(() => ({ data: { participations: [] } } as any)),
         getMe().catch(() => null),
       ]);
 
@@ -144,7 +150,7 @@ export const challengesCommunityApi = {
       // Handle user participations
       let userParticipations: any[] = [];
       if (userParticipationsResponse.status === 'fulfilled') {
-        const participationsData = userParticipationsResponse.value;
+        const participationsData = userParticipationsResponse.value as any;
         const participationsList = participationsData?.data?.participations || participationsData?.participations || [];
         userParticipations = Array.isArray(participationsList)
           ? participationsList.map(transformParticipation)
@@ -154,18 +160,18 @@ export const challengesCommunityApi = {
       // Transform current user
       const user = currentUser.status === 'fulfilled' && currentUser.value
         ? {
-            id: String(currentUser.value._id || currentUser.value.id || ''),
-            email: currentUser.value.email || '',
-            username: currentUser.value.username || currentUser.value.name || '',
-            firstName: currentUser.value.firstName || currentUser.value.name?.split(' ')[0] || undefined,
-            lastName: currentUser.value.lastName || currentUser.value.name?.split(' ').slice(1).join(' ') || undefined,
-            avatar: currentUser.value.avatar || currentUser.value.profile_picture || undefined,
-            bio: currentUser.value.bio || undefined,
-            role: currentUser.value.role || 'member',
-            verified: currentUser.value.verified || false,
-            createdAt: currentUser.value.createdAt || new Date().toISOString(),
-            updatedAt: currentUser.value.updatedAt || new Date().toISOString(),
-          }
+          id: String(currentUser.value._id || currentUser.value.id || ''),
+          email: currentUser.value.email || '',
+          username: currentUser.value.username || currentUser.value.name || '',
+          firstName: currentUser.value.firstName || currentUser.value.name?.split(' ')[0] || undefined,
+          lastName: currentUser.value.lastName || currentUser.value.name?.split(' ').slice(1).join(' ') || undefined,
+          avatar: currentUser.value.avatar || currentUser.value.profile_picture || undefined,
+          bio: currentUser.value.bio || undefined,
+          role: currentUser.value.role || 'member',
+          verified: currentUser.value.verified || false,
+          createdAt: currentUser.value.createdAt || new Date().toISOString(),
+          updatedAt: currentUser.value.updatedAt || new Date().toISOString(),
+        }
         : null;
 
       // Merge challenges with participation data

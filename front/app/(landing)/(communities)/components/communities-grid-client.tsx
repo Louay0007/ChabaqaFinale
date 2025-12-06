@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Grid, List, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { CommunityCard } from "@/app/(landing)/(communities)/components/community-card"
 import { Community } from "@/lib/models"
+import { communitiesApi } from "@/lib/api"
 
 interface CommunitiesGridClientProps {
   communities: Community[]
@@ -35,6 +36,36 @@ export function CommunitiesGridClient({
   onItemsPerPageChange,
 }: CommunitiesGridClientProps) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [joinedCommunityIds, setJoinedCommunityIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const fetchJoinedCommunities = async () => {
+      try {
+        console.log("Fetching joined communities...")
+        const response = await communitiesApi.getMyJoined()
+        console.log("Joined communities response:", response)
+        if (response.success && Array.isArray(response.data)) {
+          // Handle both id and _id
+          const ids = new Set(response.data.map(c => c.id || (c as any)._id))
+          console.log("Joined community IDs:", Array.from(ids))
+          setJoinedCommunityIds(ids)
+        }
+      } catch (error) {
+        // Silently fail if user is not logged in or other error
+        console.error("Failed to fetch joined communities", error)
+      }
+    }
+
+    fetchJoinedCommunities()
+  }, [])
+
+  // Debug log for communities prop
+  useEffect(() => {
+    if (communities.length > 0) {
+      console.log("First community in grid:", communities[0])
+      console.log("First community ID:", communities[0].id, " _id:", (communities[0] as any)._id)
+    }
+  }, [communities])
 
   const getVisiblePages = () => {
     const delta = 2
@@ -111,11 +142,10 @@ export function CommunitiesGridClient({
               variant="ghost"
               size="sm"
               onClick={() => setViewMode("grid")}
-              className={`transition-all duration-300 text-xs px-3 py-1.5 ${
-                viewMode === "grid"
-                  ? "bg-white text-chabaqa-primary shadow-md"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
-              }`}
+              className={`transition-all duration-300 text-xs px-3 py-1.5 ${viewMode === "grid"
+                ? "bg-white text-chabaqa-primary shadow-md"
+                : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                }`}
             >
               <Grid className="w-3.5 h-3.5 mr-1.5" />
               Grid
@@ -124,11 +154,10 @@ export function CommunitiesGridClient({
               variant="ghost"
               size="sm"
               onClick={() => setViewMode("list")}
-              className={`transition-all duration-300 text-xs px-3 py-1.5 ${
-                viewMode === "list"
-                  ? "bg-white text-chabaqa-primary shadow-md"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
-              }`}
+              className={`transition-all duration-300 text-xs px-3 py-1.5 ${viewMode === "list"
+                ? "bg-white text-chabaqa-primary shadow-md"
+                : "text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                }`}
             >
               <List className="w-3.5 h-3.5 mr-1.5" />
               List
@@ -141,14 +170,23 @@ export function CommunitiesGridClient({
       {communities.length > 0 ? (
         <>
           <div
-            className={`grid ${
-              viewMode === "grid"
-                ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-                : "grid-cols-1 max-w-6xl mx-auto gap-5"
-            }`}
+            className={`grid ${viewMode === "grid"
+              ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+              : "grid-cols-1 max-w-6xl mx-auto gap-5"
+              }`}
           >
             {communities.map((community) => (
-              <CommunityCard key={community.id} community={community} viewMode={viewMode} />
+              <CommunityCard
+                key={community.id}
+                community={{
+                  ...community,
+                  type: "community",
+                  link: `/communities/${community.slug}`,
+                  priceType: community.priceType as any,
+                  isMember: joinedCommunityIds.has(community.id || (community as any)._id)
+                }}
+                viewMode={viewMode}
+              />
             ))}
           </div>
 
@@ -195,11 +233,10 @@ export function CommunitiesGridClient({
                           variant={currentPage === page ? "default" : "outline"}
                           size="sm"
                           onClick={() => onPageChange(page as number)}
-                          className={`min-w-[32px] h-8 text-xs ${
-                            currentPage === page
-                              ? "bg-chabaqa-primary text-white border-chabaqa-primary"
-                              : "border-gray-300 hover:border-chabaqa-primary hover:text-chabaqa-primary"
-                          }`}
+                          className={`min-w-[32px] h-8 text-xs ${currentPage === page
+                            ? "bg-chabaqa-primary text-white border-chabaqa-primary"
+                            : "border-gray-300 hover:border-chabaqa-primary hover:text-chabaqa-primary"
+                            }`}
                         >
                           {page}
                         </Button>

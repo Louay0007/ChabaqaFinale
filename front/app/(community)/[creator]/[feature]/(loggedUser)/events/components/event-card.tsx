@@ -8,17 +8,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Ticket, CalendarIcon, MapPin, Users, Clock } from "lucide-react";
 import { format } from "date-fns";
-import { Event } from "@/lib/models";
+import { EventWithTickets } from "@/lib/api/events-community.api";
 
 interface EventCardProps {
-  event: Event;
+  event: EventWithTickets;
   selectedTicket: string;
   setSelectedTicket: (ticket: string) => void;
   quantity: number;
   setQuantity: (quantity: number) => void;
   notes: string;
   setNotes: (notes: string) => void;
-  setSelectedEvent: (event: Event | null) => void;
+  setSelectedEvent: (event: EventWithTickets | null) => void;
   handleRegister: () => void;
 }
 
@@ -34,7 +34,7 @@ export default function EventCard({
   handleRegister
 }: EventCardProps) {
   const selectedTicketData = event.tickets?.find((t) => t.id === selectedTicket);
-  const minPrice = event.tickets && event.tickets.length > 0 
+  const minPrice = event.tickets && event.tickets.length > 0
     ? Math.min(...event.tickets.map((t) => t.price || 0))
     : event.price || 0;
 
@@ -43,10 +43,10 @@ export default function EventCard({
       <CardHeader className="pb-3 sm:pb-6">
         {/* Event Image - Responsive */}
         <div className="relative overflow-hidden rounded-lg mb-3 sm:mb-4">
-          <img 
-            src={event.image} 
-            alt={event.title} 
-            className="w-full h-32 sm:h-40 lg:h-48 object-cover transition-transform hover:scale-105" 
+          <img
+            src={event.image}
+            alt={event.title}
+            className="w-full h-32 sm:h-40 lg:h-48 object-cover transition-transform hover:scale-105"
           />
           <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
             <Badge variant="secondary" className="text-xs px-2 py-1 bg-white/90 backdrop-blur-sm">

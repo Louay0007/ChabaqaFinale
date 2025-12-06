@@ -101,9 +101,14 @@ export const communitiesApi = {
     return apiClient.get<ApiSuccessResponse<any>>(`/community-aff-crea-join/${id}/stats`);
   },
 
-  // Get communities by creator
-  getByCreator: async (creatorId: string): Promise<ApiSuccessResponse<Community[]>> => {
-    return apiClient.get<ApiSuccessResponse<Community[]>>(`/community-aff-crea-join/my-created`);
+  // Get communities created by the authenticated user (creator)
+  getMyCreated: async (): Promise<ApiSuccessResponse<Community[]>> => {
+    return apiClient.get<ApiSuccessResponse<Community[]>>('/community-aff-crea-join/my-created');
+  },
+
+  // Backwards-compatible alias for getMyCreated
+  getByCreator: async (): Promise<ApiSuccessResponse<Community[]>> => {
+    return communitiesApi.getMyCreated();
   },
 
   // Get public communities
@@ -114,5 +119,53 @@ export const communitiesApi = {
   // Get my joined communities
   getMyJoined: async (): Promise<ApiSuccessResponse<Community[]>> => {
     return apiClient.get<ApiSuccessResponse<Community[]>>('/community-aff-crea-join/my-joined');
+  },
+
+  checkoutCommunity: async (id: string, promoCode?: string): Promise<ApiSuccessResponse<any>> => {
+    const payload: Record<string, any> = {
+      communityId: id,
+    };
+
+    if (promoCode) {
+      payload.promoCode = promoCode;
+    }
+
+    let headerToken: string | null = null;
+
+    if (typeof window !== 'undefined') {
+      const rawLocalToken =
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('token') ||
+        localStorage.getItem('jwt') ||
+        localStorage.getItem('authToken') ||
+        localStorage.getItem('access_token');
+
+      headerToken = rawLocalToken
+        ? (rawLocalToken.toLowerCase().startsWith('bearer ')
+            ? rawLocalToken
+            : `Bearer ${rawLocalToken}`)
+        : null;
+    }
+
+    const response = await fetch('/api/community/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(headerToken ? { Authorization: headerToken } : {}),
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        communityId: id,
+        promoCode,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.message || 'Failed to process community checkout');
+    }
+
+    return data;
   },
 };

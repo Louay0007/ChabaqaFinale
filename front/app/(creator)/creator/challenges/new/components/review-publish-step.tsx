@@ -142,13 +142,10 @@ export function ReviewPublishStep({ formData, setFormData, startDate, endDate }:
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="publish"
-                checked={formData.isPublished}
-                onCheckedChange={(checked) => setFormData((prev: any) => ({ ...prev, isPublished: checked }))}
-              />
-              <Label htmlFor="publish">Publish challenge immediately</Label>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900">
+                <strong>Note:</strong> Challenges are created as drafts. You can publish them from the management page once you have an active subscription.
+              </p>
             </div>
           </div>
         </div>

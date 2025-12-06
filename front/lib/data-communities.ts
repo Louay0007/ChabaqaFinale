@@ -116,6 +116,7 @@ export type Explore = {
   image: string
   featured: boolean;
   link: string
+  isMember?: boolean
 }
 
 export const ExploreData: { 
@@ -747,4 +748,3 @@ export const communitiesData: CommunitiesData = {
 
 
 export default { communitiesData, ExploreData };
-

@@ -39,7 +39,8 @@ export class SessionController {
     @Body() createSessionDto: CreateSessionDto,
     @Request() req: any
   ): Promise<SessionResponseDto> {
-    return this.sessionService.create(createSessionDto, req.user.userId);
+    const userId = req.user._id || req.user.userId;
+    return this.sessionService.create(createSessionDto, userId);
   }
 
   @Get()

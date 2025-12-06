@@ -49,7 +49,8 @@ export class ChallengeController {
     @Body() createChallengeDto: CreateChallengeDto,
     @Request() req: any
   ): Promise<ChallengeResponseDto> {
-    return this.challengeService.create(createChallengeDto, req.user.userId);
+    const userId = req.user._id || req.user.userId;
+    return this.challengeService.create(createChallengeDto, userId);
   }
 
   @Get()

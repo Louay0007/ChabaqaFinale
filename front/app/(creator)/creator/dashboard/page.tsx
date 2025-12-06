@@ -25,6 +25,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { CommunityManager } from "@/app/(creator)/creator/components/community-manager"
 import { api, apiClient } from "@/lib/api"
+import { useCreatorCommunity } from "@/app/(creator)/creator/context/creator-community-context"
 
 
 import { useAuthContext } from "@/app/providers/auth-provider"
@@ -33,11 +34,18 @@ import { useRouter } from "next/navigation"
 export default function CreatorDashboardPage() {
   const router = useRouter()
   const { user: authUser, isAuthenticated, loading: authLoading } = useAuthContext()
+
+  // Use shared community context
+  const {
+    communities: creatorCommunities,
+    selectedCommunity,
+    selectedCommunityId,
+    isLoading: communityLoading
+  } = useCreatorCommunity()
+
   const [activeTab, setActiveTab] = useState("overview")
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any | null>(null)
-  const [creatorCommunities, setCreatorCommunities] = useState<any[]>([])
-  const [selectedCommunity, setSelectedCommunity] = useState<any | null>(null)
   const [creatorCourses, setCreatorCourses] = useState<any[]>([])
   const [creatorChallenges, setCreatorChallenges] = useState<any[]>([])
   const [creatorSessions, setCreatorSessions] = useState<any[]>([])
@@ -48,6 +56,13 @@ export default function CreatorDashboardPage() {
   const [membersCount, setMembersCount] = useState<number>(0)
   const [topContent, setTopContent] = useState<any[]>([])
 
+  const getCommunityId = (community: any): string => {
+    const rawId = community?.id ?? community?._id
+    if (typeof rawId === 'string') return rawId
+    if (rawId && typeof rawId.toString === 'function') return rawId.toString()
+    return ''
+  }
+
   // Redirect to signin if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -55,64 +70,55 @@ export default function CreatorDashboardPage() {
     }
   }, [authLoading, isAuthenticated, router])
 
+  // Reload data when selected community changes
   useEffect(() => {
-    // Don't load data if not authenticated
-    if (!isAuthenticated || authLoading) {
+    // Don't load data if not authenticated or community not selected
+    if (!isAuthenticated || authLoading || communityLoading || !selectedCommunityId) {
       return
     }
 
     const load = async () => {
       try {
+        setLoading(true)
         // Use authenticated user from context
         setUser(authUser)
         const userId = authUser?.id
         if (!userId) { setLoading(false); return }
 
-        // Fetch my communities (creator)
-        const myComms = await api.communities.getByCreator(userId).catch(() => null as any)
-        const comms = myComms?.data || []
-
         // If creator has no communities, redirect to create first one
-        if (!comms || comms.length === 0) {
+        if (!creatorCommunities || creatorCommunities.length === 0) {
           router.push('/build-community')
           return
         }
 
-        setCreatorCommunities(comms)
-        setUserCommunities(comms)
+        setUserCommunities(creatorCommunities)
 
-        // Check for saved community selection in localStorage
-        const savedCommunityId = typeof window !== 'undefined'
-          ? localStorage.getItem('creator_selected_community_id')
-          : null
+        // Get selected community's slug for filtering
+        const communitySlug = selectedCommunity?.slug || ''
+        console.log('[Dashboard] Loading data for community:', { communitySlug, selectedCommunityId })
 
-        // Use saved community or first one
-        let communityToFind = savedCommunityId
-          ? comms.find((c: any) => c.id === savedCommunityId) || comms[0]
-          : comms[0]
-
-        // If we have a community, fetch its full details
-        let communityToUse = communityToFind
-        if (communityToFind?.id) {
-          try {
-            const fullCommunity = await api.communities.getById(communityToFind.id)
-            communityToUse = fullCommunity?.data || fullCommunity || communityToFind
-          } catch (error) {
-            console.error('Failed to fetch full community details:', error)
-          }
-        }
-
-        setSelectedCommunity(communityToUse)
-
-        // Parallel fetches
+        // Parallel fetches - filter by selected community
         const toDate = new Date()
         const fromDate = new Date(toDate.getTime() - 30 * 24 * 3600 * 1000)
 
         const [coursesRes, challengesRes, sessionsRes, overviewRes, notifRes, topCoursesAgg, topChallengesAgg, topSessionsAgg] = await Promise.all([
-          // courses created by me
-          apiClient.get<any>(`/cours/user/created`).catch(() => null),
-          apiClient.get<any>(`/challenges/by-user/${encodeURIComponent(userId)}?type=created`).catch(() => null),
-          apiClient.get<any>(`/sessions`, { creatorId: userId, page: 1, limit: 12 }).catch(() => null),
+          // 1. Courses: Always get creator's own courses (not community filtered)
+          // Endpoint: /cours/user/created -> { success: true, data: { courses: [...] } }
+          apiClient.get<any>(`/cours/user/created`, { limit: 100 }).catch((e) => { console.log('[Dashboard] Courses fetch error:', e); return null }),
+
+          // 2. Challenges
+          // If community: /challenges?communitySlug=... -> { challenges: [...] }
+          // If no community: /challenges/by-user/:id?type=created -> { success: true, data: { challenges: [...] } }
+          communitySlug
+            ? apiClient.get<any>(`/challenges`, { communitySlug, limit: 50 }).catch((e) => { console.log('[Dashboard] Challenges fetch error:', e); return null })
+            : apiClient.get<any>(`/challenges/by-user/${userId}`, { type: 'created', limit: 50 }).catch((e) => { console.log('[Dashboard] Challenges fetch error:', e); return null }),
+
+          // 3. Sessions
+          // Endpoint: /sessions?creatorId=... or ?communitySlug=... -> { sessions: [...] }
+          communitySlug
+            ? apiClient.get<any>(`/sessions`, { communitySlug, limit: 50 }).catch((e) => { console.log('[Dashboard] Sessions fetch error:', e); return null })
+            : apiClient.get<any>(`/sessions`, { creatorId: userId, limit: 50 }).catch((e) => { console.log('[Dashboard] Sessions fetch error:', e); return null }),
+
           api.creatorAnalytics.getOverview({ from: fromDate.toISOString(), to: toDate.toISOString() }).catch(() => null as any),
           api.notifications.getAll({ page: 1, limit: 5 }).catch(() => null as any),
           api.creatorAnalytics.getCourses({ from: fromDate.toISOString(), to: toDate.toISOString() }).catch(() => null as any),
@@ -120,13 +126,47 @@ export default function CreatorDashboardPage() {
           api.creatorAnalytics.getSessions({ from: fromDate.toISOString(), to: toDate.toISOString() }).catch(() => null as any),
         ])
 
-        const courses = coursesRes?.data?.courses || coursesRes?.courses || []
-        setCreatorCourses(courses)
+        console.log('[Dashboard] Raw API responses:', JSON.stringify({ coursesRes, challengesRes, sessionsRes }, null, 2))
 
-        const challenges = challengesRes?.data?.challenges || challengesRes?.challenges || []
-        setCreatorChallenges(challenges)
+        // --- PARSING LOGIC ---
 
-        const sessions = sessionsRes?.data?.data || sessionsRes?.data || sessionsRes?.items || sessionsRes?.results || []
+        // 1. Courses Parsing
+        let courses: any[] = []
+        if (coursesRes) {
+          // Handle { success: true, data: { courses: [] } }
+          if (coursesRes.data?.courses) courses = coursesRes.data.courses
+          // Handle { courses: [] }
+          else if (coursesRes.courses) courses = coursesRes.courses
+          // Handle direct array
+          else if (Array.isArray(coursesRes.data)) courses = coursesRes.data
+          else if (Array.isArray(coursesRes)) courses = coursesRes
+        }
+        setCreatorCourses(Array.isArray(courses) ? courses : [])
+
+        // 2. Challenges Parsing
+        let challenges: any[] = []
+        if (challengesRes) {
+          // Handle { success: true, data: { challenges: [] } } (from by-user)
+          if (challengesRes.data?.challenges) challenges = challengesRes.data.challenges
+          // Handle { challenges: [] } (from findAll)
+          else if (challengesRes.challenges) challenges = challengesRes.challenges
+          // Handle direct array
+          else if (Array.isArray(challengesRes.data)) challenges = challengesRes.data
+          else if (Array.isArray(challengesRes)) challenges = challengesRes
+        }
+        setCreatorChallenges(Array.isArray(challenges) ? challenges : [])
+
+        // 3. Sessions Parsing
+        let sessions: any[] = []
+        if (sessionsRes) {
+          // Handle { sessions: [] } (from findAll)
+          if (sessionsRes.sessions) sessions = sessionsRes.sessions
+          // Handle { success: true, data: { sessions: [] } } (just in case)
+          else if (sessionsRes.data?.sessions) sessions = sessionsRes.data.sessions
+          // Handle direct array
+          else if (Array.isArray(sessionsRes.data)) sessions = sessionsRes.data
+          else if (Array.isArray(sessionsRes)) sessions = sessionsRes
+        }
         setCreatorSessions(Array.isArray(sessions) ? sessions : [])
 
         setOverview(overviewRes?.data || overviewRes || null)
@@ -134,9 +174,10 @@ export default function CreatorDashboardPage() {
         const notifications = notifRes?.data || []
         setRecentActivity(Array.isArray(notifications) ? notifications.slice(0, 5) : [])
 
-        // Get members count from community data
-        const finalMembersCount = communityToUse?.members || 0
-        setMembersCount(finalMembersCount)
+        // Get members count from selected community
+        const community = selectedCommunity as any
+        const finalMembersCount = community?.members || community?.membersCount || 0
+        setMembersCount(typeof finalMembersCount === 'number' ? finalMembersCount : 0)
 
         // Build Top Performing Content (pick best from each type)
         const pickMetric = (item: any) => {
@@ -180,18 +221,18 @@ export default function CreatorDashboardPage() {
 
         setTopContent(tops)
       } catch (e) {
-        // Silent fail; UI will show empty states
+        console.error('[Dashboard] Load error:', e)
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [isAuthenticated, authLoading, authUser])
+  }, [isAuthenticated, authLoading, authUser, communityLoading, selectedCommunityId, selectedCommunity, creatorCommunities, router])
 
   const stats = [
     {
       title: "Total Members",
-      value: membersCount || selectedCommunity?.membersCount || selectedCommunity?.members || 0,
+      value: membersCount || (selectedCommunity as any)?.membersCount || (selectedCommunity as any)?.members || 0,
       change: { value: "+50", trend: "up" as const },
       icon: Users,
       color: "primary" as const,

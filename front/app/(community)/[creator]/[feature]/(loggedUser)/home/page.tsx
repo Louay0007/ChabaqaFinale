@@ -159,19 +159,19 @@ export default function CommunityDashboard({ params }: { params: Promise<{ creat
 
     setIsCreatingPost(true)
     try {
+      console.log('📝 Creating post with community:', { communityId: community.id, content: newPost })
       await postsApi.create({
-        title: '',
         content: newPost,
         communityId: community.id,
-        isPublished: true,
       })
       
       // Refresh posts
       const updatedData = await communityHomeApi.getHomeData(feature, postsPage, 10)
       setData(updatedData)
       setNewPost("")
+      console.log('✅ Post created successfully')
     } catch (error: any) {
-      console.error('Error creating post:', error)
+      console.error('❌ Error creating post:', error)
       alert(error.message || 'Failed to create post')
     } finally {
       setIsCreatingPost(false)

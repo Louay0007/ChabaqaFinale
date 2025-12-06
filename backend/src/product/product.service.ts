@@ -34,37 +34,93 @@ export class ProductService {
    * Créer un nouveau produit
    */
   async create(createProductDto: CreateProductDto, userId: string): Promise<ProductResponseDto> {
-    // Vérifier que la communauté existe
-    const community = await this.communityModel.findOne({ id: createProductDto.communityId });
-    if (!community) {
-      throw new NotFoundException('Communauté non trouvée');
+    try {
+      // Vérifier que la communauté existe (lookup by _id or slug)
+      const community = await this.communityModel.findOne({
+        $or: [
+          { _id: createProductDto.communityId },
+          { id: createProductDto.communityId },
+          { slug: createProductDto.communityId }
+        ]
+      });
+      if (!community) {
+        throw new NotFoundException('Communauté non trouvée');
+      }
+
+      // Vérifier que l'utilisateur est créateur de la communauté
+      // Normalize both IDs to strings for comparison
+      const normalizedUserId = typeof userId === 'object' ? (userId as any).toString() : String(userId);
+      const communityCreatorId = community.createur?.toString();
+      
+      console.log(`🔍 Creator check: user=${normalizedUserId}, community creator=${communityCreatorId}`);
+      
+      if (communityCreatorId !== normalizedUserId) {
+        throw new ForbiddenException('Seuls les créateurs de communauté peuvent créer des produits');
+      }
+
+      // Créer le produit
+      console.log('📝 Creating product with DTO:', createProductDto);
+      
+      // Generate product ID
+      const productId = new Types.ObjectId().toString();
+      
+      // Normalize file types and add IDs
+      const normalizedFiles = (createProductDto.files || []).map((f: any, idx: number) => {
+        // Map MIME types to enum values
+        const mimeToEnum: { [key: string]: string } = {
+          'image/png': 'PNG',
+          'image/jpeg': 'JPG',
+          'image/jpg': 'JPG',
+          'application/pdf': 'PDF',
+          'application/zip': 'ZIP',
+          'video/mp4': 'MP4',
+          'audio/mpeg': 'MP3',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+          'application/msword': 'DOC',
+        };
+        
+        const fileType = mimeToEnum[f.type] || f.type || 'OTHER';
+        
+        return {
+          id: f.id || new Types.ObjectId().toString(),
+          name: f.name,
+          url: f.url,
+          type: fileType,
+          size: f.size,
+          description: f.description,
+          order: f.order ?? idx,
+          isActive: f.isActive !== false,
+        };
+      });
+      
+      const product = new this.productModel({
+        ...createProductDto,
+        id: productId,
+        creatorId: new Types.ObjectId(userId),
+        sales: 0,
+        images: createProductDto.images || [],
+        variants: createProductDto.variants || [],
+        files: normalizedFiles,
+        features: createProductDto.features || []
+      });
+
+      const savedProduct = await product.save();
+      console.log('✅ Product saved:', savedProduct._id);
+      
+      // Récupérer les informations complètes
+      const populatedProduct = await this.productModel
+        .findById(savedProduct._id)
+        .populate('creatorId', 'name email profile_picture')
+        .exec();
+
+      console.log('✅ Product populated');
+      const result = await this.transformToResponseDto(populatedProduct!, community);
+      console.log('✅ Product transformed to response DTO');
+      return result;
+    } catch (error) {
+      console.error('❌ Error in product creation:', error);
+      throw error;
     }
-
-    // Vérifier que l'utilisateur est créateur de la communauté
-    if (community.createur.toString() !== userId) {
-      throw new ForbiddenException('Seuls les créateurs de communauté peuvent créer des produits');
-    }
-
-    // Créer le produit
-    const product = new this.productModel({
-      ...createProductDto,
-      creatorId: new Types.ObjectId(userId),
-      sales: 0,
-      images: createProductDto.images || [],
-      variants: createProductDto.variants || [],
-      files: createProductDto.files || [],
-      features: createProductDto.features || []
-    });
-
-    const savedProduct = await product.save();
-    
-    // Récupérer les informations complètes
-    const populatedProduct = await this.productModel
-      .findById(savedProduct._id)
-      .populate('creatorId', 'name email profile_picture')
-      .exec();
-
-    return await this.transformToResponseDto(populatedProduct!, community);
   }
 
   /**

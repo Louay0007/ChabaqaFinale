@@ -39,7 +39,7 @@ export interface CommunityStats {
 function transformCommunity(backendCommunity: any): Community {
   const rawCreator = backendCommunity?.creator || backendCommunity?.createur || null;
   const rawMembers = backendCommunity?.members || backendCommunity?.membersCount || 0;
-  
+
   const normalizedMembers = typeof rawMembers === 'number'
     ? rawMembers
     : Array.isArray(rawMembers)
@@ -87,14 +87,22 @@ function transformCommunity(backendCommunity: any): Community {
  * Transform backend post data to frontend format
  */
 function transformPost(backendPost: any): Post {
-  const author = backendPost.authorId || backendPost.author || {};
+  // Handle author data from backend response
+  let author: any = {};
   
+  // Try multiple sources for author data
+  if (backendPost.author) {
+    author = backendPost.author;
+  } else if (backendPost.authorId && typeof backendPost.authorId === 'object') {
+    author = backendPost.authorId;
+  }
+
   return {
     id: String(backendPost._id || backendPost.id || ''),
     title: backendPost.title || '',
     content: backendPost.content || '',
     communityId: String(backendPost.communityId || ''),
-    authorId: String(author._id || author.id || ''),
+    authorId: String(author._id || author.id || backendPost.authorId || ''),
     thumbnail: backendPost.thumbnail || undefined,
     isPublished: backendPost.isPublished !== false,
     likesCount: backendPost.likes || backendPost.likesCount || 0,
@@ -102,14 +110,14 @@ function transformPost(backendPost: any): Post {
     createdAt: backendPost.createdAt || new Date().toISOString(),
     updatedAt: backendPost.updatedAt || backendPost.createdAt || new Date().toISOString(),
     author: {
-      id: String(author._id || author.id || ''),
+      id: String(author._id || author.id || backendPost.authorId || ''),
       email: author.email || '',
       username: author.username || author.name || 'Unknown',
       firstName: author.firstName || author.name?.split(' ')[0] || undefined,
       lastName: author.lastName || author.name?.split(' ').slice(1).join(' ') || undefined,
       avatar: author.avatar || author.profile_picture || undefined,
       bio: author.bio || undefined,
-      role: author.role || 'member',
+      role: author.role || backendPost.author?.role || 'member',
       verified: author.verified || false,
       createdAt: author.createdAt || new Date().toISOString(),
       updatedAt: author.updatedAt || new Date().toISOString(),
@@ -173,7 +181,7 @@ async function calculateStats(
 ): Promise<CommunityStats> {
   const now = new Date();
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  
+
   // Count posts from this week
   const postsThisWeek = posts.filter(post => {
     const postDate = new Date(post.createdAt);
@@ -225,12 +233,21 @@ export const communityHomeApi = {
       // Fetch posts with community ID
       let posts: Post[] = [];
       let pagination = { page: 1, limit: 10, total: 0, totalPages: 0 };
-      
+
       try {
-        const postsResult = await postsApi.getByCommunity(community.id, { page: postsPage, limit: postsLimit });
-        if (postsResult.success) {
-          posts = postsResult.data.posts.map(transformPost);
-          pagination = postsResult.data.pagination;
+        const postsResult = await postsApi.getByCommunity(community.id, { page: postsPage, limit: postsLimit }) as any;
+        if (postsResult) {
+          // Handle both array and paginated response formats
+          const postsArray = Array.isArray(postsResult.data) 
+            ? postsResult.data 
+            : Array.isArray((postsResult.data as any)?.items)
+              ? (postsResult.data as any).items
+              : Array.isArray((postsResult.data as any)?.posts)
+                ? (postsResult.data as any).posts
+                : [];
+          
+          posts = postsArray.map(transformPost);
+          pagination = postsResult.pagination || { page: postsPage, limit: postsLimit, total: postsArray.length, totalPages: 1 };
         }
       } catch (error) {
         console.warn('Failed to fetch posts:', error);
@@ -243,16 +260,16 @@ export const communityHomeApi = {
         const challenges = challengesResponse.value.data || [];
         activeChallenges = challenges
           .map(transformChallenge)
-          .filter(c => c.isActive);
+          .filter((c: any) => c.isActive);
       }
 
       // Handle courses
       let courses: Course[] = [];
       if (coursesResponse.status === 'fulfilled') {
         try {
-          // The courses API might return data directly or wrapped
-          const coursesData = coursesResponse.value?.data || coursesResponse.value || [];
-          courses = Array.isArray(coursesData) 
+          // Backend returns { success: true, data: { courses: [...], pagination: {...} } }
+          const coursesData = coursesResponse.value?.data?.courses || coursesResponse.value?.data || coursesResponse.value || [];
+          courses = Array.isArray(coursesData)
             ? coursesData.map(transformCourse)
             : [];
         } catch (error) {
@@ -263,18 +280,18 @@ export const communityHomeApi = {
       // Transform current user
       const user = currentUser.status === 'fulfilled' && currentUser.value
         ? {
-            id: String(currentUser.value._id || currentUser.value.id || ''),
-            email: currentUser.value.email || '',
-            username: currentUser.value.username || currentUser.value.name || '',
-            firstName: currentUser.value.firstName || currentUser.value.name?.split(' ')[0] || undefined,
-            lastName: currentUser.value.lastName || currentUser.value.name?.split(' ').slice(1).join(' ') || undefined,
-            avatar: currentUser.value.avatar || currentUser.value.profile_picture || undefined,
-            bio: currentUser.value.bio || undefined,
-            role: currentUser.value.role || 'member',
-            verified: currentUser.value.verified || false,
-            createdAt: currentUser.value.createdAt || new Date().toISOString(),
-            updatedAt: currentUser.value.updatedAt || new Date().toISOString(),
-          }
+          id: String(currentUser.value._id || currentUser.value.id || ''),
+          email: currentUser.value.email || '',
+          username: currentUser.value.username || currentUser.value.name || '',
+          firstName: currentUser.value.firstName || currentUser.value.name?.split(' ')[0] || undefined,
+          lastName: currentUser.value.lastName || currentUser.value.name?.split(' ').slice(1).join(' ') || undefined,
+          avatar: currentUser.value.avatar || currentUser.value.profile_picture || undefined,
+          bio: currentUser.value.bio || undefined,
+          role: currentUser.value.role || 'member',
+          verified: currentUser.value.verified || false,
+          createdAt: currentUser.value.createdAt || new Date().toISOString(),
+          updatedAt: currentUser.value.updatedAt || new Date().toISOString(),
+        }
         : null;
 
       // Calculate statistics
@@ -313,8 +330,8 @@ export const communityHomeApi = {
     const response = await postsApi.getByCommunity(communityId, params);
     if (response.success) {
       return {
-        posts: response.data.posts.map(transformPost),
-        pagination: response.data.pagination,
+        posts: response.data.map(transformPost),
+        pagination: response.pagination,
       };
     }
     return { posts: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } };
@@ -328,7 +345,7 @@ export const communityHomeApi = {
     const challenges = response.data || [];
     return challenges
       .map(transformChallenge)
-      .filter(c => c.isActive);
+      .filter((c: any) => c.isActive);
   },
 
   /**

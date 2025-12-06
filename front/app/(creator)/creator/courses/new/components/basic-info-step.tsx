@@ -4,7 +4,8 @@ import { CardHeader, CardTitle, CardDescription, CardContent } from "@/component
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { BookOpen, Upload } from "lucide-react"
+import { BookOpen } from "lucide-react"
+import { ThumbnailUpload } from "./thumbnail-upload"
 
 interface BasicInfoStepProps {
   formData: {
@@ -49,11 +50,10 @@ export function BasicInfoStep({ formData, handleInputChange }: BasicInfoStepProp
 
         <div className="space-y-2">
           <Label>Course Thumbnail</Label>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-courses-500 transition-colors cursor-pointer">
-            <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-            <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 2MB (1280x720 recommended)</p>
-          </div>
+          <ThumbnailUpload
+            value={formData.thumbnail}
+            onChange={(url) => handleInputChange("thumbnail", url)}
+          />
         </div>
       </CardContent>
     </EnhancedCard>

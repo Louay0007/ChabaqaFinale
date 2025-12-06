@@ -36,7 +36,7 @@ export default function EventDetailsTab({ event }: { event: Event }) {
 
   const totalAttendees = event.attendees.length
   const totalRevenue = event.tickets.reduce((acc, ticket) => acc + (ticket.price * ticket.sold), 0)
-  const averageAttendance = event.sessions.reduce((acc, s) => acc + s.attendance, 0) / event.sessions.length || 0
+  const averageAttendance = event.sessions.reduce((acc, s) => acc + (s.attendance || 0), 0) / event.sessions.length || 0
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

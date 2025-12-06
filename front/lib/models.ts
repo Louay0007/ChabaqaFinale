@@ -60,6 +60,7 @@ export interface Community {
       discord?: string
       github?: string
       behance?: string
+      youtube?: string
     }
     customSections: Array<{
       id: number
@@ -81,27 +82,33 @@ export interface Community {
 
 export interface Course {
   id: string
-  title: string
+  titre?: string
+  title?: string
   description: string
   thumbnail: string
   communityId: string
-  community: Community
+  community?: Community
   creatorId: string
-  creator: User
-  price: number
-  currency: string
+  creator?: User
+  prix?: number
+  price?: number
+  devise?: string
+  currency?: string
   isPublished: boolean
-  sections: CourseSection[]
-  enrollments: CourseEnrollment[]
-  createdAt: Date
-  updatedAt: Date
-  category: string
-  level: string
-  duration: string
-  learningObjectives: string[]
-  requirements: string[]
-  notes: string
-  resources: CourseResource[]
+  sections?: CourseSection[]
+  enrollments?: CourseEnrollment[]
+  createdAt: string | Date
+  updatedAt?: string | Date
+  category?: string
+  niveau?: string
+  level?: string
+  duree?: string
+  duration?: string
+  learningObjectives?: string[]
+  requirements?: string[]
+  notes?: string
+  ressources?: CourseResource[]
+  resources?: CourseResource[]
 }
 
 export interface CourseSection {
@@ -176,6 +183,7 @@ export interface Challenge {
   thumbnail: string
   notes: string
   resources: ChallengeResource[]
+  tasks?: ChallengeTask[]
 }
 
 export interface ChallengeParticipant {
@@ -207,6 +215,7 @@ export interface Session {
   maxBookingsPerWeek: number
   notes: string
   resources: SessionResource[]
+  updatedAt?: Date
 }
 
 export interface SessionBooking {
@@ -383,8 +392,9 @@ export interface Event {
   category: string
   type: "Online" | "In-person" | "Hybrid"
   isActive: boolean
+  price: number
   notes?: string
-  attendees: string[]
+  attendees: any[]
   sessions: EventSession[]
   tickets: Array<{
     id: string
@@ -446,4 +456,14 @@ export interface CommunitiesData {
     label: string
   }>
   communities: Community[]
+}
+
+// Type aliases for backward compatibility
+export type Participant = ChallengeParticipant
+export type Resource = ChallengeResource | CourseResource | SessionResource
+export interface Step {
+  id: number | string
+  title: string
+  description?: string
+  status?: 'pending' | 'current' | 'completed'
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -32,8 +32,9 @@ import {
   BookOpen,
   Building,
 } from "lucide-react"
-import { getUserCommunities, mockUsers, getCommunitiesByCreator } from "@/lib/mock-data"
-import { communitiesData } from "@/lib/data-communities"
+import { communitiesApi } from "@/lib/api"
+import { useAuth } from "@/hooks/use-auth"
+import { Community } from "@/lib/api/types"
 
 
 interface AppHeaderProps {
@@ -47,13 +48,56 @@ export function AppHeader({ userType, currentCommunity, showCommunitySelector = 
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const router = useRouter()
 
-  const currentUser = userType === "creator" ? mockUsers[0] : mockUsers[1]
+  const { user } = useAuth()
+  const [userCommunities, setUserCommunities] = useState<Community[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Get user's communities based on their role
-  const userCommunities =
-    userType === "creator" ? getCommunitiesByCreator(currentUser.id) : getUserCommunities(currentUser.id)
+  // Fetch user's communities
+  useEffect(() => {
+    const fetchCommunities = async () => {
+      if (!user) return
 
-  const community = currentCommunity ? communitiesData.communities.find((c) => c.slug === currentCommunity) : null
+      try {
+        setIsLoading(true)
+        let response
+
+        if (userType === "creator") {
+          // For creators, get their created communities
+          response = await communitiesApi.getMyCreated()
+        } else {
+          // For members, get their joined communities
+          response = await communitiesApi.getMyJoined()
+        }
+
+        if (response.success && Array.isArray(response.data)) {
+          setUserCommunities(response.data)
+        }
+      } catch (error) {
+        console.error("Failed to fetch communities:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchCommunities()
+  }, [user, userType])
+
+  const community = currentCommunity
+    ? userCommunities.find((c) => c.slug === currentCommunity)
+    : null
+
+  // Use real user data if available, otherwise fallback to empty/placeholder (handled by UI)
+  const currentUser = user ? {
+    name: user.name || user.username || "User",
+    email: user.email,
+    avatar: user.avatar,
+    role: user.role
+  } : {
+    name: "Guest",
+    email: "",
+    avatar: null,
+    role: "member"
+  }
 
   const notifications = [
     {
@@ -82,45 +126,45 @@ export function AppHeader({ userType, currentCommunity, showCommunitySelector = 
   const quickActions =
     userType === "creator"
       ? [
-          {
-            label: "Create Course",
-            icon: BookOpen,
-            href: currentCommunity ? `/creator/${currentCommunity}/courses/new` : "/creator/courses/new",
-          },
-          {
-            label: "Start Challenge",
-            icon: Calendar,
-            href: currentCommunity ? `/creator/${currentCommunity}/challenges/new` : "/creator/challenges/new",
-          },
-          {
-            label: "Write Post",
-            icon: MessageSquare,
-            href: currentCommunity ? `/creator/${currentCommunity}/posts/new` : "/creator/posts/new",
-          },
-        ]
+        {
+          label: "Create Course",
+          icon: BookOpen,
+          href: currentCommunity ? `/creator/${currentCommunity}/courses/new` : "/creator/courses/new",
+        },
+        {
+          label: "Start Challenge",
+          icon: Calendar,
+          href: currentCommunity ? `/creator/${currentCommunity}/challenges/new` : "/creator/challenges/new",
+        },
+        {
+          label: "Write Post",
+          icon: MessageSquare,
+          href: currentCommunity ? `/creator/${currentCommunity}/posts/new` : "/creator/posts/new",
+        },
+      ]
       : [
-          { label: "Browse Courses", icon: BookOpen, href: `/community/${currentCommunity}/courses` },
-          { label: "Join Challenge", icon: Calendar, href: `/community/${currentCommunity}/challenges` },
-          { label: "Book Session", icon: Calendar, href: `/community/${currentCommunity}/sessions` },
-        ]
+        { label: "Browse Courses", icon: BookOpen, href: `/community/${currentCommunity}/courses` },
+        { label: "Join Challenge", icon: Calendar, href: `/community/${currentCommunity}/challenges` },
+        { label: "Book Session", icon: Calendar, href: `/community/${currentCommunity}/sessions` },
+      ]
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between px-4">
         {/* Left side - Logo and Community Selector */}
         <div className="flex items-center space-x-4">
-            <Link href="/" className="flex items-center space-x-2">
-              {/* Full text logo */}
-              <div className="hidden sm:block relative h-24 w-[100px]">
-                <Image
-                  src="/Logos/PNG/frensh.png"
-                  alt="Chabaqa Logo"
-                  fill
-                  style={{ objectFit: "contain" }}
-                  priority
-                />
-              </div>
-            </Link>
+          <Link href="/" className="flex items-center space-x-2">
+            {/* Full text logo */}
+            <div className="hidden sm:block relative h-24 w-[100px]">
+              <Image
+                src="/Logos/PNG/frensh.png"
+                alt="Chabaqa Logo"
+                fill
+                style={{ objectFit: "contain" }}
+                priority
+              />
+            </div>
+          </Link>
 
 
           {showCommunitySelector && userCommunities.length > 0 && (
@@ -133,7 +177,7 @@ export function AppHeader({ userType, currentCommunity, showCommunitySelector = 
                       <>
                         <div
                           className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-semibold"
-                          style={{ backgroundColor: community.settings.primaryColor }}
+                          style={{ backgroundColor: (community as any).settings?.primaryColor || '#7c3aed' }}
                         >
                           {community.name.charAt(0)}
                         </div>
@@ -166,7 +210,7 @@ export function AppHeader({ userType, currentCommunity, showCommunitySelector = 
                         >
                           <div
                             className="w-8 h-8 rounded flex items-center justify-center text-white text-sm font-semibold"
-                            style={{ backgroundColor: comm.settings.primaryColor }}
+                            style={{ backgroundColor: (comm as any).settings?.primaryColor || '#7c3aed' }}
                           >
                             {comm.name.charAt(0)}
                           </div>
@@ -261,9 +305,8 @@ export function AppHeader({ userType, currentCommunity, showCommunitySelector = 
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-3 rounded-lg border ${
-                      notification.unread ? "bg-primary-50 border-primary-200" : "bg-muted/50"
-                    }`}
+                    className={`p-3 rounded-lg border ${notification.unread ? "bg-primary-50 border-primary-200" : "bg-muted/50"
+                      }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -323,7 +366,7 @@ export function AppHeader({ userType, currentCommunity, showCommunitySelector = 
                   <AvatarFallback>
                     {currentUser.name
                       .split(" ")
-                      .map((n) => n[0])
+                      .map((n: string) => n[0])
                       .join("")}
                   </AvatarFallback>
                 </Avatar>

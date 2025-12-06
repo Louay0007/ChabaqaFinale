@@ -9,7 +9,8 @@ import { PricingDurationStep } from "./pricing-duration-step"
 import { SessionDetailsStep } from "./session-details-step"
 import { ReviewPublishStep } from "./review-publish-step"
 import { NavigationButtons } from "./navigation-buttons"
-import { api, apiClient } from "@/lib/api"
+import { api } from "@/lib/api"
+import { sessionsApi, type CreateSessionData } from "@/lib/api/sessions.api"
 import { useToast } from "@/hooks/use-toast"
 
 export function SessionCreationContainer() {
@@ -26,7 +27,6 @@ export function SessionCreationContainer() {
     price: "",
     currency: "USD",
     maxBookingsPerWeek: "",
-    isActive: true,
     requirements: "",
     whatYoullGet: [""],
     availableDays: [] as string[],
@@ -100,7 +100,7 @@ export function SessionCreationContainer() {
         const me = await api.auth.me().catch(() => null as any)
         const user = me?.data || (me as any)?.user || null
         if (!user) return
-        const myComms = await api.communities.getByCreator(user._id || user.id).catch(() => null as any)
+        const myComms = await api.communities.getMyCreated().catch(() => null as any)
         const first = (myComms?.data || [])[0]
         if (first?.slug) setCommunitySlug(first.slug)
       } catch {}
@@ -115,23 +115,24 @@ export function SessionCreationContainer() {
         return
       }
       // Map UI form to CreateSessionDto
-      const payload = {
+      const payload: CreateSessionData = {
         title: formData.title,
         description: formData.description,
         duration: Number(formData.duration || 0),
         price: Number(formData.price || 0),
-        currency: formData.currency || 'USD',
+        currency: (formData.currency || 'USD') as CreateSessionData['currency'],
         communitySlug,
         category: formData.category || undefined,
         maxBookingsPerWeek: formData.maxBookingsPerWeek ? Number(formData.maxBookingsPerWeek) : undefined,
         notes: formData.requirements || formData.preparationMaterials || undefined,
-        isActive: Boolean(formData.isActive),
+        // Always create as draft; creators need an active subscription to publish
+        isActive: false,
         resources: [],
-      } as any
+      }
 
-      const res = await apiClient.post<any>('/sessions', payload)
-      const created = res?.data || res
-      toast({ title: 'Session created', description: payload.title })
+      const res = await sessionsApi.create(payload)
+      const created = (res as any)?.data || res
+      toast({ title: 'Session created as draft', description: `${payload.title} - Publish it from the sessions page once you have an active subscription.` })
       const id = created?.id || created?._id || created?.session?.id || created?.session?._id
       if (id) router.push(`/creator/sessions`)
       else router.push('/creator/sessions')
@@ -179,7 +180,6 @@ export function SessionCreationContainer() {
         stepsLength={steps.length}
         setCurrentStep={setCurrentStep}
         handleSubmit={handleSubmit}
-        formData={formData}
       />
     </div>
   )

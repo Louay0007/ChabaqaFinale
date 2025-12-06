@@ -188,9 +188,9 @@ class ApiClient {
   }
 
   // File upload
-  async uploadFile<T>(endpoint: string, file: File): Promise<T> {
+  async uploadFile<T>(endpoint: string, file: File, fieldName: string = 'file'): Promise<T> {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append(fieldName, file);
 
     const doRequest = async () => fetch(`${this.baseURL}${endpoint}`, {
       method: 'POST',

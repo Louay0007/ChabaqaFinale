@@ -765,89 +765,135 @@ export class CoursService {
    * Transformer un document cours en DTO de réponse
    */
   private async transformerEnReponse(cours: CoursDocument): Promise<CoursResponseDto> {
-    // Récupérer la communauté pour avoir accès au slug
-    const community = await this.communityModel.findById(cours.communityId);
-    // Extraire tous les chapitres de toutes les sections pour la compatibilité
-    const tousLesChapitres = cours.sections.flatMap(section =>
-      section.chapitres.map(chapitre => ({
-        id: chapitre.id,
-        titre: chapitre.titre,
-        description: chapitre.contenu,
-        videoUrl: chapitre.videoUrl,
-        isPaid: !chapitre.isPreview, // Inverse de isPreview
-        ordre: chapitre.ordre,
-        duree: chapitre.duree?.toString(),
-        courseId: section.courseId,
-        sectionId: chapitre.sectionId,
-        prix: chapitre.prix,
-        notes: chapitre.notes,
-        ressources: chapitre.ressources,
-        createdAt: chapitre.createdAt
-      }))
-    );
+    try {
+      // Récupérer la communauté pour avoir accès au slug
+      const community = await this.communityModel.findById(cours.communityId);
 
-    return {
-      id: cours.id || cours._id.toString(),
-      titre: cours.titre,
-      description: cours.description,
-      thumbnail: cours.thumbnail,
-      isPaid: cours.prix > 0,
-      prix: cours.prix,
-      isPaidCourse: (cours as any).isPaidCourse || cours.prix > 0,
-      devise: cours.devise,
-      communitySlug: community?.slug || cours.communityId, // Slug pour rétrocompatibilité
-      communityId: cours.communityId, // ObjectId réel
-      creatorId: cours.creatorId.toString(),
-      isPublished: cours.isPublished,
-      enrollmentCount: cours.inscriptions?.length || 0,
-      // Nouveaux champs du schéma - mapping correct des sections
-      sections: cours.sections.map(section => ({
-        id: section.id,
-        titre: section.titre,
-        description: section.description,
-        courseId: section.courseId,
-        ordre: section.ordre,
-        createdAt: section.createdAt,
-        chapitres: section.chapitres.map(chapitre => ({
+      // Safely extract sections and chapters
+      const sections = Array.isArray(cours.sections) ? cours.sections : [];
+      const tousLesChapitres = sections.flatMap(section => {
+        const chapitres = Array.isArray(section.chapitres) ? section.chapitres : [];
+        return chapitres.map(chapitre => ({
           id: chapitre.id,
           titre: chapitre.titre,
           description: chapitre.contenu,
           videoUrl: chapitre.videoUrl,
-          isPaid: !chapitre.isPreview,
+          isPaid: !chapitre.isPreview, // Inverse de isPreview
           ordre: chapitre.ordre,
           duree: chapitre.duree?.toString(),
           courseId: section.courseId,
           sectionId: chapitre.sectionId,
           prix: chapitre.prix,
-          isPaidChapter: chapitre.isPaidChapter || !chapitre.isPreview,
           notes: chapitre.notes,
-          ressources: chapitre.ressources?.map(res => ({
-            id: res.id,
-            titre: res.titre,
-            type: res.type,
-            url: res.url,
-            description: res.description,
-            ordre: res.ordre
-          })),
+          ressources: chapitre.ressources,
           createdAt: chapitre.createdAt
-        }))
-      })),
-      category: cours.category,
-      niveau: cours.niveau,
-      duree: cours.duree,
-      learningObjectives: cours.learningObjectives,
-      requirements: cours.requirements,
-      notes: cours.notes,
-      ressources: cours.ressources,
-      createdAt: cours.createdAt.toISOString(),
-      updatedAt: cours.updatedAt.toISOString(),
-      creator: cours.creatorId && (cours.creatorId as any).name ? {
-        id: (cours.creatorId as any)._id.toString(),
-        name: (cours.creatorId as any).name,
-        email: (cours.creatorId as any).email,
-        avatar: (cours.creatorId as any).profile_picture || (cours.creatorId as any).photo_profil
-      } : undefined
-    };
+        }));
+      });
+
+      // Safely handle creator data
+      let creator: { id: string; name: string; email: string; avatar?: string } | undefined = undefined;
+      if (cours.creatorId) {
+        const creatorData = cours.creatorId as any;
+        if (typeof creatorData === 'object' && creatorData.name) {
+          creator = {
+            id: creatorData._id?.toString() || '',
+            name: creatorData.name,
+            email: creatorData.email,
+            avatar: creatorData.profile_picture || creatorData.photo_profil
+          };
+        }
+      }
+
+      return {
+        id: cours.id || cours._id.toString(),
+        titre: cours.titre,
+        description: cours.description,
+        thumbnail: cours.thumbnail,
+        isPaid: cours.prix > 0,
+        prix: cours.prix,
+        isPaidCourse: (cours as any).isPaidCourse || cours.prix > 0,
+        devise: cours.devise,
+        communitySlug: community?.slug || cours.communityId, // Slug pour rétrocompatibilité
+        communityId: cours.communityId, // ObjectId réel
+        creatorId: cours.creatorId?.toString() || '',
+        isPublished: cours.isPublished,
+        enrollmentCount: Array.isArray(cours.inscriptions) ? cours.inscriptions.length : 0,
+        // Nouveaux champs du schéma - mapping correct des sections
+        sections: sections.map(section => {
+          const chapitres = Array.isArray(section.chapitres) ? section.chapitres : [];
+          return {
+            id: section.id,
+            titre: section.titre,
+            description: section.description,
+            courseId: section.courseId,
+            ordre: section.ordre,
+            createdAt: section.createdAt,
+            chapitres: chapitres.map(chapitre => ({
+              id: chapitre.id,
+              titre: chapitre.titre,
+              description: chapitre.contenu,
+              videoUrl: chapitre.videoUrl,
+              isPaid: !chapitre.isPreview,
+              ordre: chapitre.ordre,
+              duree: chapitre.duree?.toString(),
+              courseId: section.courseId,
+              sectionId: chapitre.sectionId,
+              prix: chapitre.prix,
+              isPaidChapter: chapitre.isPaidChapter || !chapitre.isPreview,
+              notes: chapitre.notes,
+              ressources: Array.isArray(chapitre.ressources) ? chapitre.ressources.map(res => ({
+                id: res.id,
+                titre: res.titre,
+                type: res.type,
+                url: res.url,
+                description: res.description,
+                ordre: res.ordre
+              })) : [],
+              createdAt: chapitre.createdAt
+            }))
+          };
+        }),
+        category: cours.category,
+        niveau: cours.niveau,
+        duree: cours.duree,
+        learningObjectives: Array.isArray(cours.learningObjectives) ? cours.learningObjectives : [],
+        requirements: Array.isArray(cours.requirements) ? cours.requirements : [],
+        notes: cours.notes,
+        ressources: Array.isArray(cours.ressources) ? cours.ressources : [],
+        createdAt: cours.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: cours.updatedAt?.toISOString() || new Date().toISOString(),
+        creator
+      };
+    } catch (error) {
+      console.error('Error transforming course response:', error);
+      // Return a minimal response to prevent 500 errors
+      return {
+        id: cours.id || cours._id.toString(),
+        titre: cours.titre || 'Unknown Course',
+        description: cours.description || '',
+        thumbnail: cours.thumbnail,
+        isPaid: cours.prix > 0,
+        prix: cours.prix || 0,
+        isPaidCourse: (cours as any).isPaidCourse || cours.prix > 0,
+        devise: cours.devise || 'TND',
+        communitySlug: cours.communityId || '',
+        communityId: cours.communityId || '',
+        creatorId: cours.creatorId?.toString() || '',
+        isPublished: cours.isPublished || false,
+        enrollmentCount: 0,
+        sections: [],
+        category: cours.category,
+        niveau: cours.niveau,
+        duree: cours.duree,
+        learningObjectives: [],
+        requirements: [],
+        notes: cours.notes,
+        ressources: [],
+        createdAt: cours.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: cours.updatedAt?.toISOString() || new Date().toISOString(),
+        creator: undefined
+      };
+    }
   }
 
   /**
@@ -2317,4 +2363,4 @@ export class CoursService {
       throw new BadRequestException('Erreur lors du déverrouillage manuel du chapitre');
     }
   }
-} 
+}

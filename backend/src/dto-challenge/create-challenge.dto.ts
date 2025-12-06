@@ -71,6 +71,11 @@ export class CreateChallengeTaskResourceDto {
  * DTO pour créer une tâche de défi
  */
 export class CreateChallengeTaskDto {
+  @ApiPropertyOptional({ description: 'ID unique de la tâche', example: 'task-1234567890-0' })
+  @IsOptional()
+  @IsString()
+  id?: string;
+
   @ApiProperty({ description: 'Jour de la tâche', example: 1 })
   @IsNumber()
   @Min(1)

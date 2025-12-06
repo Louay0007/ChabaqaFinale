@@ -47,7 +47,7 @@ export default function CommunityAnalyticsPage() {
         if (!user) { setLoading(false); return }
 
         const [myComms, subRes] = await Promise.all([
-          api.communities.getByCreator(user._id || user.id).catch(() => null as any),
+          api.communities.getMyCreated().catch(() => null as any),
           apiClient.get<any>('/subscription/me').catch(() => null)
         ])
         const comms = myComms?.data || []
@@ -83,7 +83,37 @@ export default function CommunityAnalyticsPage() {
           api.analytics.getMembers({ startDate: from, endDate: to }).catch(() => null as any),
           api.analytics.getEngagement({ startDate: from, endDate: to }).catch(() => null as any),
         ])
-        setOverview(overviewRes?.data || overviewRes || null)
+
+        const rawOverview = overviewRes?.data || overviewRes || null
+        if (rawOverview) {
+          const totals = (rawOverview as any).totals || rawOverview
+
+          const views = Number(totals?.views ?? 0) || 0
+          const starts = Number(totals?.starts ?? 0) || 0
+          const completes = Number(totals?.completes ?? 0) || 0
+          const likes = Number(totals?.likes ?? 0) || 0
+          const shares = Number(totals?.shares ?? 0) || 0
+          const downloads = Number(totals?.downloads ?? 0) || 0
+          const bookmarks = Number(totals?.bookmarks ?? 0) || 0
+
+          const interactions = likes + shares + downloads + bookmarks
+          const engagementRate = views > 0 ? (interactions / views) * 100 : 0
+          const completionRate = starts > 0 ? (completes / starts) * 100 : 0
+
+          const normalizedOverview = {
+            ...rawOverview,
+            // Flatten commonly used fields so UI metrics don't show zeros
+            viewsTotal: views,
+            views,
+            completions: completes,
+            completionRate,
+            engagementRate,
+          }
+
+          setOverview(normalizedOverview)
+        } else {
+          setOverview(null)
+        }
 
         const membersSeries = (membersRes?.data?.series) || (membersRes?.series) || []
         setMembershipData(Array.isArray(membersSeries) ? membersSeries : [])
@@ -98,7 +128,17 @@ export default function CommunityAnalyticsPage() {
           : api.creatorAnalytics.getProducts
 
         const top = await topLoader({ from, to }).catch(() => null as any)
-        const list = (top?.data?.items) || (top?.data?.byCourse) || (top?.data?.byChallenge) || (top?.data?.bySession) || (top?.items) || []
+        const list =
+          (top?.data?.items)
+          || (top?.data?.byCourse)
+          || (top?.data?.byChallenge)
+          || (top?.data?.bySession)
+          || (top?.items)
+          || (top?.byCourse)
+          || (top?.byChallenge)
+          || (top?.bySession)
+          || (top?.byProduct)
+          || []
         setTopItems(Array.isArray(list) ? list.slice(0,3) : [])
       } catch (e:any) {
         if (e?.statusCode===402||e?.statusCode===403) setAnalyticsGated(true)

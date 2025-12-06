@@ -262,7 +262,7 @@ export class ChallengeService {
    */
   async create(
     createChallengeDto: CreateChallengeDto,
-    creatorId: string,
+    creatorId: string | any,
   ): Promise<ChallengeResponseDto> {
     // Vérifier que la communauté existe
     const community = await this.communityModel.findOne({
@@ -272,8 +272,17 @@ export class ChallengeService {
       throw new NotFoundException('Communauté non trouvée');
     }
 
+    // Normalize creatorId to string for comparison
+    const normalizedCreatorId = typeof creatorId === 'object' 
+      ? creatorId.toString() 
+      : String(creatorId);
+    const communityCreatorId = community.createur?.toString();
+
     // Vérifier que l'utilisateur est le créateur de la communauté
-    if (community.createur?.toString() !== creatorId) {
+    if (communityCreatorId !== normalizedCreatorId) {
+      console.error(
+        `❌ Permission denied: Community creator (${communityCreatorId}) does not match user (${normalizedCreatorId})`
+      );
       throw new ForbiddenException(
         'Seul le créateur de la communauté peut créer des défis',
       );
@@ -303,6 +312,12 @@ export class ChallengeService {
       );
     }
 
+    // Ensure all tasks have IDs
+    const tasksWithIds = (createChallengeDto.tasks || []).map((task, index) => ({
+      ...task,
+      id: task.id || new Types.ObjectId().toString(),
+    }));
+
     // Créer le défi
     const challenge = new this.challengeModel({
       id: challengeId,
@@ -324,7 +339,7 @@ export class ChallengeService {
       thumbnail: createChallengeDto.thumbnail,
       notes: createChallengeDto.notes,
       resources: createChallengeDto.resources || [],
-      tasks: createChallengeDto.tasks || [],
+      tasks: tasksWithIds,
       // Configuration de prix
       pricing: {
         participationFee: createChallengeDto.participationFee || 0,

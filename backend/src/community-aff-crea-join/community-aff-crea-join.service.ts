@@ -356,14 +356,14 @@ export class CommunityAffCreaJoinService {
    * @param userId - ID de l'utilisateur
    * @returns Liste des communautés créées
    */
-  async getUserCreatedCommunities(userId: string): Promise<CommunityDocument[]> {
+  async getUserCreatedCommunities(userId: string): Promise<any[]> {
     try {
       const user = await this.userModel.findById(userId);
       if (!user) {
         throw new NotFoundException('Utilisateur non trouvé');
       }
 
-      return await this.communityModel
+      const communities = await this.communityModel
         .find({ createur: new Types.ObjectId(userId) })
         .populate('createur', 'name email')
         .populate('members', 'name email')
@@ -371,6 +371,8 @@ export class CommunityAffCreaJoinService {
         .populate('moderateurs', 'name email')
         .sort({ createdAt: -1 })
         .exec();
+
+      return communities.map(community => this.transformCommunityForFrontend(community));
 
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -387,14 +389,14 @@ export class CommunityAffCreaJoinService {
    * @param userId - ID de l'utilisateur
    * @returns Liste des communautés où l'utilisateur est membre
    */
-  async getUserJoinedCommunities(userId: string): Promise<CommunityDocument[]> {
+  async getUserJoinedCommunities(userId: string): Promise<any[]> {
     try {
       const user = await this.userModel.findById(userId);
       if (!user) {
         throw new NotFoundException('Utilisateur non trouvé');
       }
 
-      return await this.communityModel
+      const communities = await this.communityModel
         .find({ members: new Types.ObjectId(userId) })
         .populate('createur', 'name email')
         .populate('members', 'name email')
@@ -402,6 +404,8 @@ export class CommunityAffCreaJoinService {
         .populate('moderateurs', 'name email')
         .sort({ createdAt: -1 })
         .exec();
+
+      return communities.map(community => this.transformCommunityForFrontend(community));
 
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -707,7 +711,18 @@ export class CommunityAffCreaJoinService {
 
       // Vérifier si l'utilisateur est déjà membre
       if (community.members.includes(new Types.ObjectId(userId))) {
-        throw new ConflictException('Vous êtes déjà membre de cette communauté');
+        const populatedCommunity = await this.communityModel
+          .findById(community._id)
+          .populate('createur', 'name email')
+          .populate('members', 'name email')
+          .populate('admins', 'name email')
+          .exec();
+
+        if (!populatedCommunity) {
+          throw new InternalServerErrorException('Erreur lors de la récupération de la communauté mise à jour');
+        }
+
+        return this.transformCommunityForFrontend(populatedCommunity);
       }
 
       // Vérifier si la communauté est privée (pour les communautés privées, seul le lien d'invitation fonctionne)
@@ -800,7 +815,18 @@ export class CommunityAffCreaJoinService {
 
       // Vérifier si l'utilisateur est déjà membre
       if (community.members.includes(new Types.ObjectId(userId))) {
-        throw new ConflictException('Vous êtes déjà membre de cette communauté');
+        const populatedCommunity = await this.communityModel
+          .findById(community._id)
+          .populate('createur', 'name email')
+          .populate('members', 'name email')
+          .populate('admins', 'name email')
+          .exec();
+
+        if (!populatedCommunity) {
+          throw new InternalServerErrorException('Erreur lors de la récupération de la communauté mise à jour');
+        }
+
+        return this.transformCommunityForFrontend(populatedCommunity);
       }
 
       // Ajouter l'utilisateur à la communauté

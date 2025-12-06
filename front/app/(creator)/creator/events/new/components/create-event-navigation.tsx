@@ -7,7 +7,6 @@ interface CreateEventNavigationProps {
   steps: any[]
   setCurrentStep: (step: number) => void
   handleSubmit: () => void
-  formData: any
 }
 
 export function CreateEventNavigation({
@@ -15,7 +14,6 @@ export function CreateEventNavigation({
   steps,
   setCurrentStep,
   handleSubmit,
-  formData
 }: CreateEventNavigationProps) {
   return (
     <div className="flex items-center justify-between">
@@ -37,7 +35,7 @@ export function CreateEventNavigation({
           </Button>
         ) : (
           <Button onClick={handleSubmit} className="bg-events-500 hover:bg-events-600">
-            {formData.isPublished ? "Create & Publish Event" : "Save as Draft"}
+            Save Event Draft
           </Button>
         )}
       </div>

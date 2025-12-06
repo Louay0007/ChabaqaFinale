@@ -6,9 +6,6 @@ interface NavigationButtonsProps {
   stepsLength: number
   setCurrentStep: (step: number) => void
   handleSubmit: () => void
-  formData: {
-    isActive: boolean
-  }
 }
 
 export function NavigationButtons({
@@ -16,7 +13,6 @@ export function NavigationButtons({
   stepsLength,
   setCurrentStep,
   handleSubmit,
-  formData,
 }: NavigationButtonsProps) {
   return (
     <div className="flex items-center justify-between">
@@ -38,7 +34,7 @@ export function NavigationButtons({
           </Button>
         ) : (
           <Button onClick={handleSubmit} className="bg-sessions-500 hover:bg-sessions-600">
-            {formData.isActive ? "Create & Publish Session" : "Save as Draft"}
+            Save Session Draft
           </Button>
         )}
       </div>

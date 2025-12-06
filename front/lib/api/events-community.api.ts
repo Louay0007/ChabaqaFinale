@@ -81,11 +81,14 @@ function transformEvent(backendEvent: any): EventWithTickets {
     endDate: backendEvent.endDate || endDate?.toISOString(),
     startTime: backendEvent.startTime || undefined,
     endTime: backendEvent.endTime || undefined,
+    timezone: backendEvent.timezone || 'UTC',
     location: backendEvent.location || undefined,
     isVirtual: !!backendEvent.onlineUrl,
     maxAttendees: backendEvent.maxAttendees || undefined,
     price: tickets.length > 0 ? Math.min(...tickets.map((t: any) => t.price)) : 0,
     isPublished: backendEvent.isPublished !== false,
+    isActive: backendEvent.isActive !== false,
+    attendees: backendEvent.attendees || [],
     createdAt: backendEvent.createdAt || new Date().toISOString(),
     updatedAt: backendEvent.updatedAt || new Date().toISOString(),
     // Additional fields for component compatibility
@@ -176,42 +179,42 @@ export const eventsCommunityApi = {
       if (userRegistrationsResponse.status === 'fulfilled' && userRegistrationsResponse.value) {
         const registrationsData = userRegistrationsResponse.value as ApiSuccessResponse<{ events: any[] }> | null;
         const registrationsList = (registrationsData as any)?.data?.events ?? [];
-        
+
         // Transform registrations
         userRegistrations = Array.isArray(registrationsList)
           ? registrationsList.map((reg: any) => {
-              // The backend returns events with user registration info embedded
-              const userRegistration = reg.userRegistration || {
-                ticketType: reg.ticketType || 'general',
-                registeredAt: reg.registeredAt || new Date().toISOString(),
-                quantity: 1,
-                status: 'confirmed',
-              };
-              
-              return transformRegistration({
-                ...userRegistration,
-                event: reg,
-                ticket: reg.tickets?.find((t: any) => t.type === userRegistration.ticketType) || reg.tickets?.[0],
-              });
-            })
+            // The backend returns events with user registration info embedded
+            const userRegistration = reg.userRegistration || {
+              ticketType: reg.ticketType || 'general',
+              registeredAt: reg.registeredAt || new Date().toISOString(),
+              quantity: 1,
+              status: 'confirmed',
+            };
+
+            return transformRegistration({
+              ...userRegistration,
+              event: reg,
+              ticket: reg.tickets?.find((t: any) => t.type === userRegistration.ticketType) || reg.tickets?.[0],
+            });
+          })
           : [];
       }
 
       // Transform current user
       const user = currentUser.status === 'fulfilled' && currentUser.value
         ? {
-            id: String(currentUser.value._id || currentUser.value.id || ''),
-            email: currentUser.value.email || '',
-            username: currentUser.value.username || currentUser.value.name || '',
-            firstName: currentUser.value.firstName || currentUser.value.name?.split(' ')[0] || undefined,
-            lastName: currentUser.value.lastName || currentUser.value.name?.split(' ').slice(1).join(' ') || undefined,
-            avatar: currentUser.value.avatar || currentUser.value.profile_picture || undefined,
-            bio: currentUser.value.bio || undefined,
-            role: currentUser.value.role || 'member',
-            verified: currentUser.value.verified || false,
-            createdAt: currentUser.value.createdAt || new Date().toISOString(),
-            updatedAt: currentUser.value.updatedAt || new Date().toISOString(),
-          }
+          id: String(currentUser.value._id || currentUser.value.id || ''),
+          email: currentUser.value.email || '',
+          username: currentUser.value.username || currentUser.value.name || '',
+          firstName: currentUser.value.firstName || currentUser.value.name?.split(' ')[0] || undefined,
+          lastName: currentUser.value.lastName || currentUser.value.name?.split(' ').slice(1).join(' ') || undefined,
+          avatar: currentUser.value.avatar || currentUser.value.profile_picture || undefined,
+          bio: currentUser.value.bio || undefined,
+          role: currentUser.value.role || 'member',
+          verified: currentUser.value.verified || false,
+          createdAt: currentUser.value.createdAt || new Date().toISOString(),
+          updatedAt: currentUser.value.updatedAt || new Date().toISOString(),
+        }
         : null;
 
       // Mark events as registered if user has registrations

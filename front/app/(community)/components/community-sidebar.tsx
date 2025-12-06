@@ -109,7 +109,7 @@ export function CommunitySidebar({ communitySlug }: CommunitySidebarProps) {
             {community && (
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold"
-                style={{ backgroundColor: community.primaryColor }}
+                style={{ backgroundColor: community.settings?.primaryColor || '#7c3aed' }}
               >
                 {community.name.charAt(0)}
               </div>

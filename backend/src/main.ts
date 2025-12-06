@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import * as cookieParser from 'cookie-parser';
+import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as express from 'express';
 import { SecurityMiddleware } from './common/middleware/security.middleware';
@@ -31,6 +31,14 @@ async function bootstrap() {
     transform: true,
     transformOptions: {
       enableImplicitConversion: true,
+    },
+    exceptionFactory: (errors) => {
+      const formattedErrors = errors.map(error => ({
+        field: error.property,
+        messages: Object.values(error.constraints || {}),
+      }));
+      console.error('❌ Validation Error:', JSON.stringify(formattedErrors, null, 2));
+      return new Error(`Validation failed: ${JSON.stringify(formattedErrors)}`);
     },
   }));
 

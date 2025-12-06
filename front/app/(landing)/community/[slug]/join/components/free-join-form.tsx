@@ -170,9 +170,15 @@ export function FreeJoinForm({ community }: FreeJoinFormProps) {
         <div className="lg:col-span-1 lg:sticky top-16 h-fit">
           <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
             <h2 className="text-gray-900 text-2xl font-bold leading-tight tracking-tight">
-              Join {community.name}
+              Join {community.name} for Free
             </h2>
-            <p className="text-gray-600 text-base font-normal leading-normal mt-2 mb-6">
+            <div className="mt-2 mb-4">
+              <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                <Award className="w-3 h-3" />
+                Free Community
+              </Badge>
+            </div>
+            <p className="text-gray-600 text-base font-normal leading-normal mb-6">
               Become a member for free to unlock discussions, resources, and networking opportunities.
             </p>
 

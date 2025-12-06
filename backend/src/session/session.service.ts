@@ -180,15 +180,21 @@ export class SessionService {
   /**
    * Créer une nouvelle session
    */
-  async create(createSessionDto: CreateSessionDto, creatorId: string): Promise<SessionResponseDto> {
+  async create(createSessionDto: CreateSessionDto, creatorId: string | any): Promise<SessionResponseDto> {
     // Vérifier que la communauté existe
     const community = await this.communityModel.findOne({ slug: createSessionDto.communitySlug });
     if (!community) {
       throw new NotFoundException('Communauté non trouvée');
     }
 
+    // Normaliser l'ID créateur pour comparaison
+    const normalizedCreatorId = typeof creatorId === 'object'
+      ? creatorId.toString()
+      : String(creatorId);
+    const communityCreatorId = community.createur?.toString();
+
     // Vérifier que l'utilisateur est le créateur de la communauté
-    if (community.createur?.toString() !== creatorId) {
+    if (communityCreatorId !== normalizedCreatorId) {
       throw new ForbiddenException('Seul le créateur de la communauté peut créer des sessions');
     }
 

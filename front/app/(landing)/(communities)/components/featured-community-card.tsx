@@ -27,7 +27,7 @@ export function FeaturedCommunityCard({ community, index, slug }: FeaturedCommun
   // Get type-specific styling and CTA text
   const getTypeConfig = (type?: ItemType) => {
     const itemType = type || "community"
-    
+
     const typeConfigs = {
       community: {
         badgeColor: "border-blue-500/50 text-blue-600 bg-blue-50",
@@ -55,7 +55,7 @@ export function FeaturedCommunityCard({ community, index, slug }: FeaturedCommun
         ctaColors: "#f65887, #fddab0"
       }
     }
-    
+
     return typeConfigs[itemType]
   }
 
@@ -82,11 +82,10 @@ export function FeaturedCommunityCard({ community, index, slug }: FeaturedCommun
         {/* Compact Price Badge */}
         <div className="absolute top-2 right-2">
           <Badge
-            className={`px-2 py-0.5 font-semibold text-[10px] border-0 shadow-md rounded-full ${
-              community.priceType === "free"
+            className={`px-2 py-0.5 font-semibold text-[10px] border-0 shadow-md rounded-full ${community.priceType === "free"
                 ? "bg-gradient-to-r from-emerald-400 to-teal-500 text-white"
                 : "bg-gradient-to-r from-violet-500 to-purple-600 text-white"
-            }`}
+              }`}
           >
             {formatPrice(community.price, community.priceType)}
           </Badge>
@@ -139,14 +138,14 @@ export function FeaturedCommunityCard({ community, index, slug }: FeaturedCommun
         </div>
 
         {/* Simple CTA Button */}
-        <Link href={community.link || `/${community.creator}/${community.slug}`}>
-          <button 
+        <Link href={community.isMember ? (community.link || `/${community.creator}/${community.slug}`) : `/community/${community.slug}/join`}>
+          <button
             className="w-full mt-2 py-1.5 text-xs font-semibold rounded-lg text-white shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-300"
             style={{
               background: "linear-gradient(to right, #8e78fb, #8e78fb)"
             }}
           >
-            {typeConfig.ctaText}
+            {community.isMember ? typeConfig.ctaText : "Join"}
           </button>
         </Link>
       </div>

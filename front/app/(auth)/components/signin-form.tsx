@@ -7,10 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2, Shield, AlertCircle, CheckCircle } from "lucide-react"
-import { loginAction, verify2FAAction, resend2FACodeAction } from "../signin/actions"
-import { signInSchema, type SignInFormData } from "@/lib/validation/auth.validation"
-import { TwoFactorVerification } from "@/components/auth/two-factor-verification"
+import { Loader2, Shield, AlertCircle } from "lucide-react"
+import { signInSchema } from "@/lib/validation/auth.validation"
 import { useToast } from "@/hooks/use-toast"
 import { useAuthContext } from "@/app/providers/auth-provider"
 
@@ -22,35 +20,23 @@ export default function SignInForm({ onSuccess }: SignInFormProps = {}) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [showPassword, setShowPassword] = useState(false)
-  const [requires2FA, setRequires2FA] = useState(false)
-  const [userIdFor2FA, setUserIdFor2FA] = useState("")
-  const [rememberMeFor2FA, setRememberMeFor2FA] = useState(false)
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
-  const { fetchMe } = useAuthContext()
+  const { login } = useAuthContext()
 
   useEffect(() => {
-    setIsLoaded(true)
     const message = searchParams.get("message")
     if (message) {
       setSuccessMessage(message)
     }
   }, [searchParams])
-
-  // Role-based redirect helper (deprecated - using window.location instead)
-  const redirectAfterAuth = async () => {
-    // This function is no longer used - we use window.location directly in handleVerify2FA
-  }
-
-  // Deprecated: old profile slug redirect (kept for reference)
-  const getProfileSlugUrl = () => `/explore`
 
   const validateForm = (): boolean => {
     setFieldErrors({})
@@ -81,60 +67,13 @@ export default function SignInForm({ onSuccess }: SignInFormProps = {}) {
     setIsLoading(true)
 
     try {
-      const result = await loginAction({ email, password, remember_me: rememberMe })
-
-      if (result.requires2FA && result.userId) {
-        // 2FA is now mandatory - show verification form
-        setUserIdFor2FA(result.userId)
-        setRememberMeFor2FA(rememberMe)
-        setRequires2FA(true)
-        setIsLoading(false) // Stop loading to show 2FA form
-      } else if (result.success) {
-        await fetchMe()
-        if (onSuccess) onSuccess()
-
-        // Redirect based on role
-        const role = result.role?.toLowerCase() || result.user?.role?.toLowerCase()
-
-        if (role === 'creator') {
-          window.location.href = '/creator/dashboard'
-        } else if (role === 'admin') {
-          window.location.href = '/admin'
-        } else {
-          window.location.href = '/explore'
-        }
-      } else {
-        const errorMessage = result.error || "An unknown error occurred"
-        setError(errorMessage)
-
-        // Provide more helpful error messages based on common error patterns
-        let title = "Sign In Failed"
-        let description = errorMessage
-
-        if (errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('wrong')) {
-          title = "Invalid Credentials"
-          description = "The email or password you entered is incorrect. Please check and try again."
-        } else if (errorMessage.toLowerCase().includes('not found') || errorMessage.toLowerCase().includes('404')) {
-          title = "Account Not Found"
-          description = "No account found with this email address. Please check your email or create a new account."
-        } else if (errorMessage.toLowerCase().includes('blocked') || errorMessage.toLowerCase().includes('suspended')) {
-          title = "Account Suspended"
-          description = "Your account has been temporarily suspended. Please contact support for assistance."
-        } else if (errorMessage.toLowerCase().includes('verify') || errorMessage.toLowerCase().includes('email')) {
-          title = "Email Not Verified"
-          description = "Please verify your email address before signing in. Check your inbox for the verification link."
-        }
-
-        toast({
-          variant: "destructive",
-          title,
-          description,
-          duration: 6000,
-        })
-      }
-    } catch (err) {
-      const errorMessage = "Login failed. Please try again."
+      await login({ email, password })
+      if (onSuccess) onSuccess()
+      // Redirect is handled in AuthProvider
+    } catch (err: any) {
+      const errorMessage = err.message || "Login failed. Please try again."
       setError(errorMessage)
+
       toast({
         variant: "destructive",
         title: "Connection Error",
@@ -146,179 +85,13 @@ export default function SignInForm({ onSuccess }: SignInFormProps = {}) {
     }
   }
 
-
-  const handleVerify2FA = async (userId: string, code: string) => {
-    setError("")
-    try {
-      const result = await verify2FAAction(userId, code, rememberMeFor2FA)
-      if (result.success) {
-        console.log('Login successful, redirecting');
-
-        // Clear any existing auth state to prevent conflicts
-        if (typeof window !== 'undefined') {
-          // Clear any potential cached auth data
-          localStorage.removeItem('auth_user')
-          sessionStorage.removeItem('auth_user')
-        }
-
-        // Use window.location for hard redirect to ensure cookies are properly set
-        if (onSuccess) {
-          onSuccess();
-        }
-
-        // Wait for cookies to be properly set before checking role
-        await new Promise(resolve => setTimeout(resolve, 1000))
-
-        // Check if we have user info from the 2FA response
-        if (result.role) {
-          const role = String(result.role).toLowerCase()
-          if (role === 'creator') {
-            window.location.href = '/creator/dashboard'
-            return
-          } else if (role === 'admin') {
-            window.location.href = '/admin'
-            return
-          } else {
-            window.location.href = '/explore'
-            return
-          }
-        } else if (result.user?.role) {
-          const role = String(result.user.role).toLowerCase()
-          if (role === 'creator') {
-            window.location.href = '/creator/dashboard'
-            return
-          } else if (role === 'admin') {
-            window.location.href = '/admin'
-            return
-          } else {
-            window.location.href = '/explore'
-            return
-          }
-        }
-
-        // If no role info from 2FA response, try to fetch it
-        try {
-          const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
-          const res = await fetch(`${apiBase}/auth/me`, {
-            method: "GET",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            cache: "no-store"
-          })
-
-          if (res.ok) {
-            const json = await res.json().catch(() => null)
-            const role = json?.data?.role || json?.user?.role || json?.role
-
-            // Immediate role-based redirect
-            if (String(role).toLowerCase() === 'creator') {
-              window.location.href = '/creator/dashboard'
-              return
-            } else if (String(role).toLowerCase() === 'admin') {
-              window.location.href = '/admin'
-              return
-            } else {
-              window.location.href = '/explore'
-              return
-            }
-          }
-        } catch (roleError) {
-          console.warn('Could not fetch user role immediately, using fallback redirect:', roleError)
-        }
-
-        // Final fallback: redirect based on rememberMe setting or default
-        if (rememberMeFor2FA) {
-          // If rememberMe was checked, assume creator (common for creators)
-          window.location.href = '/creator/dashboard'
-        } else {
-          window.location.href = '/explore'
-        }
-      } else {
-        const errorMessage = result.error || "Verification failed"
-        setError(errorMessage)
-
-        let title = "2FA Verification Failed"
-        let description = errorMessage
-
-        if (errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('wrong')) {
-          description = "The verification code you entered is incorrect. Please check the code and try again."
-        } else if (errorMessage.toLowerCase().includes('expired')) {
-          description = "The verification code has expired. Please request a new code."
-        }
-
-        toast({
-          variant: "destructive",
-          title,
-          description,
-          duration: 5000,
-        })
-      }
-    } catch (err) {
-      const errorMessage = "An error occurred during verification."
-      setError(errorMessage)
-      toast({
-        variant: "destructive",
-        title: "Verification Error",
-        description: "Unable to verify your code. Please check your internet connection and try again.",
-        duration: 5000,
-      })
-    }
-  }
-
-  const handleResend2FA = async () => {
-    if (!userIdFor2FA) return
-    setError("")
-    try {
-      const result = await resend2FACodeAction(userIdFor2FA)
-      if (result.success) {
-        setSuccessMessage(result.message || "Code de vérification renvoyé par email.")
-        // Clear success message after 5 seconds
-        setTimeout(() => setSuccessMessage(""), 5000)
-      } else {
-        const errorMessage = result.error || "Échec du renvoi du code"
-        setError(errorMessage)
-        toast({
-          variant: "destructive",
-          title: "Code Resend Failed",
-          description: "Unable to send a new verification code. Please wait a moment and try again, or contact support if the problem persists.",
-          duration: 5000,
-        })
-      }
-    } catch (err) {
-      const errorMessage = "Une erreur s'est produite lors du renvoi du code."
-      setError(errorMessage)
-      toast({
-        variant: "destructive",
-        title: "Resend Error",
-        description: "Unable to send a new verification code. Please check your internet connection and try again.",
-        duration: 5000,
-      })
-    }
-  }
-
   const handleGoogleLogin = () => {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || ""
-    // Backend base host (without trailing /api if present)
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
     const backendBase = apiBase.endsWith("/api") ? apiBase.slice(0, -4) : apiBase
-    // For Google OAuth, redirect to signin page which will handle role-based redirection
     const redirect = encodeURIComponent("/signin")
-    // If backend supports passing redirect query, include it
     const url = `${backendBase}/auth/google?redirect=${redirect}`
     window.location.href = url
   }
-
-  if (requires2FA) {
-    return (
-      <TwoFactorVerification
-        userId={userIdFor2FA}
-        onVerify={handleVerify2FA}
-        onResend={handleResend2FA}
-        error={error}
-        successMessage={successMessage}
-      />
-    )
-  }
-
 
   return (
     <>

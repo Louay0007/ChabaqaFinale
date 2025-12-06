@@ -1,18 +1,61 @@
 import { apiClient, ApiSuccessResponse, PaginatedResponse, PaginationParams } from './client';
 import type { Event, EventTicket } from './types';
 
-export interface CreateEventData {
+export interface CreateEventSessionData {
   title: string;
-  slug: string;
   description: string;
-  communityId?: string;
-  thumbnail?: string;
-  startDate: string;
-  endDate: string;
-  location?: string;
-  isVirtual: boolean;
-  maxAttendees?: number;
+  startTime: string;
+  endTime: string;
+  speaker?: string;
+  notes?: string;
+  isActive?: boolean;
+}
+
+export interface CreateEventTicketData {
+  type: string;
+  name: string;
   price: number;
+  quantity: number;
+  description?: string;
+}
+
+export interface CreateEventSpeakerData {
+  name: string;
+  title?: string;
+  bio?: string;
+  photo?: string;
+}
+
+export interface CreateEventData {
+  communityId: string;
+
+  title: string;
+  description: string;
+
+  startDate: string;
+  endDate?: string;
+
+  startTime: string;
+  endTime: string;
+
+  timezone: string;
+  location: string;
+  onlineUrl?: string;
+
+  category: string;
+  type: 'In-person' | 'Online' | 'Hybrid';
+
+  notes?: string;
+  image?: string;
+
+  sessions?: CreateEventSessionData[];
+  tickets?: CreateEventTicketData[];
+  speakers?: CreateEventSpeakerData[];
+
+  tags?: string[];
+
+  isActive?: boolean;
+  isPublished?: boolean;
 }
 
 export interface UpdateEventData extends Partial<CreateEventData> {

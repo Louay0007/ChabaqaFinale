@@ -6,7 +6,7 @@ import { EnhancedCard } from "@/components/ui/enhanced-card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { 
+import {
   CalendarIcon,
   Clock,
   MapPin,
@@ -19,7 +19,7 @@ import {
   ChevronUp,
   Eye,
   Edit,
-    Plus
+  Plus
 } from "lucide-react"
 import Image from "next/image"
 import { getEventSessions } from "@/lib/mock-data"
@@ -66,26 +66,26 @@ function EventCard({ event, isExpanded, onToggleExpand }: EventCardProps) {
   const totalSessions = sessions.length
   const totalTicketsSold = event.tickets.reduce((acc, ticket) => acc + ticket.sold, 0)
   const revenue = event.tickets.reduce((acc, ticket) => acc + (ticket.price * ticket.sold), 0)
-  const avgAttendance = sessions.reduce((acc, session) => acc + session.attendance, 0) / totalSessions || 0
+  const avgAttendance = sessions.reduce((acc, session) => acc + (session.attendance || 0), 0) / totalSessions || 0
 
   return (
     <EnhancedCard key={event.id} className="overflow-hidden">
       <div className="p-6">
-        <EventCardHeader 
+        <EventCardHeader
           event={event}
           isExpanded={isExpanded}
           onToggleExpand={onToggleExpand}
         />
-        
+
         {isExpanded && (
           <div className="mt-6 pt-6 border-t">
-            <EventStats 
+            <EventStats
               attendees={event.attendees.length}
               ticketsSold={totalTicketsSold}
               sessions={totalSessions}
               revenue={revenue}
             />
-            
+
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
               <QuickActions eventId={event.id} />
               <EventDetails event={event} />
@@ -108,7 +108,7 @@ function EventCardHeader({ event, isExpanded, onToggleExpand }: EventCardProps) 
           <EventBadges event={event} />
         </div>
       </div>
-      <EventActions 
+      <EventActions
         eventId={event.id}
         isExpanded={isExpanded}
         onToggleExpand={onToggleExpand}
@@ -177,7 +177,7 @@ function EventBadges({ event }: { event: Event }) {
   )
 }
 
-function EventActions({ eventId, isExpanded, onToggleExpand }: { 
+function EventActions({ eventId, isExpanded, onToggleExpand }: {
   eventId: string
   isExpanded: boolean
   onToggleExpand: (eventId: string) => void
@@ -360,8 +360,8 @@ function EmptyState({ type }: { type: 'upcoming' | 'past' }) {
         {type === 'upcoming' ? 'No upcoming events' : 'No past events'}
       </h3>
       <p className="text-muted-foreground mb-6">
-        {type === 'upcoming' 
-          ? 'Create your first event to get started' 
+        {type === 'upcoming'
+          ? 'Create your first event to get started'
           : 'Your past events will appear here'}
       </p>
       {type === 'upcoming' && (

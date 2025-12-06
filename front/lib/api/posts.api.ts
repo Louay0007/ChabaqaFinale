@@ -2,11 +2,12 @@ import { apiClient, ApiSuccessResponse, PaginatedResponse, PaginationParams } fr
 import type { Post, Comment } from './types';
 
 export interface CreatePostData {
-  title: string;
+  title?: string;
   content: string;
   communityId: string;
   thumbnail?: string;
-  isPublished?: boolean;
+  excerpt?: string;
+  tags?: string[];
 }
 
 export interface UpdatePostData extends Partial<CreatePostData> {}

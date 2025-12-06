@@ -1,8 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { FeaturedCommunities } from "@/app/(landing)/(communities)/components/featured-communities"
-import { CommunitiesSearchSection } from "@/app/(landing)/(communities)/components/communities-search-section"
-import { CommunitiesCTA } from "@/app/(landing)/(communities)/components/communities-cta"
+import { ExplorePageClient } from "./explore-page-client"
 import { communitiesApi } from "@/lib/api"
 import type { Community } from "@/lib/api/types"
 
@@ -61,10 +59,10 @@ function transformCommunityToExplore(community: Community) {
 
 export default async function CommunitiesPage() {
   let communities: Community[] = []
-  
+
   try {
     // Fetch communities from backend API
-    const response = await communitiesApi.getAll({ 
+    const response = await communitiesApi.getAll({
       limit: 50,
       featured: undefined // Get all communities
     })
@@ -82,9 +80,7 @@ export default async function CommunitiesPage() {
       <Header />
 
       <main className="pt-16">
-        <FeaturedCommunities communities={exploreCommunities} />
-        <CommunitiesSearchSection communities={exploreCommunities} />
-        <CommunitiesCTA />
+        <ExplorePageClient communities={exploreCommunities} />
       </main>
 
       <Footer />

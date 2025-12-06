@@ -1,15 +1,15 @@
 import { Sparkles } from "lucide-react";
-import { Event } from "@/lib/models";
+import { EventWithTickets } from "@/lib/api/events-community.api";
 
 interface EventsHeaderProps {
-  availableEvents: Event[];
+  availableEvents: EventWithTickets[];
   myTickets: any[];
 }
 
 export default function EventsHeader({ availableEvents, myTickets }: EventsHeaderProps) {
   // Filter only published and active events
-  const upcomingEvents = availableEvents?.filter(e => 
-    e.isPublished && new Date(e.startDate) >= new Date()
+  const upcomingEvents = availableEvents?.filter(e =>
+    e.isActive && new Date(e.startDate) >= new Date()
   ) || []
 
   // Calculate total tickets sold

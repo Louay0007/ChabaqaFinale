@@ -5,40 +5,22 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../schema/user.schema';
 import { Admin, AdminDocument } from '../../schema/admin.schema';
-import { TokenBlacklistService } from '../../common/services/token-blacklist.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Admin.name) private adminModel: Model<AdminDocument>,
-    private tokenBlacklistService: TokenBlacklistService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        (request: any) => {
-          return request?.cookies?.accessToken;
-        },
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ]),
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: process.env.JWT_SECRET || 'your-secret-key',
     });
   }
 
   async validate(payload: any) {
-    // ÉTAPE 1: Vérifier si le token est révoqué (blacklist)
-    const tokenId = payload.jti || `${payload.sub}-${payload.iat}`;
-    const isRevoked = await this.tokenBlacklistService.isTokenRevoked(tokenId, payload.sub);
-
-    if (isRevoked) {
-      throw new UnauthorizedException('Token révoqué - veuillez vous reconnecter');
-    }
-
-    // ÉTAPE 2: Vérifier le fingerprint (anti-theft) - optionnel pour access tokens
-    // Note: fingerprint validation is primarily done in refresh flow for better UX
-
-    // ÉTAPE 3: Vérifier si c'est un admin (basé sur le rôle dans le token)
+    // Check if it's an admin
     if (payload.role === 'admin') {
       const admin = await this.adminModel.findById(payload.sub);
 
@@ -54,7 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         isAdmin: true,
       };
     } else {
-      // Sinon, c'est un utilisateur normal
+      // Normal user
       const user = await this.userModel.findById(payload.sub);
 
       if (!user) {

@@ -172,7 +172,7 @@ export function CourseCreationContainer() {
         const me = await api.auth.me().catch(() => null as any)
         const user = me?.data || (me as any)?.user || null
         if (!user) return
-        const myComms = await api.communities.getByCreator(user._id || user.id).catch(() => null as any)
+        const myComms = await api.communities.getMyCreated().catch(() => null as any)
         const first = (myComms?.data || [])[0]
         if (first?.slug) setFormData(prev => ({ ...prev, communitySlug: first.slug }))
       } catch { }
@@ -193,13 +193,23 @@ export function CourseCreationContainer() {
           titre: c.title || `Chapitre ${jdx + 1}`,
           description: c.content || "",
           videoUrl: c.videoUrl || undefined,
-          isPaid: Boolean(isPaid),
-          prix: isPaid ? undefined : 0,
+          isPaid: !c.isPreview, // Use isPreview to determine if paid
+          prix: !c.isPreview ? (prixNum || 0) : 0, // If not preview, use course price
           ordre: c.order || (jdx + 1),
           duree: typeof c.duration === 'number' && c.duration > 0 ? `${c.duration}` : undefined,
           notes: undefined,
         }))
       }))
+
+      // Map English level to French enum values
+      const levelMapping: { [key: string]: string | undefined } = {
+        'Beginner': 'débutant',
+        'Intermediate': 'intermédiaire',
+        'Advanced': 'avancé',
+        'All Levels': undefined
+      }
+
+      const mappedLevel = formData.level ? levelMapping[formData.level] : undefined
 
       const payload = {
         titre: formData.title,
@@ -211,7 +221,7 @@ export function CourseCreationContainer() {
         communitySlug: formData.communitySlug,
         isPublished: Boolean(formData.isPublished),
         category: formData.category || undefined,
-        niveau: formData.level || undefined,
+        niveau: mappedLevel,
         duree: formData.duration || undefined,
         learningObjectives: (formData.learningObjectives || []).filter(Boolean),
         requirements: (formData.requirements || []).filter(Boolean),

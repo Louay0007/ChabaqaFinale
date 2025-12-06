@@ -15,7 +15,7 @@ export function Header() {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
-  const { user: authUser, isLoading } = useAuth()
+  const { user: authUser, loading } = useAuth()
   const isAuthenticated = !!authUser
   const profileHandle = ((authUser?.email || "").split("@")[0]) || "user"
 
@@ -26,7 +26,7 @@ export function Header() {
   const handleLogout = async () => {
     setIsLoggingOut(true)
     setError("") // Reset error
-    
+
     try {
       const result = await logoutAction()
 
@@ -71,7 +71,7 @@ export function Header() {
 
           {/* Right: Desktop actions (auth-aware) */}
           <div className="hidden lg:flex lg:flex-1 lg:justify-end items-center gap-x-4">
-            {isLoading ? null : !isAuthenticated ? (
+            {loading ? null : !isAuthenticated ? (
               <>
                 <Link href="/signin" className="text-sm font-semibold leading-6 text-gray-900 dark:text-white hover:text-pink-600 dark:hover:text-pink-400 transition-colors">Sign in</Link>
                 <Link href="/build-community" className="rounded-md bg-pink-500 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-pink-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600">
@@ -133,7 +133,7 @@ export function Header() {
 
             {/* Mobile CTA Buttons (auth-aware) */}
             <div className="pt-2 space-y-2">
-              {isLoading ? null : !isAuthenticated ? (
+              {loading ? null : !isAuthenticated ? (
                 <>
                   <Link href="/signin">
                     <Button variant="ghost" className="w-full justify-start">
